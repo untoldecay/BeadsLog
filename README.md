@@ -2,9 +2,9 @@
 
 **Distributed, git-backed graph issue tracker for AI agents.**
 
-[![License](https://img.shields.io/github/license/steveyeggie/beads)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/steveyeggie/beads)](https://goreportcard.com/report/github.com/steveyeggie/beads)
-[![Release](https://img.shields.io/github/v/release/steveyeggie/beads)](https://github.com/steveyeggie/beads/releases)
+[![License](https://img.shields.io/github/license/untoldecay/BeadsLog)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/untoldecay/BeadsLog)](https://goreportcard.com/report/github.com/untoldecay/BeadsLog)
+[![Release](https://img.shields.io/github/v/release/untoldecay/BeadsLog)](https://github.com/untoldecay/BeadsLog/releases)
 [![npm version](https://img.shields.io/npm/v/@beads/bd)](https://www.npmjs.com/package/@beads/bd)
 [![PyPI](https://img.shields.io/pypi/v/beads-mcp)](https://pypi.org/project/beads-mcp/)
 
@@ -25,11 +25,27 @@ Beads provides a **persistent, structured memory system** for AI coding agents. 
 - Maintain task context in git repos without external services
 - Replace markdown TODO lists with dependency-aware graphs
 
+## 📚 Two CLI Tools
+
+This project provides two complementary command-line tools:
+
+| Tool | Purpose | Commands |
+|------|---------|----------|
+| **`bd`** | Issue tracker for task management | `bd init`, `bd create`, `bd ready`, `bd list`, `bd show`, `bd close` |
+| **`devlog`** | Markdown devlog parser and analyzer | `devlog list`, `devlog graph`, `devlog search`, `devlog entities`, `devlog show` |
+
+- **Use `bd`** to manage tasks, issues, and dependencies in a git-backed graph database
+- **Use `devlog`** to parse and query markdown developer logs with entity extraction and graph visualization
+
+Both tools work together: `devlog` can reference `bd` issue IDs (like `bd-123`) in your markdown logs, creating links between your devlog entries and your task tracker.
+
 ## ⚡ Quick Start
+
+### For `bd` (Issue Tracker)
 
 ```bash
 # Install (macOS/Linux/FreeBSD)
-curl -fsSL https://raw.githubusercontent.com/steveyeggie/beads/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/untoldecay/BeadsLog/main/scripts/install.sh | bash
 
 # Initialize (Humans run this once)
 bd init
@@ -38,13 +54,33 @@ bd init
 echo "Use 'bd' for task tracking" >> AGENTS.md
 ```
 
+### For `devlog` (Markdown Parser)
+
+```bash
+# Install from Go
+go install github.com/untoldecay/BeadsLog/cmd/devlog@latest
+
+# Create a devlog
+cat > index.md << 'EOF'
+# Devlog
+
+## 2025-01-15 - Started project
+Initial implementation. MyFunction handles the core logic.
+TODO: Add tests.
+EOF
+
+# Query your devlog
+devlog list
+devlog entities
+```
+
 ## 📦 Installation
 
 ### One-Line Install (Recommended)
 
 **macOS / Linux / FreeBSD:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steveyeggie/beads/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/untoldecay/BeadsLog/main/scripts/install.sh | bash
 ```
 This downloads the latest binary for your platform and installs it to `~/.local/bin` (or adds to PATH).
 
@@ -58,13 +94,17 @@ Wraps native binaries with automatic platform detection.
 
 **Homebrew (macOS/Linux):**
 ```bash
-brew install steveyeggie/beads/bd
+brew install untoldecay/BeadsLog/bd
 ```
 Installs the native binary with shell completion.
 
 **Go (any platform):**
 ```bash
-go install github.com/steveyeggie/beads/cmd/bd@latest
+# Install bd (issue tracker)
+go install github.com/untoldecay/BeadsLog/cmd/bd@latest
+
+# Install devlog (markdown parser)
+go install github.com/untoldecay/BeadsLog/cmd/devlog@latest
 ```
 Installs to `$GOPATH/bin` (usually `~/go/bin`).
 
@@ -78,11 +118,15 @@ Installs the Model Context Protocol server for Claude integration.
 
 ```bash
 # Clone repository
-git clone https://github.com/steveyeggie/beads.git
+git clone https://github.com/untoldecay/BeadsLog.git
 cd beads
 
-# Build and install
+# Build and install both tools
 make install
+
+# Or build individually
+cd cmd/bd && go build -o bd
+cd ../devlog && go build -o devlog
 ```
 Builds from source and installs to `$GOPATH/bin`.
 
@@ -97,13 +141,17 @@ Builds from source and installs to `$GOPATH/bin`.
 ### Verifying Installation
 
 ```bash
+# Verify bd (issue tracker)
 bd version
+
+# Verify devlog (markdown parser)
+devlog --help
 ```
-Should output the current version number.
+Should output version information and help text.
 
 ### Shell Completion
 
-Beads includes automatic shell completion for bash, zsh, fish, and powershell. Restart your shell after installation to enable.
+Both tools include automatic shell completion for bash, zsh, fish, and powershell. Restart your shell after installation to enable.
 
 ## 🚀 Getting Started
 
@@ -346,6 +394,187 @@ tasks:
 
 See [docs/CONFIG.md](docs/CONFIG.md) for all configuration options.
 
+---
+
+## 📝 Devlog CLI - Markdown Developer Log Parser
+
+**`devlog`** is a companion CLI tool for parsing and analyzing markdown-based developer logs. It transforms your devlog into a queryable knowledge graph with entity extraction and relationship tracking.
+
+### What is Devlog?
+
+Devlog reads markdown files with entries in `## YYYY-MM-DD - Title` format and extracts:
+- **CamelCase entities** - `MyFunction`, `ClassName`, `UserService`
+- **kebab-case entities** - `my-function`, `url-path`, `api-endpoint`
+- **Keywords** - `TODO`, `FIXME`, `NOTE`, `HACK`, `XXX`, `BUG`
+- **Issue IDs** - References to `bd-123`, `BD-456`, etc.
+
+**Use cases:**
+- Maintain a searchable devlog alongside your code
+- Track entity relationships across your codebase
+- Find all work related to a specific component
+- Generate reports from your daily development logs
+- Resume work with full context from previous sessions
+
+### Installing Devlog
+
+```bash
+# From Go (any platform)
+go install github.com/untoldecay/BeadsLog/cmd/devlog@latest
+
+# Or build locally
+cd cmd/devlog
+go build -o devlog
+
+# Verify installation
+devlog --help
+```
+
+### Quick Start with Devlog
+
+**1. Create a devlog file:**
+
+```bash
+# Create index.md in your project
+cat > index.md << 'EOF'
+# Devlog
+
+## 2025-01-15 - Implemented user authentication
+Added JWT-based authentication to the API.
+MyFunction handles token validation.
+UserService manages user data.
+TODO: Add refresh token support.
+
+## 2025-01-16 - Fixed database connection bug
+Fixed issue where connections were not being properly closed.
+This was causing memory leaks in production.
+Tracked by bd-123.
+
+## 2025-01-17 - Added unit tests for UserService
+Wrote comprehensive tests for user CRUD operations.
+Coverage now at 85% for UserService.
+EOF
+```
+
+**2. List your entries:**
+
+```bash
+devlog list
+```
+
+**3. Explore entity relationships:**
+
+```bash
+# Show graph for a specific entity
+devlog graph UserService
+
+# List all entities
+devlog entities
+
+# Search for specific topics
+devlog search "database"
+```
+
+### Devlog Commands
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `devlog list` | List all devlog entries | `devlog list --limit 5 --type feature` |
+| `devlog graph <entity>` | Show entity relationship graph | `devlog graph MyFunction --depth 3` |
+| `devlog entities` | List all detected entities | `devlog entities --type CamelCase --min 3` |
+| `devlog search <query>` | Full-text search with context | `devlog search "database" --depth 2` |
+| `devlog show <date>` | Show full entry content | `devlog show 2025-01-15` |
+| `devlog impact <entity>` | Show what depends on entity | `devlog impact UserService --depth 2` |
+| `devlog resume` | Find matching sessions for context | `devlog resume --query auth --query JWT` |
+| `devlog import-md` | Import markdown to beads database | `devlog import-md --file index.md` |
+
+### Common Devlog Workflows
+
+**Track feature development:**
+```bash
+# See all authentication work
+devlog search "authentication"
+
+# Explore related entities
+devlog graph JWT
+devlog graph UserService
+
+# Check impact of changes
+devlog impact UserService
+```
+
+**Investigate bugs:**
+```bash
+# Find bug-related entries
+devlog list --type bug
+
+# Search database issues
+devlog search "database"
+
+# Show full context
+devlog show 2025-01-16
+```
+
+**Prepare for standup:**
+```bash
+# Show recent work
+devlog list --limit 5
+
+# Find all TODOs
+devlog search "TODO"
+
+# Check active entities
+devlog entities --min 2
+```
+
+**Resume previous work:**
+```bash
+# Find sessions with context
+devlog resume --query authentication --query JWT
+
+# Explore entity graph
+devlog graph MyFunction --depth 3
+```
+
+### Entity Types
+
+| Type | Pattern | Examples |
+|------|---------|----------|
+| **CamelCase** | Capitalized words | `MyFunction`, `UserService`, `JWT`, `API` |
+| **kebab-case** | Hyphenated lowercase | `my-function`, `url-path`, `api-endpoint` |
+| **Keywords** | Special markers | `TODO`, `FIXME`, `NOTE`, `HACK`, `XXX`, `BUG` |
+| **Issue IDs** | Beads issue references | `bd-123`, `BD-456` |
+
+### Devlog Output Formats
+
+**Table format (default, human-readable):**
+```bash
+devlog list
+```
+
+**JSON format (machine-readable):**
+```bash
+devlog list --format json | jq '.[] | {date, title, entities}'
+```
+
+### Integration with bd
+
+Devlog and bd work together seamlessly:
+
+```bash
+# In your devlog, reference bd issues
+## 2025-01-15 - Working on bd-a3f8
+Implemented the token refresh logic.
+bd-a3f8.1 covers the OAuth flow.
+
+# Query devlog for issue references
+devlog graph bd-a3f8
+devlog search "bd-a3f8"
+```
+
+For complete devlog documentation, see [cmd/devlog/README.md](cmd/devlog/README.md).
+
+---
+
 ## 🌐 Community Tools
 
 See [docs/COMMUNITY_TOOLS.md](docs/COMMUNITY_TOOLS.md) for a curated list of community-built tools:
@@ -367,6 +596,10 @@ See [docs/COMMUNITY_TOOLS.md](docs/COMMUNITY_TOOLS.md) for a curated list of com
 - [Git Integration](docs/GIT_INTEGRATION.md) - Git sync and branching
 - [Protected Branches](docs/PROTECTED_BRANCHES.md) - Separate branch for metadata
 
+### Devlog CLI
+- [Devlog Documentation](cmd/devlog/README.md) - Complete devlog CLI guide
+- [Devlog Command Reference](cmd/devlog/COMMAND_QUICK_REFERENCE.md) - Quick command reference
+
 ### Advanced Topics
 - [Architecture](docs/ARCHITECTURE.md) - System design and internals
 - [Configuration](docs/CONFIG.md) - All configuration options
@@ -381,9 +614,9 @@ See [docs/COMMUNITY_TOOLS.md](docs/COMMUNITY_TOOLS.md) for a curated list of com
 - [Security](SECURITY.md) - Security policy
 
 ### Community
-- [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/steveyeggie/beads) - AI-powered Q&A
-- [GitHub Discussions](https://github.com/steveyeggie/beads/discussions) - Community discussions
-- [GitHub Issues](https://github.com/steveyeggie/beads/issues) - Bug reports and feature requests
+- [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/untoldecay/BeadsLog) - AI-powered Q&A
+- [GitHub Discussions](https://github.com/untoldecay/BeadsLog/discussions) - Community discussions
+- [GitHub Issues](https://github.com/untoldecay/BeadsLog/issues) - Bug reports and feature requests
 
 ## 🤝 Contributing
 
@@ -393,7 +626,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Clone repository
-git clone https://github.com/steveyeggie/beads.git
+git clone https://github.com/untoldecay/BeadsLog.git
 cd beads
 
 # Install dependencies
