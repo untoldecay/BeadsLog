@@ -1,0 +1,28 @@
+{
+  "category": "refactor",
+  "description": "Update cmd/devlog/main.go to register all new subcommands (import-md, graph, list, show, search, entities, impact, resume). Configure cobra root command settings",
+  "title": "Wire all commands to main.go CLI root",
+  "dependencies": [
+    "Implement Markdown import command",
+    "Create graph CLI command",
+    "Implement list CLI command with filtering",
+    "Implement show CLI command for session details",
+    "Implement search CLI command",
+    "Implement entities CLI command",
+    "Implement impact CLI command",
+    "Implement resume CLI command with hybrid context"
+  ],
+  "priority": 12,
+  "status": "verified",
+  "id": "feature-1768155961770-griivoxge",
+  "descriptionHistory": [
+    {
+      "description": "Update cmd/devlog/main.go to register all new subcommands (import-md, graph, list, show, search, entities, impact, resume). Configure cobra root command settings",
+      "timestamp": "2026-01-11T18:26:01.772Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:13:53.705Z",
+  "updatedAt": "2026-01-11T21:17:46.938Z"
+}

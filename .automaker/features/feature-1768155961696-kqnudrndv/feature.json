@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/import-md.go with complete parsing logic for index.md format. Include IndexRow struct, parseIndexMD, createSession, extractAndLinkEntities functions using regex patterns for entity detection (CamelCase, kebab-case, keywords)",
+  "title": "Implement Markdown import command",
+  "dependencies": [
+    "Extend database schema with devlog tables"
+  ],
+  "priority": 3,
+  "status": "verified",
+  "id": "feature-1768155961696-kqnudrndv",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/import-md.go with complete parsing logic for index.md format. Include IndexRow struct, parseIndexMD, createSession, extractAndLinkEntities functions using regex patterns for entity detection (CamelCase, kebab-case, keywords)",
+      "timestamp": "2026-01-11T18:26:01.697Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T20:59:17.438Z",
+  "updatedAt": "2026-01-11T21:02:24.543Z"
+}

@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Run 'go build ./cmd/devlog' to compile binary. Test initialization with './devlog init'. Verify build succeeds without errors",
+  "title": "Build and test devlog binary",
+  "dependencies": [
+    "Wire all commands to main.go CLI root"
+  ],
+  "priority": 13,
+  "status": "verified",
+  "id": "feature-1768155961774-jzxbhuq85",
+  "descriptionHistory": [
+    {
+      "description": "Run 'go build ./cmd/devlog' to compile binary. Test initialization with './devlog init'. Verify build succeeds without errors",
+      "timestamp": "2026-01-11T18:26:01.777Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:15:20.461Z",
+  "updatedAt": "2026-01-11T21:19:26.721Z"
+}

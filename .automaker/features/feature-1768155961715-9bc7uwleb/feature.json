@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/entities.go listing all entities sorted by mention_count. Display entity type and frequency statistics",
+  "title": "Implement entities CLI command",
+  "dependencies": [
+    "Extend database schema with devlog tables"
+  ],
+  "priority": 9,
+  "status": "verified",
+  "id": "feature-1768155961715-9bc7uwleb",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/entities.go listing all entities sorted by mention_count. Display entity type and frequency statistics",
+      "timestamp": "2026-01-11T18:26:01.736Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:08:29.471Z",
+  "updatedAt": "2026-01-11T21:13:51.071Z"
+}

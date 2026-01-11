@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Run './devlog import-md index.md' to populate database with existing devlog entries. Verify session count matches expected (50+ sessions), check entity extraction worked",
+  "title": "Import existing index.md data",
+  "dependencies": [
+    "Build and test devlog binary"
+  ],
+  "priority": 14,
+  "status": "verified",
+  "id": "feature-1768155961784-wp4y9oq3x",
+  "descriptionHistory": [
+    {
+      "description": "Run './devlog import-md index.md' to populate database with existing devlog entries. Verify session count matches expected (50+ sessions), check entity extraction worked",
+      "timestamp": "2026-01-11T18:26:01.788Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:17:50.670Z",
+  "updatedAt": "2026-01-11T21:23:37.229Z"
+}

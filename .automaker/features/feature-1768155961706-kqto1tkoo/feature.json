@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/list.go with 'devlog list --type [type]' filter. Query sessions table by type and display in table format matching original index.md structure",
+  "title": "Implement list CLI command with filtering",
+  "dependencies": [
+    "Extend database schema with devlog tables"
+  ],
+  "priority": 6,
+  "status": "verified",
+  "id": "feature-1768155961706-kqto1tkoo",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/list.go with 'devlog list --type [type]' filter. Query sessions table by type and display in table format matching original index.md structure",
+      "timestamp": "2026-01-11T18:26:01.710Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:02:27.032Z",
+  "updatedAt": "2026-01-11T21:08:24.877Z"
+}

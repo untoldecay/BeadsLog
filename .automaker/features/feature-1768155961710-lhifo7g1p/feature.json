@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/show.go with 'devlog show [date|filename]' command. Read and display full markdown content from linked files, combining metadata from database with narrative from filesystem",
+  "title": "Implement show CLI command for session details",
+  "dependencies": [
+    "Extend database schema with devlog tables"
+  ],
+  "priority": 7,
+  "status": "verified",
+  "id": "feature-1768155961710-lhifo7g1p",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/show.go with 'devlog show [date|filename]' command. Read and display full markdown content from linked files, combining metadata from database with narrative from filesystem",
+      "timestamp": "2026-01-11T18:26:01.711Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:08:08.366Z",
+  "updatedAt": "2026-01-11T21:11:49.961Z"
+}

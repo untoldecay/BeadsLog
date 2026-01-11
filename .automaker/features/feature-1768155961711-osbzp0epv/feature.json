@@ -1,0 +1,22 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/search.go combining full-text search across sessions/narratives with graph context. Show matching sessions plus related entities",
+  "title": "Implement search CLI command",
+  "dependencies": [
+    "Implement list CLI command with filtering",
+    "Implement graph traversal queries"
+  ],
+  "priority": 8,
+  "status": "verified",
+  "id": "feature-1768155961711-osbzp0epv",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/search.go combining full-text search across sessions/narratives with graph context. Show matching sessions plus related entities",
+      "timestamp": "2026-01-11T18:26:01.712Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:08:29.364Z",
+  "updatedAt": "2026-01-11T21:11:54.939Z"
+}

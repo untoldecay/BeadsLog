@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Add sessions, entities, session_entities, and entity_deps tables to internal/db/schema.go. Implement migrate() function to handle schema initialization and migrations on top of existing Beads schema",
+  "title": "Extend database schema with devlog tables",
+  "dependencies": [
+    "Fork Beads repository and initialize devlog project"
+  ],
+  "priority": 2,
+  "status": "verified",
+  "id": "feature-1768155961694-nkre380ks",
+  "descriptionHistory": [
+    {
+      "description": "Add sessions, entities, session_entities, and entity_deps tables to internal/db/schema.go. Implement migrate() function to handle schema initialization and migrations on top of existing Beads schema",
+      "timestamp": "2026-01-11T18:26:01.695Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T20:59:17.397Z",
+  "updatedAt": "2026-01-11T21:00:18.777Z"
+}

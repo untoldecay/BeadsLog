@@ -1,0 +1,21 @@
+{
+  "category": "enhancement",
+  "description": "Create README.md with installation instructions, command reference, workflow examples showing transition from markdown to devlog CLI. Include graph traversal examples",
+  "title": "Document setup and usage in README",
+  "dependencies": [
+    "Configure .devlog/ for git tracking"
+  ],
+  "priority": 17,
+  "status": "verified",
+  "id": "feature-1768155961811-g0mbcmb6d",
+  "descriptionHistory": [
+    {
+      "description": "Create README.md with installation instructions, command reference, workflow examples showing transition from markdown to devlog CLI. Include graph traversal examples",
+      "timestamp": "2026-01-11T18:26:01.813Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:23:39.746Z",
+  "updatedAt": "2026-01-11T21:26:54.314Z"
+}

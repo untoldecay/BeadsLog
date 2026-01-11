@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Add .devlog/sessions.jsonl to git repository. Create initial commit with 'Devlog v1.0' message. Verify git status shows tracked files",
+  "title": "Configure .devlog/ for git tracking",
+  "dependencies": [
+    "Verify all CLI commands work correctly"
+  ],
+  "priority": 16,
+  "status": "verified",
+  "id": "feature-1768155961803-cn1ujk20q",
+  "descriptionHistory": [
+    {
+      "description": "Add .devlog/sessions.jsonl to git repository. Create initial commit with 'Devlog v1.0' message. Verify git status shows tracked files",
+      "timestamp": "2026-01-11T18:26:01.806Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:23:39.667Z",
+  "updatedAt": "2026-01-11T21:26:16.072Z"
+}

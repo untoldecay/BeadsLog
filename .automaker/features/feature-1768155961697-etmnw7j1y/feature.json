@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create internal/queries/graph.go with GetEntityGraph function using recursive SQL CTE to traverse entity relationships up to specified depth. Parse results into EntityGraph struct for visualization",
+  "title": "Implement graph traversal queries",
+  "dependencies": [
+    "Extend database schema with devlog tables"
+  ],
+  "priority": 4,
+  "status": "verified",
+  "id": "feature-1768155961697-etmnw7j1y",
+  "descriptionHistory": [
+    {
+      "description": "Create internal/queries/graph.go with GetEntityGraph function using recursive SQL CTE to traverse entity relationships up to specified depth. Parse results into EntityGraph struct for visualization",
+      "timestamp": "2026-01-11T18:26:01.698Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:01:53.345Z",
+  "updatedAt": "2026-01-11T21:08:03.777Z"
+}

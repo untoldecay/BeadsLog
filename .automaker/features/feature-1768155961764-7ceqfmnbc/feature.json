@@ -1,0 +1,22 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/resume.go with 'devlog resume [query] --hybrid' flag. Combine session matching with 2-hop entity graph context for AI agent consumption. Add --json output option",
+  "title": "Implement resume CLI command with hybrid context",
+  "dependencies": [
+    "Implement search CLI command",
+    "Implement graph traversal queries"
+  ],
+  "priority": 11,
+  "status": "verified",
+  "id": "feature-1768155961764-7ceqfmnbc",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/resume.go with 'devlog resume [query] --hybrid' flag. Combine session matching with 2-hop entity graph context for AI agent consumption. Add --json output option",
+      "timestamp": "2026-01-11T18:26:01.767Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:11:59.391Z",
+  "updatedAt": "2026-01-11T21:16:07.168Z"
+}

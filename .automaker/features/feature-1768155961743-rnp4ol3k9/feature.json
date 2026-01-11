@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/impact.go with 'devlog impact [entity]' command. Reverse graph query showing what depends on the specified entity (upward traversal)",
+  "title": "Implement impact CLI command",
+  "dependencies": [
+    "Implement graph traversal queries"
+  ],
+  "priority": 10,
+  "status": "verified",
+  "id": "feature-1768155961743-rnp4ol3k9",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/impact.go with 'devlog impact [entity]' command. Reverse graph query showing what depends on the specified entity (upward traversal)",
+      "timestamp": "2026-01-11T18:26:01.751Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:11:59.339Z",
+  "updatedAt": "2026-01-11T21:15:17.517Z"
+}

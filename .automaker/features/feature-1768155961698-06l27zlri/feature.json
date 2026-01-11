@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Create cmd/devlog/graph.go implementing 'devlog graph [entity] --depth N' command. Display hierarchical tree output showing entity relationships with proper indentation",
+  "title": "Create graph CLI command",
+  "dependencies": [
+    "Implement graph traversal queries"
+  ],
+  "priority": 5,
+  "status": "verified",
+  "id": "feature-1768155961698-06l27zlri",
+  "descriptionHistory": [
+    {
+      "description": "Create cmd/devlog/graph.go implementing 'devlog graph [entity] --depth N' command. Display hierarchical tree output showing entity relationships with proper indentation",
+      "timestamp": "2026-01-11T18:26:01.705Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:01:53.390Z",
+  "updatedAt": "2026-01-11T21:07:53.359Z"
+}

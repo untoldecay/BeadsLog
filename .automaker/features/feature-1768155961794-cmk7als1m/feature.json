@@ -1,0 +1,21 @@
+{
+  "category": "feature",
+  "description": "Test each command: './devlog list --type fix', './devlog graph manage-columns', './devlog entities', './devlog search migration', './devlog show 2025-11-29'. Validate output format and correctness",
+  "title": "Verify all CLI commands work correctly",
+  "dependencies": [
+    "Import existing index.md data"
+  ],
+  "priority": 15,
+  "status": "verified",
+  "id": "feature-1768155961794-cmk7als1m",
+  "descriptionHistory": [
+    {
+      "description": "Test each command: './devlog list --type fix', './devlog graph manage-columns', './devlog entities', './devlog search migration', './devlog show 2025-11-29'. Validate output format and correctness",
+      "timestamp": "2026-01-11T18:26:01.797Z",
+      "source": "initial"
+    }
+  ],
+  "branchName": "master",
+  "startedAt": "2026-01-11T21:19:29.391Z",
+  "updatedAt": "2026-01-11T21:25:20.499Z"
+}
