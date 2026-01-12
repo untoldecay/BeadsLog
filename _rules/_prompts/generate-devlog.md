@@ -74,14 +74,15 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 ## Index Maintenance Instructions
 
-**Index Reference:** All work subjects from this session must be referenced in the `_rules/_devlog/_index.md` file following the established nomenclature rules. The index maintains a concise record of all development work for easy scanning and pattern recognition across sessions.
+**Index Reference:** All work subjects from this session must be referenced in the `_rules/_devlog/_index.md` file.
+
+### **CRITICAL AI UPDATE RULES:**
+1. **APPEND ONLY:** Add new rows to the **existing Markdown table** at the very bottom of the index file.
+2. **NO NEW HEADERS:** Do not create a new "## Work Index" header. Use the one already there.
+3. **ONE ROW PER SUBJECT:** Each distinct work subject gets its own line.
 
 ### Index Structure:
 ```markdown
-## Work Index
-
-| Subject | Problems | Date | Devlog |
-|---------|----------|------|---------|
 | [prefix] subject-description | Brief problem description | YYYY-MM-DD | [filename.md](filename.md) |
 ```
 

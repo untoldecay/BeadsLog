@@ -207,7 +207,8 @@ var devlogSyncCmd = &cobra.Command{
 		
 		rows := parseIndexMD(indexPath)
 		if rows == nil {
-			fmt.Fprintf(os.Stderr, "Error parsing index or empty\n")
+			fmt.Fprintf(os.Stderr, "Error: Index file found at %s but contains no valid entries.\n", indexPath)
+			fmt.Fprintf(os.Stderr, "Tip: Verify the file format matches the 'bd devlog init' template.\n")
 			return
 		}
 
@@ -240,6 +241,12 @@ var devlogSyncCmd = &cobra.Command{
 
 const indexTemplate = `# Development Log Index
 
+> [!IMPORTANT]
+> **AI AGENT INSTRUCTIONS:**
+> 1. **APPEND ONLY:** Always add new session rows to the **existing table** at the bottom of this file.
+> 2. **NO DUPLICATES:** Never create a new "## Work Index" header or a second table.
+> 3. **STAY AT BOTTOM:** Ensure the table remains the very last element in this file.
+
 This index provides a concise record of all development work for easy scanning and pattern recognition across sessions.
 
 ## Nomenclature Rules:
@@ -257,10 +264,6 @@ This index provides a concise record of all development work for easy scanning a
 | Subject | Problems | Date | Devlog |
 |---------|----------|------|---------|
 | [init] Setup | Initial devlog structure setup | 2024-01-01 | [2024-01-01_setup.md](2024-01-01_setup.md) |
-
----
-
-*This index is automatically updated when devlogs are created via the generation prompt. All work subjects must be referenced in this index following the established nomenclature rules.*
 `
 
 const promptTemplate = `# Prompt: Generate Chronological Debugging & Development Log
@@ -339,14 +342,15 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 ## Index Maintenance Instructions
 
-**Index Reference:** All work subjects from this session must be referenced in the "_rules/_devlog/_index.md" file following the established nomenclature rules. The index maintains a concise record of all development work for easy scanning and pattern recognition across sessions.
+**Index Reference:** All work subjects from this session must be referenced in the "_rules/_devlog/_index.md" file. 
+
+### **CRITICAL AI UPDATE RULES:**
+1. **APPEND ONLY:** Add new rows to the **existing Markdown table** at the very bottom of the index file.
+2. **NO NEW HEADERS:** Do not create a new "## Work Index" header. Use the one already there.
+3. **ONE ROW PER SUBJECT:** Each distinct work subject gets its own line.
 
 ### Index Structure:
 ` + "```markdown" + `
-## Work Index
-
-| Subject | Problems | Date | Devlog |
-|---------|----------|------|---------|
 | [prefix] subject-description | Brief problem description | YYYY-MM-DD | [filename.md](filename.md) |
 ` + "```" + `
 
@@ -367,8 +371,6 @@ To provide a complete, transparent, and chronological log of the entire developm
 - "[deploy] Export rationalization v4.1.141" - Successfully deployed unified export system to staging
 
 **Important:** Each distinct work subject in a session should be listed on its own line in the index, even if multiple subjects reference the same devlog file.
-
-**Note:** Add a reference to this index maintenance in the devlog's "Final Session Summary" section to remind users that subjects must be referenced in the "_index.md" file in case the AI assistant doesn't follow this prompt directly.
 `
 
 var devlogGraphCmd = &cobra.Command{
@@ -762,6 +764,43 @@ var devlogStatusCmd = &cobra.Command{
 	},
 }
 
+var devlogResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset devlog database (truncate tables)",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Print("⚠️  This will delete ALL devlog data (sessions, entities, relationships) from the local database.\n")
+		fmt.Print("Are you sure? [y/N] ")
+		var confirm string
+		fmt.Scanln(&confirm)
+		if strings.ToLower(confirm) != "y" && strings.ToLower(confirm) != "yes" {
+			fmt.Println("Aborted.")
+			return
+		}
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+
+		db := store.UnderlyingDB()
+		
+		tables := []string{"session_entities", "entity_deps", "sessions", "entities"}
+		for _, table := range tables {
+			if _, err := db.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
+				fmt.Fprintf(os.Stderr, "Error clearing table %s: %v\n", table, err)
+			}
+		}
+
+		// Reset sync metadata so next sync works
+		_ = store.SetMetadata(rootCtx, "last_devlog_sync", "")
+
+		fmt.Println("✅ Devlog database reset.")
+		fmt.Println("Run 'bd devlog sync' to re-import from files.")
+	},
+}
+
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
@@ -778,6 +817,7 @@ func init() {
 	devlogCmd.AddCommand(devlogImpactCmd)
 	devlogCmd.AddCommand(devlogResumeCmd)
 	devlogCmd.AddCommand(installHooksCmd)
+	devlogCmd.AddCommand(devlogResetCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
 }

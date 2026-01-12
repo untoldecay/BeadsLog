@@ -1,5 +1,11 @@
 # Development Log Index
 
+> [!IMPORTANT]
+> **AI AGENT INSTRUCTIONS:**
+> 1. **APPEND ONLY:** Always add new session rows to the **existing table** at the bottom of this file.
+> 2. **NO DUPLICATES:** Never create a new "## Work Index" header or a second table.
+> 3. **STAY AT BOTTOM:** Ensure the table remains the very last element in this file.
+
 This index provides a concise record of all development work for easy scanning and pattern recognition across sessions.
 
 ## Nomenclature Rules:
@@ -17,15 +23,7 @@ This index provides a concise record of all development work for easy scanning a
 | Subject | Problems | Date | Devlog |
 |---------|----------|------|---------|
 | [init] Setup | Initial devlog structure setup | 2024-01-01 | [2024-01-01_setup.md](2024-01-01_setup.md) |
-
----
-
-*This index is automatically updated when devlogs are created via the generation prompt. All work subjects must be referenced in this index following the established nomenclature rules.*
 | [feature] Devlog System | Implemented graph-powered session memory, CLI, and automation | 2026-01-12 | [2026-01-12_devlog-system-implementation.md](2026-01-12_devlog-system-implementation.md) |
-## Work Index
-
-| Subject | Problems | Date | Devlog |
-|---------|----------|------|---------|
 | [rationalize] Export endpoint system | 5 redundant export endpoints causing confusion and maintenance issues | 2025-11-22 | [2025-11-22_export-rationalization-and-vector-fixes.md](2025-11-22_export-rationalization-and-vector-fixes.md) |
 | [fix] Vector export format detection | Added intelligent format selection for vector vs regular tables | 2025-11-22 | [2025-11-22_export-rationalization-and-vector-fixes.md](2025-11-22_export-rationalization-and-vector-fixes.md) |
 | [feature] Remote MCP SSE | Implemented Remote SSE transport for MCP with absolute URLs | 2026-01-10 | [2026-01-10_mcp-remote-sse-integration.md](2026-01-10_mcp-remote-sse-integration.md) |
@@ -83,7 +81,5 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] MCP Server Phase 3 data writing tools | Converted insert/update/delete tools to project-scoped pattern with auto-cleanup | 2026-01-08 | [2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md](2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md) |
 | [enhance] Auto-cleanup for deleted databases/tables | Implemented automatic removal of deleted tables from config/projects.json | 2026-01-08 | [2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md](2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md) |
 | [debug] Perplexity tool discoverability investigation | Investigated why write tools don't appear in Perplexity's tool list (client-side filtering confirmed) | 2026-01-08 | [2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md](2026-01-08_mcp-phase3-data-writing-and-auto-cleanup.md) |
-
----
-
-*This index is automatically updated when devlogs are created via the generation prompt. All work subjects must be referenced in this index following the established nomenclature rules.*| [feature] DailyBrief Foundation | Setup SwiftUI project and N8N integration | 2025-09-25 | [2025-09-25_session_summary.md](2025-09-25_session_summary.md) |
+| [feature] DailyBrief Foundation | Setup SwiftUI project and N8N integration | 2025-09-25 | [2025-09-25_session_summary.md](2025-09-25_session_summary.md) |
+| [fix] Devlog Index Corruption | Fixed infinite loop and duplicate headers in index file caused by footer appending | 2026-01-12 | [2026-01-12_devlog-system-implementation.md](2026-01-12_devlog-system-implementation.md) |

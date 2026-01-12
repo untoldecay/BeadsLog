@@ -74,13 +74,31 @@ To implement the "Devlog Beads" system, transforming the Beads issue tracker int
 
 ---
 
+### **Phase 6: Fixing Index Corruption (Infinite Append Loop)**
+
+**Initial Problem:** The `_index.md` file was becoming corrupted with duplicate "Work Index" headers and table rows appended after the footer, caused by AI agents misinterpreting the file structure.
+
+*   **My Assumption/Plan #1:** Reproduce the issue with a test case.
+    *   **Action Taken:** Created `cmd/bd/devlog_index_test.go` to assert that the file contains only one header and no rows after the footer.
+    *   **Result:** The test failed as expected, confirming multiple headers and rows out of place.
+    *   **Analysis/Correction:** Validated that the corruption was reproducible and detectable.
+
+*   **My Assumption/Plan #2:** Fix the root cause by simplifying the file structure and updating templates.
+    *   **Action Taken:** 
+        1.  Manually consolidated `_rules/_devlog/_index.md` into a single table and removed the footer note ("This index is automatically updated...").
+        2.  Updated `cmd/bd/devlog_cmds.go` to remove the footer from `indexTemplate` and `promptTemplate`.
+        3.  Updated `_rules/_prompts/generate-devlog.md` with strict "APPEND ONLY" instructions and "NO NEW HEADERS" rules.
+    *   **Result:** Verification test passed. `bd devlog list` output confirmed clean parsing.
+    *   **Analysis/Correction:** The footer was acting as a false delimiter. Removing it ensures that "appending to the file" naturally appends to the table. Adding explicit "AI AGENT INSTRUCTIONS" to the header provides a second layer of defense.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** The Devlog system is fully implemented, including schema, ingestion, CLI commands (`list`, `show`, `graph`, `status`), and automation hooks. It correctly handles updates to markdown files via content hashing.
+**Final Status:** The Devlog system is fully implemented and hardened against AI-induced index corruption. The `_index.md` is clean, and the prompt templates now strictly enforce append-only behavior without creating duplicate headers.
 
 **Key Learnings:**
 *   **Command Naming Conflicts:** Subcommands (like `init`) can inherit behavior from root commands or conflict with existing variable names in the same package. Renaming to `initialize` avoided the `noDbCommands` skip logic.
 *   **Markdown Parsing:** Naively splitting strings is insufficient for Markdown tables with links. Specific regex or substring logic is needed to extract filenames from `[link](file)` patterns.
 *   **Database Migrations:** Adding columns (`file_hash`) mid-development requires proper migration registration to ensure the schema evolves correctly without manual SQL execution.
-
----
+*   **AI File Manipulation:** Avoid footer notes in files that AI agents are expected to append to. If a file ends with a footer, the AI will likely append *after* it, breaking structured formats like tables. Always end the file with the structure you want extended.
