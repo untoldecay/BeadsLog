@@ -132,3 +132,22 @@ Use the beads MCP server for native function calls instead of shell commands:
 ---
 
 **For detailed workflows and advanced features, see [AGENTS.md](../AGENTS.md)**
+
+
+## Devlog Protocol (MANDATORY)
+
+This repo uses **Beads Devlog** to persist context and prevent regressions. You must follow this protocol:
+
+### 1. 🟢 Start of Session
+- **Resume Context:** Run `bd devlog resume --last 1` to load the immediate history.
+- **Goal:** Understand what happened last time to avoid repeating mistakes.
+
+### 2. 🟡 During Work
+- **Bug Encounter:** If you hit a bug, run `bd devlog search "error message"` to see if it's a known issue.
+- **Information Request:** If asking about a component, run `bd devlog impact <component>` to understand dependencies.
+- **Planning:** If making a plan, check `bd devlog graph <entity>` to verify architectural assumptions.
+
+### 3. 🔴 End of Session
+- **Log & Sync:**
+  1. Generate the session log using `_rules/_prompts/generate-devlog.md`.
+  2. Run `bd devlog sync` to persist it to the database.

@@ -97,33 +97,16 @@ var devlogInitCmd = &cobra.Command{
 }
 
 func configureAgentRules() {
-	rules := `
-## BeadsLog Workflow Protocol
-This project follows a cycle of **Planning** (Forward) and **Reflection** (Backward).
-- **Planning:** Coordinate future work via a dependency-aware task graph.
-- **Reflection:** Capture and retrieve past context, architectural reasoning, and session history.
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
 
-### The Loop:
-1. **Plan:** Before starting, check tasks: ` + "`bd ready`" + ` or ` + "`bd list`" + ` to understand the goal.
-2. **Context:** Before coding, check history: ` + "`bd devlog resume --last 1`" + ` or ` + "`bd devlog search \"topic\"`" + ` to avoid repeating past mistakes.
-3. **Log:** At session end, use ` + "`_rules/_devlog/_generate_devlog_prompt.md`" + ` to document assumptions and outcomes.
-4. **Close:** When finished, close the task: ` + "`bd close <id>`" + `.
-
-### Devlog Tooling
-| Goal | Command |
-| :--- | :--- |
-| **Resume** | ` + "`bd devlog resume --last 1`" + ` |
-| **Search** | ` + "`bd devlog search \"query\"`" + ` |
-| **Impact** | ` + "`bd devlog impact \"entity\"`" + ` |
-| **Graph** | ` + "`bd devlog graph \"entity\"`" + ` |
-`
 	candidates := []string{
+		"AGENTS.md",
 		".windsufrules",
 		".cursorrules",
 		".claude/rules",
-		"AGENTS.md",
 		"GEMINI.md",
 		".github/copilot-instructions.md",
+		".github/COPILOT-INSTRUCTIONS.md",
 	}
 
 	foundFile := ""
@@ -135,13 +118,25 @@ This project follows a cycle of **Planning** (Forward) and **Reflection** (Backw
 	}
 
 	if foundFile == "" {
-		fmt.Println("\n💡 Tip: Add these rules to your AI agent instructions:")
-		fmt.Println(rules)
+		fmt.Println("\n💡 Tip: To enforce devlog usage for AI agents, create an AGENTS.md file and add:")
+		fmt.Printf("   %s\n", bootstrapTrigger)
 		return
 	}
 
 	fmt.Printf("\nFound agent configuration: %s\n", foundFile)
-	fmt.Printf("Add BeadsLog workflow rules to this file? [Y/n] ")
+	
+	// Check if already onboarded or trigger already present
+	content, _ := os.ReadFile(foundFile)
+	if strings.Contains(string(content), "Devlog Protocol") {
+		fmt.Println("✅ Devlog Protocol already present in agent rules.")
+		return
+	}
+	if strings.Contains(string(content), bootstrapTrigger) {
+		fmt.Println("✅ Bootstrap trigger already present.")
+		return
+	}
+
+	fmt.Printf("Add Devlog bootstrap trigger to this file? [Y/n] ")
 
 	var response string
 	fmt.Scanln(&response)
@@ -152,14 +147,14 @@ This project follows a cycle of **Planning** (Forward) and **Reflection** (Backw
 			return
 		}
 		defer f.Close()
-		if _, err := f.WriteString("\n" + rules); err != nil {
-			fmt.Printf("Error writing rules: %v\n", err)
+		if _, err := f.WriteString("\n" + bootstrapTrigger + "\n"); err != nil {
+			fmt.Printf("Error writing trigger: %v\n", err)
 			return
 		}
-		fmt.Println("✅ Rules added.")
+		fmt.Println("✅ Bootstrap trigger added. Next time an agent starts, it will run 'bd devlog onboard'.")
 	} else {
-		fmt.Println("Skipped. Here are the rules for manual addition:")
-		fmt.Println(rules)
+		fmt.Println("Skipped. You can manually add this to your agent rules:")
+		fmt.Println(bootstrapTrigger)
 	}
 }
 
@@ -694,6 +689,99 @@ fi
 	},
 }
 
+// devlogOnboardCmd injects the Devlog Protocol into agent instruction files
+var devlogOnboardCmd = &cobra.Command{
+	Use:   "onboard",
+	Short: "Inject Devlog Protocol into agent rules (AGENTS.md, .cursorrules, etc.)",
+	Run: func(cmd *cobra.Command, args []string) {
+		candidates := []string{
+			"AGENTS.md",
+			".cursorrules",
+			".windsufrules",
+			"CLAUDE.md",
+			".github/copilot-instructions.md",
+			".github/COPILOT-INSTRUCTIONS.md",
+		}
+
+		protocol := `
+## Devlog Protocol (MANDATORY)
+
+This repo uses **Beads Devlog** to persist context and prevent regressions. You must follow this protocol:
+
+### 1. 🟢 Start of Session
+- **Resume Context:** Run ` + "`bd devlog resume --last 1`" + ` to load the immediate history.
+- **Goal:** Understand what happened last time to avoid repeating mistakes.
+
+### 2. 🟡 During Work
+- **Bug Encounter:** If you hit a bug, run ` + "`bd devlog search \"error message\"`" + ` to see if it's a known issue.
+- **Information Request:** If asking about a component, run ` + "`bd devlog impact <component>`" + ` to understand dependencies.
+- **Planning:** If making a plan, check ` + "`bd devlog graph <entity>`" + ` to verify architectural assumptions.
+
+### 3. 🔴 End of Session
+- **Log & Sync:**
+  1. Generate the session log using ` + "`_rules/_prompts/generate-devlog.md`" + `.
+  2. Run ` + "`bd devlog sync`" + ` to persist it to the database.
+`
+
+		found := false
+		for _, file := range candidates {
+			if _, err := os.Stat(file); err == nil {
+				injectProtocol(file, protocol)
+				found = true
+			}
+		}
+
+		if !found {
+			// If no specific agent file, suggest creating AGENTS.md
+			fmt.Println("No standard agent instruction file found.")
+			fmt.Println("Creating AGENTS.md with Devlog Protocol...")
+			if err := os.WriteFile("AGENTS.md", []byte(protocol), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating AGENTS.md: %v\n", err)
+			} else {
+				fmt.Println("✅ Created AGENTS.md")
+			}
+		} else {
+			fmt.Println("✅ Devlog Protocol injected into detected agent files.")
+		}
+	},
+}
+
+func injectProtocol(file, protocol string) {
+	content, err := os.ReadFile(file)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
+		return
+	}
+
+	strContent := string(content)
+	
+	// Self-healing: Remove the bootstrap trigger if present
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
+	if strings.Contains(strContent, bootstrapTrigger) {
+		strContent = strings.ReplaceAll(strContent, bootstrapTrigger, "")
+		// Clean up potentially empty lines left behind
+		strContent = strings.TrimSpace(strContent) + "\n"
+	}
+
+	// Idempotency: Don't inject if already present
+	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
+		fmt.Printf("Skipping %s (protocol already present)\n", file)
+		// Still save to apply the bootstrap removal
+		if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
+		}
+		return
+	}
+
+	// Append protocol
+	newContent := strContent + "\n" + protocol
+	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
+		return
+	}
+	fmt.Printf("Updated %s\n", file)
+}
+
 // devlogStatusCmd shows current devlog configuration and stats
 var devlogStatusCmd = &cobra.Command{
 	Use:   "status",
@@ -818,6 +906,7 @@ func init() {
 	devlogCmd.AddCommand(devlogResumeCmd)
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
+	devlogCmd.AddCommand(devlogOnboardCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
 }
