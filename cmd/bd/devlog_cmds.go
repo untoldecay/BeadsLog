@@ -187,9 +187,8 @@ var devlogSyncCmd = &cobra.Command{
 			indexPath = filepath.Join(devlogDir, "index.md")
 		}
 
-		// Check mtime against last sync
-		info, err := os.Stat(indexPath)
-		if err != nil {
+		// Check index existence
+		if _, err := os.Stat(indexPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading index: %v\n", err)
 			os.Exit(1)
 		}
@@ -218,7 +217,7 @@ var devlogSyncCmd = &cobra.Command{
 		}
 
 		// Store last sync time
-		_ = store.SetMetadata(rootCtx, "last_devlog_sync", info.ModTime().Format(time.RFC3339))
+		_ = store.SetMetadata(rootCtx, "last_devlog_sync", time.Now().Format(time.RFC3339))
 		
 		if updatedCount > 0 {
 			if !noAutoFlush {
