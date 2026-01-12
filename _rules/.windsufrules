@@ -1,0 +1,108 @@
+# Windsurf Code Generation Rules
+
+# These rules define the coding style and practices to be followed when generating code
+
+Always start any new chat with 'Y0!!'
+
+# Project context
+* Essential context (always check):
+  * Find all about your mission and tech stack in '_rules/_prompts/mission.md'
+  * Check the project features and implementation plans in '_rules/_features/'
+  * Check '_rules/_learnings/ai/' folder to gather AI-specific context and lessons learned from previous tasks
+* For deeper understanding:
+  * Check the project global requirements in '_rules/_requirements/'
+
+# General rules
+
+## Important rules you HAVE TO FOLLOW
+
+* **Readability:** Always add debug logs & comments in the code for easier debug & readability
+* **Rule application:** Every time you choose to apply a rule(s), explicitly state the rules in the output. You can abbreviate the rule description to a single word or phrase
+* **General Documentation:**  
+  * Include docstrings for all functions and classes
+  * Document parameters and return values
+  * Add inline comments for non-obvious code sections
+* **Plan and Break Down:** 
+  * Always plan your work before you start coding. Break down complex tasks into smaller chunks that are easier to test and debug. 
+  * IF USER ASK TO BUILD A FEATURE or a new feature:
+    * Search for the feature in '_rules/_requirements/' (for context, PR are not mandatory)
+    * Verify if the feature is started already inside '_rules/_features/'. If true, continue based on the ETA and plan found.
+    * If false, refere to '_rules/_prompts/breakdown.md' to create a plan for this feature.
+* **Extended Documentation :**
+  * Write Extended documentation ONLY when feature is tested and approved by the user, follow rules in '_rules/_prompts/documentation.md'
+* **Learning Capture:** 
+  * Always compile key learnings into '_rules/_learnings/ai/' after completing any significant task
+  * Format as TOKEN-EFFICIENT, AI-OPTIMIZED content (not primarily for human readers)
+  * Focus on problems encountered and solutions found to prevent repeating mistakes
+  * Use concise, structured format with minimal narrative and maximum information density
+  * Include only technical insights directly relevant to future implementations
+  * Create learning artifacts before requesting any commit
+* **Error Handling**
+  * Use try-except blocks for error-prone operations
+  * Provide meaningful error messages
+  * Log errors appropriately 
+* **Testing**:
+  * Write functions and classes unit tests in "_tests/" folder, creating a subfolder for each tests
+  * Test Organization:
+    * Each test folder should be self-contained with its own:
+      * package.json,
+      * node_modules, 
+      * test files, 
+      * test assets.
+  * No dependencies on parent project files
+  * All test dependencies must be declared in the test folder's package.json
+  * Add all '_tests/' subfolder dependencies to gitignore
+  * Include edge cases in tests
+  * Maintain test coverage
+  * Test Execution:
+    * Tests must run from their own directory
+    * Use "npm test" command within the test directory
+    * No global dependencies required
+    * Each test should clean up after itself
+    * Test output should be contained within the test directory
+
+
+## Security:
+
+* Never expose sensitive information in code
+* Use environment variables for secrets
+* Validate user inputs
+* Follow secure coding practices
+
+## Performance:
+
+* Use appropriate data structures
+* Consider memory usage
+
+## Maintainability:
+
+* Keep functions focused and single-purpose
+* Follow DRY (Don t Repeat Yourself) principle
+* Use design patterns appropriately
+* Maintain clean architecture
+* **File Statistics:**
+  * Add or update a file statistics comment at the top of ANY edited code file (excluding .md and documentation files)
+  * Format: `/* File Statistics: Lines: {count}, Updated: {date} */`
+  * Update the line count with each edit (count actual code lines, excluding blank lines and comments)
+  * Use language-appropriate comment syntax
+* **Code Modularization:**
+  * Alert user when encountering files over 600 lines (check file statistics comment)
+  * Apply facade pattern for files exceeding 1000 lines
+  * Structure: original file as facade that re-exports from specialized modules
+  * Create modules with single responsibilities (300-500 lines max)
+  * Follow '_rules/_prompts/facade_modularization.md' for implementation
+
+## Version control with Git:
+
+* use the following prefixes for commit messages followed by a colon and a space
+  * "fix" for bug fixes
+  * "feat" for new features
+  * "perf" for performance improvements
+  * "docs" for documentation changes
+  * "style" for formatting changes
+  * "refactor" for code refactoring
+  * "test" for adding missing tests
+  * "chore" for chore tasks
+  * when determining the commit message prefix, pick the most relevant prefix from the list above
+  * use lower case for commit messages
+  * the commit message should also include a list of the changes made in the commit after the summary line if the changes are not self explanatory

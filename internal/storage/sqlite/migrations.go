@@ -55,13 +55,14 @@ var migrationsList = []Migration{
 	{"owner_column", migrations.MigrateOwnerColumn},
 	{"crystallizes_column", migrations.MigrateCrystallizesColumn},
 	{"work_type_column", migrations.MigrateWorkTypeColumn},
-	{"source_system_column", migrations.MigrateSourceSystemColumn},
-	{"quality_score_column", migrations.MigrateQualityScoreColumn},
-}
-
-// MigrationInfo contains metadata about a migration for inspection
-type MigrationInfo struct {
-	Name        string `json:"name"`
+		{"source_system_column", migrations.MigrateSourceSystemColumn},
+		{"quality_score_column", migrations.MigrateQualityScoreColumn},
+			{"devlog_schema", migrations.MigrateDevlogSchema},
+			{"devlog_file_hash", migrations.MigrateDevlogFileHash},
+		}
+		
+		// MigrationInfo contains metadata about a migration for inspection
+		type MigrationInfo struct{	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
@@ -121,6 +122,8 @@ func getMigrationDescription(name string) string {
 		"work_type_column":             "Adds work_type column for work assignment model (mutex vs open_competition per Decision 006)",
 		"source_system_column":         "Adds source_system column for federation adapter tracking",
 		"quality_score_column":         "Adds quality_score column for aggregate quality (0.0-1.0) set by Refineries",
+		"devlog_schema":                "Adds devlog tables: sessions, entities, session_entities, entity_deps",
+		"devlog_file_hash":             "Adds file_hash column to sessions table for content change detection",
 	}
 
 	if desc, ok := descriptions[name]; ok {
