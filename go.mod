@@ -1,4 +1,4 @@
-module github.com/steveyegge/beads
+module github.com/untoldecay/BeadsLog
 
 go 1.24.0
 
