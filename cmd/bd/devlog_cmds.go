@@ -108,6 +108,14 @@ This project follows a cycle of **Planning** (Forward) and **Reflection** (Backw
 2. **Context:** Before coding, check history: ` + "`bd devlog resume --last 1`" + ` or ` + "`bd devlog search \"topic\"`" + ` to avoid repeating past mistakes.
 3. **Log:** At session end, use ` + "`_rules/_devlog/_generate_devlog_prompt.md`" + ` to document assumptions and outcomes.
 4. **Close:** When finished, close the task: ` + "`bd close <id>`" + `.
+
+### Devlog Tooling
+| Goal | Command |
+| :--- | :--- |
+| **Resume** | ` + "`bd devlog resume --last 1`" + ` |
+| **Search** | ` + "`bd devlog search \"query\"`" + ` |
+| **Impact** | ` + "`bd devlog impact \"entity\"`" + ` |
+| **Graph** | ` + "`bd devlog graph \"entity\"`" + ` |
 `
 	candidates := []string{
 		".windsufrules",

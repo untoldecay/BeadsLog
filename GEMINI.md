@@ -41,6 +41,18 @@
 *   **Linting:** `golangci-lint run ./...`. Note: The project has a baseline of ~100 known warnings; focus on avoiding *new* issues.
 *   **Formatting:** Standard `gofmt`.
 
+### Devlog System (Memory & Context)
+The Devlog system allows you to search past sessions, analyze architectural impact, and resume context. Use these commands to be a smarter agent.
+
+| Goal | Command | Description |
+| :--- | :--- | :--- |
+| **Resume Context** | `bd devlog resume --last 1` | Get the full content of the last session to catch up. |
+| **Find Solution** | `bd devlog search "error message"` | Search past logs for similar errors or topics. |
+| **Check Impact** | `bd devlog impact "component-name"` | See what depends on a component before modifying it. |
+| **Visualize** | `bd devlog graph "entity"` | See the dependency tree of an entity. |
+| **List History** | `bd devlog list --type feature` | See a timeline of specific work types. |
+| **Sync** | `bd devlog sync` | Manually ingest new logs (usually handled by git hooks). |
+
 ### Critical Rules
 1.  **NEVER modify `.beads/issues.jsonl` manually.** This file is the database source of truth. Always use CLI commands or internal helpers to modify issues. CI will fail if this file is manually edited in a PR.
 2.  **Respect the Architecture:** Changes to core logic usually involve `internal/storage` (SQLite) and `internal/types`. CLI commands in `cmd/bd` should remain thin wrappers around internal logic or RPC calls.
