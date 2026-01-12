@@ -700,6 +700,14 @@ var devlogStatusCmd = &cobra.Command{
 		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
 		lastSync, _ := store.GetMetadata(rootCtx, "last_devlog_sync")
 
+		if lastSync != "" {
+			if t, err := time.Parse(time.RFC3339, lastSync); err == nil {
+				lastSync = t.Local().Format("2006-01-02 at 15h04m05s")
+			}
+		} else {
+			lastSync = "(never)"
+		}
+
 		fmt.Println("\nDevlog System Status")
 		fmt.Println("====================")
 		
