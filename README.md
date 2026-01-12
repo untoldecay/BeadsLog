@@ -49,19 +49,25 @@ Stop solving the same bug twice. BeadsLog transforms static markdown logs into a
     ```bash
     bd devlog initialize
     ```
-    *It can also auto-configure your AI agent rules (Claude, Windsurf, Cursor).*
+    *This will also offer to add a **bootstrap trigger** to your agent instruction files (e.g., AGENTS.md, .cursorrules).*
 
-2.  **Install Automation:** Adds git hooks (`post-commit`, `post-merge`) to auto-ingest logs.
+2.  **AI Onboarding:** When an agent starts, it will see the trigger and run:
+    ```bash
+    bd devlog onboard
+    ```
+    *This automatically injects the **MANDATORY Devlog Protocol** into the agent's context, ensuring they pro-actively use the graph and log their work.*
+
+3.  **Install Automation:** Adds git hooks (`post-commit`, `post-merge`) to auto-ingest logs.
     ```bash
     bd devlog install-hooks
     ```
 
 ### 🔄 Usage Workflow
 
-1.  **Work:** Code your task as usual.
-2.  **Log:** Generate a log entry (using the provided prompt in `_rules/_devlog/_generate_devlog_prompt.md`).
-3.  **Commit:** `git commit -m "feat:..."`
-    *   *The system automatically detects the new log, extracts entities, and updates the knowledge graph in the background.*
+1.  **Resume:** Agent starts by running `bd devlog resume --last 1`.
+2.  **Work:** Code the task as usual.
+3.  **Log:** Generate a log entry (using the prompt in `_rules/_prompts/generate-devlog.md`).
+4.  **Sync:** `git commit` or manual `bd devlog sync`.
 
 ---
 
@@ -69,6 +75,7 @@ Stop solving the same bug twice. BeadsLog transforms static markdown logs into a
 
 | Command | Usage | Description |
 | :--- | :--- | :--- |
+| **Onboard** | `bd devlog onboard` | Injects the Devlog Protocol into agent rules (AGENTS.md, etc.). |
 | **Search** | `bd devlog search "query"` | Hybrid search across session titles, narratives, and entities. |
 | **Resume** | `bd devlog resume [--last N]` | Finds relevant context or shows the last N sessions. |
 | **Impact** | `bd devlog impact "entity"` | Shows what other components depend on or relate to a specific entity. |
@@ -76,6 +83,7 @@ Stop solving the same bug twice. BeadsLog transforms static markdown logs into a
 | **List** | `bd devlog list [--type]` | Lists chronological sessions. Filter by `fix`, `feature`, `chore`, etc. |
 | **Show** | `bd devlog show <date>` | Displays the full content of a specific session log. |
 | **Sync** | `bd devlog sync` | Manually triggers ingestion of new or updated devlogs. |
+| **Reset** | `bd devlog reset` | **Truncates** all devlog tables (sessions, entities) for a fresh start. |
 | **Status** | `bd devlog status` | Checks configuration, stats, and git hook health. |
 
 ---
