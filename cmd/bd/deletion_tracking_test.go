@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/config"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // TestMultiWorkspaceDeletionSync simulates the bd-hv01 bug scenario:

@@ -10,16 +10,16 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/cmd/bd/doctor"
-	"github.com/steveyegge/beads/internal/beads"
-	"github.com/steveyegge/beads/internal/config"
-	"github.com/steveyegge/beads/internal/configfile"
-	"github.com/steveyegge/beads/internal/git"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/syncbranch"
-	"github.com/steveyegge/beads/internal/types"
-	"github.com/steveyegge/beads/internal/ui"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
+	"github.com/untoldecay/BeadsLog/internal/beads"
+	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/configfile"
+	"github.com/untoldecay/BeadsLog/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/ui"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 var initCmd = &cobra.Command{

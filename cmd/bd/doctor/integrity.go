@@ -12,10 +12,10 @@ import (
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
-	"github.com/steveyegge/beads/cmd/bd/doctor/fix"
-	"github.com/steveyegge/beads/internal/beads"
-	"github.com/steveyegge/beads/internal/configfile"
-	"github.com/steveyegge/beads/internal/git"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor/fix"
+	"github.com/untoldecay/BeadsLog/internal/beads"
+	"github.com/untoldecay/BeadsLog/internal/configfile"
+	"github.com/untoldecay/BeadsLog/internal/git"
 )
 
 // CheckIDFormat checks whether issues use hash-based or sequential IDs

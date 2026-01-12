@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // Verify sqliteTxStorage implements storage.Transaction at compile time

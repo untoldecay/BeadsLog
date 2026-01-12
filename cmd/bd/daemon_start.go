@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/beads"
-	"github.com/steveyegge/beads/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/beads"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
 )
 
 var daemonStartCmd = &cobra.Command{

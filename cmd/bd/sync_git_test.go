@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/git"
 )
 
 // setupGitRepoWithBeads creates a temporary git repository with a .beads directory.

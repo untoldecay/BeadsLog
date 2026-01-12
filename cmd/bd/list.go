@@ -17,15 +17,15 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/config"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/timeparsing"
-	"github.com/steveyegge/beads/internal/types"
-	"github.com/steveyegge/beads/internal/ui"
-	"github.com/steveyegge/beads/internal/util"
-	"github.com/steveyegge/beads/internal/validation"
+	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/timeparsing"
+	"github.com/untoldecay/BeadsLog/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/ui"
+	"github.com/untoldecay/BeadsLog/internal/util"
+	"github.com/untoldecay/BeadsLog/internal/validation"
 )
 
 // parseTimeFlag parses time strings using the layered time parsing architecture.

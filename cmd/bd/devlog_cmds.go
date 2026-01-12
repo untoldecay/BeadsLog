@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/queries"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/queries"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
 var devlogCmd = &cobra.Command{

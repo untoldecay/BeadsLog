@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/storage/memory"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/storage/memory"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 func TestIssueIDCompletion(t *testing.T) {

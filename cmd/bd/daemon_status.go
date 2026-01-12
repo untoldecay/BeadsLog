@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/daemon"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/internal/daemon"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // DaemonStatusReport is a single daemon status entry for JSON output

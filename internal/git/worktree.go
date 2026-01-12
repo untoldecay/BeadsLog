@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/steveyegge/beads/internal/merge"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/internal/merge"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 // WorktreeManager handles git worktree lifecycle for separate beads branches

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/git"
 )
 
 func TestDetectExistingHooks(t *testing.T) {

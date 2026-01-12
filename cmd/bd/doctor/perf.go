@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/beads"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 )
 
 var cpuProfileFile *os.File

@@ -59,8 +59,8 @@ func TestIsUpstreamRepo(t *testing.T) {
 		expected bool
 	}{
 		{"ssh upstream", "git@github.com:steveyegge/beads.git", true},
-		{"https upstream", "https://github.com/steveyegge/beads.git", true},
-		{"https upstream no .git", "https://github.com/steveyegge/beads", true},
+		{"https upstream", "https://github.com/untoldecay/BeadsLog.git", true},
+		{"https upstream no .git", "https://github.com/untoldecay/BeadsLog", true},
 		{"fork ssh", "git@github.com:contributor/beads.git", false},
 		{"fork https", "https://github.com/contributor/beads.git", false},
 		{"different repo", "git@github.com:someone/other-project.git", false},
@@ -72,7 +72,7 @@ func TestIsUpstreamRepo(t *testing.T) {
 			upstreamPatterns := []string{
 				"steveyegge/beads",
 				"git@github.com:steveyegge/beads",
-				"https://github.com/steveyegge/beads",
+				"https://github.com/untoldecay/BeadsLog",
 			}
 
 			matches := false
@@ -93,7 +93,7 @@ func TestIsUpstreamRepo(t *testing.T) {
 // Test 1: Upstream maintainer (origin = steveyegge/beads)
 func TestIsUpstreamRepo_Maintainer(t *testing.T) {
 	dir := setupGitRepoForForkTest(t)
-	addRemote(t, dir, "origin", "https://github.com/steveyegge/beads.git")
+	addRemote(t, dir, "origin", "https://github.com/untoldecay/BeadsLog.git")
 
 	if !isUpstreamRepo(dir) {
 		t.Error("expected isUpstreamRepo to return true for steveyegge/beads")
@@ -138,7 +138,7 @@ func TestIsUpstreamRepo_NoOrigin(t *testing.T) {
 func TestIsForkOfBeads_StandardFork(t *testing.T) {
 	dir := setupGitRepoForForkTest(t)
 	addRemote(t, dir, "origin", "https://github.com/peterkc/beads.git")
-	addRemote(t, dir, "upstream", "https://github.com/steveyegge/beads.git")
+	addRemote(t, dir, "upstream", "https://github.com/untoldecay/BeadsLog.git")
 
 	if !isForkOfBeads(dir) {
 		t.Error("expected isForkOfBeads to return true for standard fork setup")
@@ -149,7 +149,7 @@ func TestIsForkOfBeads_StandardFork(t *testing.T) {
 func TestIsForkOfBeads_CustomNaming(t *testing.T) {
 	dir := setupGitRepoForForkTest(t)
 	addRemote(t, dir, "origin", "https://github.com/peterkc/beads.git")
-	addRemote(t, dir, "github", "https://github.com/steveyegge/beads.git")
+	addRemote(t, dir, "github", "https://github.com/untoldecay/BeadsLog.git")
 
 	if !isForkOfBeads(dir) {
 		t.Error("expected isForkOfBeads to return true for custom remote naming")
@@ -315,7 +315,7 @@ func TestIsForkProtectionDisabled(t *testing.T) {
 func TestConfigOptOut_GitConfig(t *testing.T) {
 	dir := setupGitRepoForForkTest(t)
 	addRemote(t, dir, "origin", "https://github.com/peterkc/beads.git")
-	addRemote(t, dir, "upstream", "https://github.com/steveyegge/beads.git")
+	addRemote(t, dir, "upstream", "https://github.com/untoldecay/BeadsLog.git")
 
 	// Verify this IS a fork of beads
 	if !isForkOfBeads(dir) {

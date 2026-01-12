@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/git"
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
 
 // syncBranchCommitAndPush commits JSONL to the sync branch using a worktree.

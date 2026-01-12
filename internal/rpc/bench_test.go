@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	sqlitestorage "github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/types"
+	sqlitestorage "github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // BenchmarkDirectCreate benchmarks direct SQLite create operations

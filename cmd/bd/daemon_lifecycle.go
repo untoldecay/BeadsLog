@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/daemon"
-	"github.com/steveyegge/beads/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/daemon"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
 )
 
 // DaemonStatusResponse is returned for daemon status check

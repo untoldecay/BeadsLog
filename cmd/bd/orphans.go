@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/cmd/bd/doctor"
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 var doctorFindOrphanedIssues = doctor.FindOrphanedIssues

@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads"
-	"github.com/steveyegge/beads/internal/config"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog"
+	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
 
 // isDaemonAutoSyncing checks if daemon is running with auto-commit and auto-push enabled.

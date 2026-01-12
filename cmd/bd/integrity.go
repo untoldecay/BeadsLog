@@ -14,8 +14,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // isJSONLNewer checks if JSONL file is newer than database file.

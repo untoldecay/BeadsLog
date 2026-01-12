@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/types"
-	"github.com/steveyegge/beads/internal/util"
-	"github.com/steveyegge/beads/internal/validation"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/util"
+	"github.com/untoldecay/BeadsLog/internal/validation"
 )
 
 var searchCmd = &cobra.Command{

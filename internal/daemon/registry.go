@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/steveyegge/beads/internal/lockfile"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/internal/lockfile"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 // RegistryEntry represents a daemon entry in the registry

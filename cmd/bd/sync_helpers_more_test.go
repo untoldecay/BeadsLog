@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/config"
 )
 
 func TestBuildGitCommitArgs_ConfigOptions(t *testing.T) {

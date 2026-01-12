@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
 
 // TestSyncBranchConfigPriorityOverUpstream tests that when sync.branch is configured,

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/steveyegge/beads/cmd/bd/doctor"
-	"github.com/steveyegge/beads/internal/git"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
+	"github.com/untoldecay/BeadsLog/internal/git"
 )
 
 func TestDoctorNoBeadsDir(t *testing.T) {

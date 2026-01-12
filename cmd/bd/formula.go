@@ -11,8 +11,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/formula"
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/internal/formula"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // formulaCmd is the parent command for formula operations.

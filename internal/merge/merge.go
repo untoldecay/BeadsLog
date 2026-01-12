@@ -36,7 +36,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // Issue represents a beads issue with all possible fields

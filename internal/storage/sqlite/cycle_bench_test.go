@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // BenchmarkCycleDetection benchmarks the cycle detection performance

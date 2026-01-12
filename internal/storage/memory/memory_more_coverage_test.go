@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 func TestMemoryStorage_LoadFromIssues_IndexesAndCounters(t *testing.T) {

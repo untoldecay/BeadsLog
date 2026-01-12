@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/git"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/syncbranch"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // TestSyncBranchCommitAndPush_NotConfigured tests backward compatibility

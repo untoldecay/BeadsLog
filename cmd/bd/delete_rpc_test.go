@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // TestDeleteViaDaemon_SuccessfulDeletion tests successful single issue deletion via daemon RPC

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/git"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/git"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
 func TestGetVersionsSince(t *testing.T) {

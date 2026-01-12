@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/autoimport"
-	"github.com/steveyegge/beads/internal/debug"
-	"github.com/steveyegge/beads/internal/export"
-	"github.com/steveyegge/beads/internal/importer"
-	"github.com/steveyegge/beads/internal/storage"
-	"github.com/steveyegge/beads/internal/storage/sqlite"
-	"github.com/steveyegge/beads/internal/types"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/internal/autoimport"
+	"github.com/untoldecay/BeadsLog/internal/debug"
+	"github.com/untoldecay/BeadsLog/internal/export"
+	"github.com/untoldecay/BeadsLog/internal/importer"
+	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 // handleExport handles the export operation

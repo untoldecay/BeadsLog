@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/internal/daemon"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/internal/daemon"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 // JSON response types for daemons commands

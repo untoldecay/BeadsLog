@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/lockfile"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/utils"
+	"github.com/untoldecay/BeadsLog/internal/lockfile"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 // walkWithDepth walks a directory tree with depth limiting

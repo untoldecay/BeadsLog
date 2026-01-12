@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // TestDetectCyclesSimple tests simple 2-node cycles

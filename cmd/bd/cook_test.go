@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/steveyegge/beads/internal/formula"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/formula"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // =============================================================================

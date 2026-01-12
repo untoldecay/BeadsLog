@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
 )
 
 // TestSocketPathEnvOverride verifies that BD_SOCKET env var overrides default socket path.

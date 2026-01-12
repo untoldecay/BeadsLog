@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/linear"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/linear"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 func TestLinearPriorityToBeads(t *testing.T) {

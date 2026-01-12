@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // TestDaemonAutoImportAfterGitPull tests bd-09b5f2f5 fix

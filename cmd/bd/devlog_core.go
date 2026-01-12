@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
 type IndexRow struct {

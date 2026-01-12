@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/steveyegge/beads/internal/hooks"
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/hooks"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 )
 
 // CommandContext holds all runtime state for command execution.

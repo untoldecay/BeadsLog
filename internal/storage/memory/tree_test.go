@@ -4,7 +4,7 @@ import (
     "context"
     "testing"
 
-    "github.com/steveyegge/beads/internal/types"
+    "github.com/untoldecay/BeadsLog/internal/types"
 )
 
 func TestGetDependencyTree_IncludesRoot(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // getCachedBlockedIssues returns the set of issue IDs currently in blocked_issues_cache

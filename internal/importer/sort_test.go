@@ -3,7 +3,7 @@ package importer
 import (
 	"testing"
 
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 func TestGetHierarchyDepth(t *testing.T) {

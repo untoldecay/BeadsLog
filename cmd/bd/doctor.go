@@ -11,8 +11,8 @@ import (
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 	"github.com/spf13/cobra"
-	"github.com/steveyegge/beads/cmd/bd/doctor"
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // Status constants for doctor checks

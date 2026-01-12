@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/steveyegge/beads/internal/syncbranch"
-	"github.com/steveyegge/beads/internal/types"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // SyncIntegrityResult contains the results of a pre-sync integrity check.

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // landingThePlaneSection is the "landing the plane" instructions for AI agents

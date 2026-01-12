@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/steveyegge/beads/internal/config"
-	"github.com/steveyegge/beads/internal/merge"
-	"github.com/steveyegge/beads/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/merge"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 )
 
 // isIssueNotFoundError checks if the error indicates the issue doesn't exist in the database.

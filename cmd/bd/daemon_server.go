@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/steveyegge/beads/internal/rpc"
-	"github.com/steveyegge/beads/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 )
 
 // startRPCServer initializes and starts the RPC server

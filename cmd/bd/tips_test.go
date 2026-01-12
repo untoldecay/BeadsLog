@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/storage/memory"
+	"github.com/untoldecay/BeadsLog/internal/storage/memory"
 )
 
 func TestTipSelection(t *testing.T) {

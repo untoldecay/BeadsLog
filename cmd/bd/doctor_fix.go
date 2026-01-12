@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/steveyegge/beads/cmd/bd/doctor"
-	"github.com/steveyegge/beads/cmd/bd/doctor/fix"
-	"github.com/steveyegge/beads/internal/syncbranch"
-	"github.com/steveyegge/beads/internal/ui"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
+	"github.com/untoldecay/BeadsLog/cmd/bd/doctor/fix"
+	"github.com/untoldecay/BeadsLog/internal/syncbranch"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // previewFixes shows what would be fixed without applying changes

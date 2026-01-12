@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steveyegge/beads/internal/storage/memory"
+	"github.com/untoldecay/BeadsLog/internal/storage/memory"
 )
 
 // TestCheckStaleness_SymlinkedJSONL verifies that mtime detection uses the symlink's
