@@ -38,7 +38,7 @@ go install github.com/untoldecay/BeadsLog/cmd/bd@latest
 # 2. Initialize (Setup Tasks & Devlog assets)
 bd init
 
-# 3. AI Onboarding (Run once per agent session)
+# 3. AI Onboarding (Run once per repo by the first agent)
 bd devlog onboard
 ```
 
