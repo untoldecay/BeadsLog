@@ -522,6 +522,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 			fmt.Printf("\nRun %s to see details and fix these issues.\n\n", ui.RenderAccent("bd doctor --fix"))
 		}
+
+		// BeadsLog: Automatically initialize devlog space
+		initializeDevlog("_rules/_devlog", quiet)
 	},
 }
 

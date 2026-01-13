@@ -15,58 +15,17 @@ No external databases or complex dependencies required. It's a single binary.
 # One-liner install (requires Go)
 go install github.com/untoldecay/BeadsLog/cmd/bd@latest
 
-# Initialize in your repo
+# Initialize in your repo (automatically sets up Tasks & Devlogs)
 bd init
 ```
 
 ## 🧠 The Devlog System
-
-Stop solving the same bug twice. BeadsLog transforms static markdown logs into a queryable knowledge graph, connecting "what you did" (sessions) with "what you touched" (entities).
-
-### 🔥 Power Scenarios
-
-*   **"Resume Context"**
-    Start a new chat session with full context of what you did last time.
-    `bd devlog resume --last 1`
-
-*   **"I've seen this error before..."**
-    Don't search blindly. Find the exact session where you fixed that obscure "Nginx buffering" bug last month.
-    `bd devlog resume "nginx 400 error"`
-
-*   **"Refactoring Anxiety"**
-    You are changing the `auth-hook`. Instantly see every component that historically depends on it before you break something.
-    `bd devlog impact "auth-hook"`
-
-*   **"Instant Onboarding"**
-    Joining a feature mid-stream? Get a filtered timeline of every architectural decision made for the "MCP Server" implementation.
-    `bd devlog list --type feature | grep "MCP"`
-
----
-
-### ⚙️ Setup Workflow
-
-1.  **Initialize Space:** Creates the `_rules/_devlog` structure or adopts your existing one.
-    ```bash
-    bd devlog initialize
-    ```
-    *This will also offer to add a **bootstrap trigger** to your agent instruction files (e.g., AGENTS.md, .cursorrules).*
-
-2.  **AI Onboarding:** When an agent starts, it will see the trigger and run:
-    ```bash
-    bd devlog onboard
-    ```
-    *This automatically injects the **MANDATORY Devlog Protocol** into the agent's context, ensuring they pro-actively use the graph and log their work.*
-
-3.  **Install Automation:** Adds git hooks (`post-commit`, `post-merge`) to auto-ingest logs.
-    ```bash
-    bd devlog install-hooks
-    ```
-
+...
 ### 🔄 Usage Workflow
 
 1.  **Resume:** Agent starts by running `bd devlog resume --last 1`.
 2.  **Work:** Code the task as usual.
-3.  **Log:** Generate a log entry (using the prompt in `_rules/_prompts/generate-devlog.md`).
+3.  **Log:** Generate a log entry (using the prompt in `_rules/_devlog/_generate-devlog.md`).
 4.  **Sync:** `git commit` or manual `bd devlog sync`.
 
 ---
@@ -75,11 +34,12 @@ Stop solving the same bug twice. BeadsLog transforms static markdown logs into a
 
 | Command | Usage | Description |
 | :--- | :--- | :--- |
-| **Onboard** | `bd devlog onboard` | Injects the Devlog Protocol into agent rules (AGENTS.md, etc.). |
+| **Onboard** | `bd devlog onboard` | Enrolls AI agent into the **MANDATORY Devlog Protocol**. |
 | **Search** | `bd devlog search "query"` | Hybrid search across session titles, narratives, and entities. |
 | **Resume** | `bd devlog resume [--last N]` | Finds relevant context or shows the last N sessions. |
 | **Impact** | `bd devlog impact "entity"` | Shows what other components depend on or relate to a specific entity. |
 | **Graph** | `bd devlog graph "entity"` | Visualizes the dependency tree (parent/child/related) of an entity. |
+| **Verify** | `bd devlog verify [--fix]` | Audits sessions for missing metadata and generates recovery directives. |
 | **List** | `bd devlog list [--type]` | Lists chronological sessions. Filter by `fix`, `feature`, `chore`, etc. |
 | **Show** | `bd devlog show <date>` | Displays the full content of a specific session log. |
 | **Sync** | `bd devlog sync` | Manually triggers ingestion of new or updated devlogs. |

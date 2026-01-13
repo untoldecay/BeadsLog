@@ -46,51 +46,62 @@ var devlogInitCmd = &cobra.Command{
 		if len(args) > 0 {
 			baseDir = args[0]
 		}
-
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating devlog dir: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Create _index.md
-		indexPath := filepath.Join(baseDir, "_index.md")
-		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-			if err := os.WriteFile(indexPath, []byte(indexTemplate), 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("Created %s\n", indexPath)
-		}
-
-		// Create _generate-devlog.md in the baseDir
-		promptPath := filepath.Join(baseDir, "_generate-devlog.md")
-		if _, err := os.Stat(promptPath); os.IsNotExist(err) {
-			if err := os.WriteFile(promptPath, []byte(promptTemplate), 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("Created %s\n", promptPath)
-		}
-
-		// Store config
-		store, err := sqlite.New(rootCtx, dbPath)
-		if err == nil {
-			defer store.Close()
-			// Always set or update if empty
-			current, _ := store.GetConfig(rootCtx, "devlog_dir")
-			if current == "" || current != baseDir {
-				_ = store.SetConfig(rootCtx, "devlog_dir", baseDir)
-			}
-		}
-
-		fmt.Println("✅ Devlog initialized. Use 'bd devlog sync' to ingest.")
-
-		// Agent Rules Integration
-		configureAgentRules()
+		initializeDevlog(baseDir, false)
 	},
 }
 
-func configureAgentRules() {
+func initializeDevlog(baseDir string, quiet bool) {
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error creating devlog dir: %v\n", err)
+		}
+		return
+	}
+
+	// Create _index.md
+	indexPath := filepath.Join(baseDir, "_index.md")
+	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+		if err := os.WriteFile(indexPath, []byte(indexTemplate), 0644); err != nil {
+			if !quiet {
+				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
+			}
+		} else if !quiet {
+			fmt.Printf("Created %s\n", indexPath)
+		}
+	}
+
+	// Create _generate-devlog.md in the baseDir
+	promptPath := filepath.Join(baseDir, "_generate-devlog.md")
+	if _, err := os.Stat(promptPath); os.IsNotExist(err) {
+		if err := os.WriteFile(promptPath, []byte(promptTemplate), 0644); err != nil {
+			if !quiet {
+				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
+			}
+		} else if !quiet {
+			fmt.Printf("Created %s\n", promptPath)
+		}
+	}
+
+	// Store config
+	store, err := sqlite.New(rootCtx, dbPath)
+	if err == nil {
+		defer store.Close()
+		// Always set or update if empty
+		current, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if current == "" || current != baseDir {
+			_ = store.SetConfig(rootCtx, "devlog_dir", baseDir)
+		}
+	}
+
+	if !quiet {
+		fmt.Println("✅ Devlog initialized. Use 'bd devlog sync' to ingest.")
+	}
+
+	// Agent Rules Integration
+	configureAgentRules(quiet)
+}
+
+func configureAgentRules(quiet bool) {
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
 
 	candidates := []string{
@@ -112,21 +123,39 @@ func configureAgentRules() {
 	}
 
 	if foundFile == "" {
-		fmt.Println("\n💡 Tip: To enforce devlog usage for AI agents, create an AGENTS.md file and add:")
-		fmt.Printf("   %s\n", bootstrapTrigger)
+		if !quiet {
+			fmt.Println("\n💡 Tip: To enforce devlog usage for AI agents, create an AGENTS.md file and add:")
+			fmt.Printf("   %s\n", bootstrapTrigger)
+		}
 		return
 	}
 
-	fmt.Printf("\nFound agent configuration: %s\n", foundFile)
+	if !quiet {
+		fmt.Printf("\nFound agent configuration: %s\n", foundFile)
+	}
 	
 	// Check if already onboarded or trigger already present
 	content, _ := os.ReadFile(foundFile)
 	if strings.Contains(string(content), "Devlog Protocol") {
-		fmt.Println("✅ Devlog Protocol already present in agent rules.")
+		if !quiet {
+			fmt.Println("✅ Devlog Protocol already present in agent rules.")
+		}
 		return
 	}
 	if strings.Contains(string(content), bootstrapTrigger) {
-		fmt.Println("✅ Bootstrap trigger already present.")
+		if !quiet {
+			fmt.Println("✅ Bootstrap trigger already present.")
+		}
+		return
+	}
+
+	if quiet {
+		// In quiet mode, just append the trigger silently
+		f, err := os.OpenFile(foundFile, os.O_APPEND|os.O_WRONLY, 0644)
+		if err == nil {
+			_, _ = f.WriteString("\n" + bootstrapTrigger + "\n")
+			f.Close()
+		}
 		return
 	}
 
