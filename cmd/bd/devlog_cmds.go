@@ -326,6 +326,13 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 ---
 
+### **Architectural Relationships**
+<!-- Format: [From Entity] -> [To Entity] (relationship type) -->
+- EntityA -> EntityB (uses)
+- EntityC -> EntityA (depends on)
+
+---
+
 ## Guidelines for Generation:
 1.  **Chronological Order:** The phases must follow the order in which they occurred in the conversation.
 2.  **Focus on the "Why":** Don't just list actions. Explain the reasoning behind each action (the assumption) and the analysis of the result. The goal is to capture the thought process.
@@ -585,7 +592,7 @@ var devlogImpactCmd = &cobra.Command{
 			SELECT e.name, ed.relationship 
 			FROM entity_deps ed 
 			JOIN entities e ON ed.from_entity = e.id 
-			WHERE ed.to_entity IN (SELECT id FROM entities WHERE name = ?)
+			WHERE ed.to_entity IN (SELECT id FROM entities WHERE LOWER(name) = LOWER(?))
 		`, entityName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

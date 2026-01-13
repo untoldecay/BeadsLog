@@ -185,6 +185,52 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string)
 			}
 		}
 	}
+
+	// Phase 2: Extract explicit relationships
+	// Looking for pattern: "- EntityA -> EntityB (relationship)"
+	relPat := regexp.MustCompile(`(?m)^\s*-\s+([a-zA-Z0-9\-_]+)\s+->\s+([a-zA-Z0-9\-_]+)(?:\s+\(([^)]+)\))?`)
+	relMatches := relPat.FindAllStringSubmatch(text, -1)
+
+	for _, match := range relMatches {
+		if len(match) >= 3 {
+			fromName := strings.ToLower(strings.TrimSpace(match[1]))
+			toName := strings.ToLower(strings.TrimSpace(match[2]))
+			relType := "depends_on"
+			if len(match) > 3 && match[3] != "" {
+				relType = strings.TrimSpace(match[3])
+			}
+
+			// Ensure both entities exist and get their IDs
+			fromID := ensureEntityExists(store, fromName)
+			toID := ensureEntityExists(store, toName)
+
+			// Link them using IDs
+			_, err := db.Exec(`
+                INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
+                VALUES (?, ?, ?, ?)
+            `, fromID, toID, relType, sessionID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error linking entities: %v\n", err)
+			}
+		}
+	}
+}
+
+func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
+	db := store.UnderlyingDB()
+	entityID := fmt.Sprintf("ent-%s", hashID(name))
+	_, _ = db.Exec(`
+        INSERT OR IGNORE INTO entities (id, name, type, mention_count)
+        VALUES (?, ?, 'component', 0)
+    `, entityID, name)
+
+	// In case of name collision but different ID, get the actual one
+	var actualID string
+	err := db.QueryRow("SELECT id FROM entities WHERE name = ?", name).Scan(&actualID)
+	if err == nil {
+		return actualID
+	}
+	return entityID
 }
 
 func hashID(s string) string {

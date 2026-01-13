@@ -63,6 +63,13 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 ---
 
+### **Architectural Relationships**
+<!-- Format: [From Entity] -> [To Entity] (relationship type) -->
+- EntityA -> EntityB (uses)
+- EntityC -> EntityA (depends on)
+
+---
+
 ## Guidelines for Generation:
 1.  **Chronological Order:** The phases must follow the order in which they occurred in the conversation.
 2.  **Focus on the "Why":** Don't just list actions. Explain the *reasoning* behind each action (the assumption) and the *analysis* of the result. The goal is to capture the thought process.
