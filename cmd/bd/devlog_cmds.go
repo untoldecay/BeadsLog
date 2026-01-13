@@ -190,8 +190,20 @@ var devlogSyncCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		rows := parseIndexMD(indexPath)
-		if rows == nil {
+		rows, err := parseIndexMD(indexPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "🚨 **SYNTAX ERROR in %s**\n", indexPath)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Println("\n🚀 **AI SYNTAX CORRECTION DIRECTIVE**")
+			fmt.Println("The index file is corrupted. You MUST fix it to continue.")
+			fmt.Println("1. **READ** the '_index.md' file to identify the corruption.")
+			fmt.Println("2. **FIX** the table structure (one row per line, 5 pipes per row).")
+			fmt.Println("3. **REMOVE** any duplicate headers or footers.")
+			fmt.Println("4. **MANDATORY RE-RUN:** Execute 'bd devlog sync' immediately after fixing.")
+			os.Exit(1)
+		}
+
+		if rows == nil || len(rows) == 0 {
 			fmt.Fprintf(os.Stderr, "Error: Index file found at %s but contains no valid entries.\n", indexPath)
 			fmt.Fprintf(os.Stderr, "Tip: Verify the file format matches the 'bd devlog init' template.\n")
 			return
@@ -729,6 +741,9 @@ This repo uses **Beads Devlog** to persist context and prevent regressions. You 
 ### 4. 🔎 Metadata Audit
 - **Verification:** Occasionally run ` + "`bd devlog verify`" + `.
 - **Self-Fix:** If sessions are missing metadata, run ` + "`bd devlog verify --fix`" + ` and follow the instructions to re-analyze them.
+
+### 5. 🩹 Self-Correction
+- **Directives:** If a command output starts with ` + "`🚀 **AI ... DIRECTIVE**`" + `, you MUST prioritize fixing the reported issue and then **RE-RUN** the failed command immediately.
 `
 
 		found := false

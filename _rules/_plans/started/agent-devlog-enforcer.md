@@ -11,40 +11,37 @@
 ### **1. Infrastructure Hardening (Completed)**
 - **Index Corruption Fix:** Removed the problematic footer in `_index.md` that caused AI agents to append duplicate headers.
 - **AI Instructions:** Added prominent "AI AGENT INSTRUCTIONS" in the header of `_index.md` to enforce append-only behavior.
+- **Strict Linting:** `parseIndexMD` now detects syntax errors (multiple headers, malformed rows, double-appends) and returns descriptive errors.
 - **Template Updates:** Modified `indexTemplate` and `promptTemplate` in the Go source to align with the new structure.
-- **Consolidated Assets:** Moved the generation prompt to `_rules/_devlog/_generate-devlog.md` (hidden prefix) to keep all devlog assets in one folder and avoid agent confusion during scans.
+- **Consolidated Assets:** Moved the generation prompt to `_rules/_devlog/_generate-devlog.md`.
 
 ### **2. Core Tooling (Completed)**
-- **`bd devlog reset`:** Implemented command to truncate devlog tables, allowing for clean re-imports.
+- **`bd devlog reset`:** Command to truncate devlog tables for clean re-imports.
 - **`bd devlog sync` Improvements:** 
-    - Enhanced error messages for empty indexes.
-    - **Relationship Extraction:** Added logic to parse explicit entity dependencies using the `- EntityA -> EntityB (type)` pattern.
-- **`bd devlog verify`:** Implemented command to detect sessions missing architectural metadata (entities).
-- **`bd devlog onboard`:** Implemented command to:
-    - Detect agent instruction files (`AGENTS.md`, `.cursorrules`, etc.).
-    - Inject the **MANDATORY Devlog Protocol**.
-    - Perform self-healing by removing bootstrap triggers.
+    - **Quiet Mode:** Silent by default (summary only), verbose with `-v`.
+    - **Relationship Extraction:** Parses explicit entity dependencies (`- A -> B`).
+    - **Self-Correction Directive:** If the index is corrupted, it outputs a `🚀 **AI SYNTAX CORRECTION DIRECTIVE**` forcing the agent to fix and retry.
+- **`bd devlog verify`:** Command to audit sessions for missing metadata and generate `🚀 **AI RE-INVESTIGATION DIRECTIVE**`.
+- **`bd devlog onboard`:** Injects the **MANDATORY Devlog Protocol** and removes bootstrap triggers.
 
 ### **3. Protocol Integration (Completed)**
-- Updated `_generate-devlog.md` with the new protocol and **Architectural Relationships** section.
-- Refined the Devlog Protocol to include specific scenarios:
+- Updated `_generate-devlog.md` with relationships section.
+- Refined the Devlog Protocol to include:
     - **Session Start:** Resume context.
-    - **Bug Encounter:** Search for related issues.
-    - **Information Request:** Check impact and dependencies.
-    - **Planning:** Verify assumptions via graph.
-- **Automated Human Bootstrap:** Updated `bd devlog initialize` to automatically add the bootstrap trigger to detected agent files, creating the "Agent Trap."
+    - **Bugs/Info/Planning:** Specific graph/search scenarios.
+    - **Audit:** Regular verification.
+    - **Self-Correction:** Explicit instruction to follow `DIRECTIVES` and **RE-RUN** failed commands.
 
 ---
 
 ## **Key Accomplishments**
-- **The "Trap" Flow:** Human runs `bd devlog init` -> `AGENTS.md` gets a single-line trigger -> Agent runs `bd devlog onboard` -> Instructions are replaced with the full MANDATORY protocol.
-- **Structured Knowledge:** Agents now pro-actively document entity relationships, building a queryable architectural graph automatically.
-- **Self-Healing:** The `onboard` command cleans up after itself by removing the trigger line.
+- **Robustness:** The system now detects its own corruption and instructs the agent how to fix it.
+- **Automation:** Human runs `init` -> Agent runs `onboard` -> Protocol is enforced for life.
+- **Intelligence:** Clear distinction between "troubleshooting noise" and "final architectural truth" in audit directives.
 
 ---
 
 ## **Key Learnings**
-- AI agents interpret "append" relative to the very last line of a file; structured files should end with the extendable structure (e.g., a table) rather than a footer.
-- Explicit instructions in the file header are highly effective for steering agent behavior.
-- Hidden prefixes (`_`) prevent agents from misidentifying templates as data during directory scans.
-- Multi-layered bootstrap flows (Human -> Trigger -> Agent Onboarding) ensure adoption with minimal friction.
+- AI agents are highly responsive to structured "Directives" (`🚀 **AI ... DIRECTIVE**`).
+- Ending files with the target structure (tables) is safer than using footers.
+- Self-healing loops (Detect -> Instruct -> Retry) significantly reduce maintenance burden.

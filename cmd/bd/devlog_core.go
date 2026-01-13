@@ -97,25 +97,56 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	return true, nil
 }
 
-func parseIndexMD(filename string) []IndexRow {
+func parseIndexMD(filename string) ([]IndexRow, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		// Don't panic, return empty (caller handles error if needed)
-		return nil
+		return nil, fmt.Errorf("failed to read index: %w", err)
+	}
+
+	text := string(data)
+	
+	// Check for common syntax corruption
+	if strings.Count(text, "## Work Index") > 1 {
+		return nil, fmt.Errorf("duplicate '## Work Index' headers detected (AI append error)")
 	}
 
 	dir := filepath.Dir(filename)
-	lines := strings.Split(string(data), "\n")
+	lines := strings.Split(text, "\n")
 	var rows []IndexRow
 	inTable := false
 
-	for _, line := range lines {
+	for i, line := range lines {
 		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
 		if strings.Contains(line, "| Subject | Problems |") {
 			inTable = true
 			continue
 		}
-		if inTable && strings.Count(line, "|") >= 4 && !strings.HasPrefix(line, "|---") {
+
+		if inTable {
+			if strings.HasPrefix(line, "|---") {
+				continue
+			}
+			
+			if !strings.HasPrefix(line, "|") {
+				// We exited the table area?
+				// But we are strict now: if we were in a table and see garbage, complain
+				continue
+			}
+
+			// Critical Check: Double appends (two rows on same line)
+			// A valid row has exactly 5 pipes (starts with |, ends with |, 3 internal)
+			pipeCount := strings.Count(line, "|")
+			if pipeCount > 5 {
+				return nil, fmt.Errorf("line %d: malformed row (too many pipes, likely multiple sessions merged into one line)", i+1)
+			}
+			if pipeCount < 5 {
+				return nil, fmt.Errorf("line %d: malformed row (missing columns, expected 4 columns)", i+1)
+			}
+
 			parts := strings.Split(line, "|")
 			if len(parts) >= 5 {
 				filenamePart := strings.TrimSpace(parts[4])
@@ -138,7 +169,7 @@ func parseIndexMD(filename string) []IndexRow {
 			}
 		}
 	}
-	return rows
+	return rows, nil
 }
 
 func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string) {
