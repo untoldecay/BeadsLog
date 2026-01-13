@@ -23,4 +23,5 @@ This index provides a concise record of all development work for easy scanning a
 | Subject | Problems | Date | Devlog |
 |---------|----------|------|---------|
 | [feature] Devlog System | Implemented graph-powered session memory, CLI, and automation | 2026-01-12 | [2026-01-12_devlog-system-implementation.md](2026-01-12_devlog-system-implementation.md) |
-| [feature] Agent Enforcer | Implemented onboarding flow, hidden prompt structure, and verify audit directive | 2026-01-12 | [2026-01-12_agent-devlog-enforcer-implementation.md](2026-01-12_agent-devlog-enforcer-implementation.md) || [feature] Missing Tracking | Implemented 'is_missing' flag in DB and updated verify command | 2026-01-12 | [2026-01-12_missing-files-tracking.md](2026-01-12_missing-files-tracking.md) |
+| [feature] Agent Enforcer | Implemented onboarding flow, hidden prompt structure, and verify audit directive | 2026-01-12 | [2026-01-12_agent-devlog-enforcer-implementation.md](2026-01-12_agent-devlog-enforcer-implementation.md) |
+| [feature] Missing Tracking | Implemented 'is_missing' flag in DB and updated verify command | 2026-01-12 | [2026-01-12_missing-files-tracking.md](2026-01-12_missing-files-tracking.md) |
