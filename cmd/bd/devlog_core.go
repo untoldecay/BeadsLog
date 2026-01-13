@@ -51,7 +51,7 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	
 	if err != nil {
 		// If file doesn't exist, we can still create the session record but warn
-		fmt.Fprintf(os.Stderr, "Warning: could not read session file %s: %v\n", filePath, err)
+		fmt.Fprintf(os.Stderr, "Missing log session, %s : %v\n", filePath, err)
 		narrative = row.Problem // Use problem description as fallback narrative
 		// Hash only the problem
 		sum := sha256.Sum256([]byte(narrative))

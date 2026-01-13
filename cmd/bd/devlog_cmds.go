@@ -47,14 +47,8 @@ var devlogInitCmd = &cobra.Command{
 			baseDir = args[0]
 		}
 
-		promptsDir := filepath.Join(filepath.Dir(baseDir), "_prompts")
-
 		if err := os.MkdirAll(baseDir, 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating devlog dir: %v\n", err)
-			os.Exit(1)
-		}
-		if err := os.MkdirAll(promptsDir, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating prompts dir: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -68,8 +62,8 @@ var devlogInitCmd = &cobra.Command{
 			fmt.Printf("Created %s\n", indexPath)
 		}
 
-		// Create generate-devlog.md
-		promptPath := filepath.Join(promptsDir, "generate-devlog.md")
+		// Create _generate-devlog.md in the baseDir
+		promptPath := filepath.Join(baseDir, "_generate-devlog.md")
 		if _, err := os.Stat(promptPath); os.IsNotExist(err) {
 			if err := os.WriteFile(promptPath, []byte(promptTemplate), 0644); err != nil {
 				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
@@ -161,7 +155,7 @@ func configureAgentRules() {
 // devlogSyncCmd updates the database from the filesystem
 var devlogSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Sync devlogs to database",
+	Short: "Sync devlogs to database (use -v for detailed logs)",
 	Run: func(cmd *cobra.Command, args []string) {
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -179,7 +173,7 @@ var devlogSyncCmd = &cobra.Command{
 			} else if _, err := os.Stat("index.md"); err == nil {
 				devlogDir = "." // Fallback for testing
 			} else {
-				fmt.Fprintf(os.Stderr, "Error: devlog not configured. Run 'bd devlog init'\n")
+				fmt.Fprintf(os.Stderr, "Error: devlog not configured. Run 'bd devlog initialize'\n")
 				os.Exit(1)
 			}
 		}
@@ -196,10 +190,6 @@ var devlogSyncCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Always parse and sync, let SyncSession handle file-level hashing optimization
-		// The "last_sync" metadata check is insufficient if *content* changed without mtime change (rare but possible with git)
-		// or if *other* files changed. SyncSession logic is robust enough to run cheap checks.
-		
 		rows := parseIndexMD(indexPath)
 		if rows == nil {
 			fmt.Fprintf(os.Stderr, "Error: Index file found at %s but contains no valid entries.\n", indexPath)
@@ -207,7 +197,9 @@ var devlogSyncCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("Scanning %d sessions...\n", len(rows))
+		if verboseFlag {
+			fmt.Printf("Scanning %d sessions...\n", len(rows))
+		}
 		updatedCount := 0
 		for _, row := range rows {
 			updated, err := SyncSession(store, row)
@@ -216,7 +208,9 @@ var devlogSyncCmd = &cobra.Command{
 			}
 			if updated {
 				updatedCount++
-				fmt.Printf("  Updated: %s\n", row.Subject)
+				if verboseFlag {
+					fmt.Printf("  Updated: %s\n", row.Subject)
+				}
 			}
 		}
 
@@ -228,7 +222,7 @@ var devlogSyncCmd = &cobra.Command{
 				flushToJSONLWithState(flushState{forceDirty: true})
 			}
 			fmt.Printf("✅ Synced %d sessions\n", updatedCount)
-		} else {
+		} else if verboseFlag {
 			fmt.Println("Already up to date.")
 		}
 	},
@@ -699,7 +693,7 @@ fi
 // devlogOnboardCmd injects the Devlog Protocol into agent instruction files
 var devlogOnboardCmd = &cobra.Command{
 	Use:   "onboard",
-	Short: "Inject Devlog Protocol into agent rules (AGENTS.md, .cursorrules, etc.)",
+	Short: "Enroll AI agent into the MANDATORY Devlog Protocol",
 	Run: func(cmd *cobra.Command, args []string) {
 		candidates := []string{
 			"AGENTS.md",
@@ -726,8 +720,12 @@ This repo uses **Beads Devlog** to persist context and prevent regressions. You 
 
 ### 3. 🔴 End of Session
 - **Log & Sync:**
-  1. Generate the session log using ` + "`_rules/_prompts/generate-devlog.md`" + `.
+  1. Generate the session log using ` + "`_rules/_devlog/_generate-devlog.md`" + `.
   2. Run ` + "`bd devlog sync`" + ` to persist it to the database.
+
+### 4. 🔎 Metadata Audit
+- **Verification:** Occasionally run ` + "`bd devlog verify`" + `.
+- **Self-Fix:** If sessions are missing metadata, run ` + "`bd devlog verify --fix`" + ` and follow the instructions to re-analyze them.
 `
 
 		found := false
@@ -740,15 +738,17 @@ This repo uses **Beads Devlog** to persist context and prevent regressions. You 
 
 		if !found {
 			// If no specific agent file, suggest creating AGENTS.md
-			fmt.Println("No standard agent instruction file found.")
-			fmt.Println("Creating AGENTS.md with Devlog Protocol...")
+			if verboseFlag {
+				fmt.Println("No standard agent instruction file found.")
+				fmt.Println("Creating AGENTS.md with Devlog Protocol...")
+			}
 			if err := os.WriteFile("AGENTS.md", []byte(protocol), 0644); err != nil {
 				fmt.Fprintf(os.Stderr, "Error creating AGENTS.md: %v\n", err)
 			} else {
 				fmt.Println("✅ Created AGENTS.md")
 			}
 		} else {
-			fmt.Println("✅ Devlog Protocol injected into detected agent files.")
+			fmt.Println("✅ Devlog Protocol enforced in agent rules.")
 		}
 	},
 }
@@ -772,7 +772,9 @@ func injectProtocol(file, protocol string) {
 
 	// Idempotency: Don't inject if already present
 	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
-		fmt.Printf("Skipping %s (protocol already present)\n", file)
+		if verboseFlag {
+			fmt.Printf("Skipping %s (protocol already present)\n", file)
+		}
 		// Still save to apply the bootstrap removal
 		if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
@@ -786,7 +788,9 @@ func injectProtocol(file, protocol string) {
 		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
 		return
 	}
-	fmt.Printf("Updated %s\n", file)
+	if verboseFlag {
+		fmt.Printf("Updated %s\n", file)
+	}
 }
 
 // devlogStatusCmd shows current devlog configuration and stats
@@ -817,7 +821,7 @@ var devlogStatusCmd = &cobra.Command{
 		
 		if devlogDir == "" {
 			fmt.Println("Status: Not configured")
-			fmt.Println("Action: Run 'bd devlog init' to set up a devlog space.")
+			fmt.Println("Action: Run 'bd devlog initialize' to set up a devlog space.")
 			return
 		}
 
@@ -861,7 +865,7 @@ var devlogStatusCmd = &cobra.Command{
 
 var devlogResetCmd = &cobra.Command{
 	Use:   "reset",
-	Short: "Reset devlog database (truncate tables)",
+	Short: "Clear all devlog data (sessions, entities, relationships)",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Print("⚠️  This will delete ALL devlog data (sessions, entities, relationships) from the local database.\n")
 		fmt.Print("Are you sure? [y/N] ")
@@ -896,10 +900,73 @@ var devlogResetCmd = &cobra.Command{
 	},
 }
 
+// devlogVerifyCmd identifies sessions missing metadata
+var devlogVerifyCmd = &cobra.Command{
+	Use:   "verify",
+	Short: "Audit sessions for missing architectural metadata (entities/relationships)",
+	Run: func(cmd *cobra.Command, args []string) {
+		fix, _ := cmd.Flags().GetBool("fix")
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+
+		db := store.UnderlyingDB()
+
+		// 1. Sessions without entities
+		rows, err := db.Query(`
+			SELECT id, title, filename 
+			FROM sessions 
+			WHERE id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+		`)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error querying sessions: %v\n", err)
+			return
+		}
+		defer rows.Close()
+
+		var incomplete []struct{ ID, Title, Filename string }
+		for rows.Next() {
+			var s struct{ ID, Title, Filename string }
+			rows.Scan(&s.ID, &s.Title, &s.Filename)
+			incomplete = append(incomplete, s)
+		}
+
+		if len(incomplete) == 0 {
+			fmt.Println("✅ All sessions have linked entities.")
+			return
+		}
+
+		if !fix {
+			fmt.Println("Sessions missing entities:")
+			for _, s := range incomplete {
+				fmt.Printf("- [%s] %s (%s)\n", s.ID, s.Title, s.Filename)
+			}
+			fmt.Printf("\nFound %d sessions without metadata.\n", len(incomplete))
+			fmt.Println("Tip: Run 'bd devlog verify --fix' to trigger AI re-investigation.")
+		} else {
+			fmt.Println("🚀 **AI RE-INVESTIGATION DIRECTIVE**")
+			fmt.Println("The following sessions are missing architectural metadata. For EACH file below:")
+			fmt.Println("1. **READ** the entire file to understand the session journey.")
+			fmt.Println("2. **IDENTIFY** the final architectural state (focus on 'Final Session Summary' and the last successful implementation phases).")
+			fmt.Println("3. **IGNORE** discarded hypotheses, failed tests, or deprecated assumptions from earlier phases.")
+			fmt.Println("4. **APPEND** an '### Architectural Relationships' section with accurate 'EntityA -> EntityB (type)' links.")
+			fmt.Println("\nFiles to analyze:")
+			for _, s := range incomplete {
+				fmt.Printf("- %s\n", s.Filename)
+			}
+			fmt.Println("\nAfter updating the files, run 'bd devlog sync'.")
+		}
+	},
+}
+
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
+	devlogVerifyCmd.Flags().Bool("fix", false, "Generate re-investigation directive for AI agents")
 
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogSyncCmd)
@@ -914,6 +981,7 @@ func init() {
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)
+	devlogCmd.AddCommand(devlogVerifyCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
 }

@@ -12,17 +12,21 @@
 - **Index Corruption Fix:** Removed the problematic footer in `_index.md` that caused AI agents to append duplicate headers.
 - **AI Instructions:** Added prominent "AI AGENT INSTRUCTIONS" in the header of `_index.md` to enforce append-only behavior.
 - **Template Updates:** Modified `indexTemplate` and `promptTemplate` in the Go source to align with the new structure.
+- **Consolidated Assets:** Moved the generation prompt to `_rules/_devlog/_generate-devlog.md` (hidden prefix) to keep all devlog assets in one folder and avoid agent confusion during scans.
 
 ### **2. Core Tooling (Completed)**
 - **`bd devlog reset`:** Implemented command to truncate devlog tables, allowing for clean re-imports.
-- **`bd devlog sync` Improvements:** Enhanced error messages for empty indexes with actionable tips.
+- **`bd devlog sync` Improvements:** 
+    - Enhanced error messages for empty indexes.
+    - **Relationship Extraction:** Added logic to parse explicit entity dependencies using the `- EntityA -> EntityB (type)` pattern.
+- **`bd devlog verify`:** Implemented command to detect sessions missing architectural metadata (entities).
 - **`bd devlog onboard`:** Implemented command to:
     - Detect agent instruction files (`AGENTS.md`, `.cursorrules`, etc.).
     - Inject the **MANDATORY Devlog Protocol**.
     - Perform self-healing by removing bootstrap triggers.
 
 ### **3. Protocol Integration (Completed)**
-- Updated `generate-devlog.md` with the new protocol.
+- Updated `_generate-devlog.md` with the new protocol and **Architectural Relationships** section.
 - Refined the Devlog Protocol to include specific scenarios:
     - **Session Start:** Resume context.
     - **Bug Encounter:** Search for related issues.
@@ -34,7 +38,7 @@
 
 ## **Key Accomplishments**
 - **The "Trap" Flow:** Human runs `bd devlog init` -> `AGENTS.md` gets a single-line trigger -> Agent runs `bd devlog onboard` -> Instructions are replaced with the full MANDATORY protocol.
-- **Robustness:** Fixed pre-existing logic that was causing index corruption.
+- **Structured Knowledge:** Agents now pro-actively document entity relationships, building a queryable architectural graph automatically.
 - **Self-Healing:** The `onboard` command cleans up after itself by removing the trigger line.
 
 ---
@@ -42,4 +46,5 @@
 ## **Key Learnings**
 - AI agents interpret "append" relative to the very last line of a file; structured files should end with the extendable structure (e.g., a table) rather than a footer.
 - Explicit instructions in the file header are highly effective for steering agent behavior.
+- Hidden prefixes (`_`) prevent agents from misidentifying templates as data during directory scans.
 - Multi-layered bootstrap flows (Human -> Trigger -> Agent Onboarding) ensure adoption with minimal friction.
