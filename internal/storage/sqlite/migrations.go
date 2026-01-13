@@ -59,6 +59,7 @@ var migrationsList = []Migration{
 		{"quality_score_column", migrations.MigrateQualityScoreColumn},
 			{"devlog_schema", migrations.MigrateDevlogSchema},
 			{"devlog_file_hash", migrations.MigrateDevlogFileHash},
+			{"devlog_missing_flag", migrations.MigrateDevlogMissingFlag},
 		}
 		
 		// MigrationInfo contains metadata about a migration for inspection
@@ -124,6 +125,7 @@ func getMigrationDescription(name string) string {
 		"quality_score_column":         "Adds quality_score column for aggregate quality (0.0-1.0) set by Refineries",
 		"devlog_schema":                "Adds devlog tables: sessions, entities, session_entities, entity_deps",
 		"devlog_file_hash":             "Adds file_hash column to sessions table for content change detection",
+		"devlog_missing_flag":          "Adds is_missing column to sessions table for file existence tracking",
 	}
 
 	if desc, ok := descriptions[name]; ok {

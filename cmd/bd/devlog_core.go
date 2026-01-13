@@ -31,7 +31,8 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 
 	// Check if session exists and get current state
 	var currentFilename, currentHash string
-	err := db.QueryRow("SELECT filename, file_hash FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash)
+	var currentMissing bool
+	err := db.QueryRow("SELECT filename, file_hash, is_missing FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing)
 	
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
@@ -48,8 +49,10 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	content, err := ioutil.ReadFile(filePath)
 	var contentHash string
 	var narrative string
+	isMissing := false
 	
 	if err != nil {
+		isMissing = true
 		// If file doesn't exist, we can still create the session record but warn
 		fmt.Fprintf(os.Stderr, "Missing log session, %s : %v\n", filePath, err)
 		narrative = row.Problem // Use problem description as fallback narrative
@@ -64,7 +67,7 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	}
 
 	// Determine if update is needed
-	needsUpdate := !exists || currentFilename != row.Filename || currentHash != contentHash
+	needsUpdate := !exists || currentFilename != row.Filename || currentHash != contentHash || currentMissing != isMissing
 
 	if !needsUpdate {
 		return false, nil // No changes
@@ -73,15 +76,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?
 			WHERE id = ?
-		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, sessionID)
+		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, sessionID)
 	}
 
 	if err != nil {

@@ -915,7 +915,24 @@ var devlogVerifyCmd = &cobra.Command{
 
 		db := store.UnderlyingDB()
 
-		// 1. Sessions without entities
+		// 1. Sessions marked as missing
+		missingRows, err := db.Query("SELECT id, title, filename FROM sessions WHERE is_missing = 1")
+		if err == nil {
+			foundMissing := false
+			for missingRows.Next() {
+				if !foundMissing {
+					fmt.Println("Sessions with missing log files:")
+					foundMissing = true
+				}
+				var id, title, filename string
+				missingRows.Scan(&id, &title, &filename)
+				fmt.Printf("- [%s] %s (file: %s)\n", id, title, filename)
+			}
+			missingRows.Close()
+			if foundMissing { fmt.Println() }
+		}
+
+		// 2. Sessions without entities
 		rows, err := db.Query(`
 			SELECT id, title, filename 
 			FROM sessions 
