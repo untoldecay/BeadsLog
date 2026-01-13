@@ -661,7 +661,10 @@ var installHooksCmd = &cobra.Command{
 
 		hookContent := `#!/bin/sh
 # Auto-sync devlogs to beads database
-if command -v bd >/dev/null 2>&1; then
+# Try local binary first, then global command
+if [ -f "./bd" ]; then
+    ./bd devlog sync >/dev/null 2>&1 &
+elif command -v bd >/dev/null 2>&1; then
     bd devlog sync >/dev/null 2>&1 &
 fi
 `

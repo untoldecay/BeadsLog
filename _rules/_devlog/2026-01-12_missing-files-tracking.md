@@ -37,6 +37,16 @@ To improve the robustness of the devlog system by explicitly tracking missing se
 
 ---
 
+### **Phase 4: Git Hook Robustness**
+
+**Initial Problem:** Git hooks were failing to sync because they relied on a global `bd` command that might be missing or outdated in dev environments.
+
+*   **My Assumption/Plan #1:** Update hooks to check for a local repository binary.
+    *   **Action Taken:** Modified the hook template in `cmd/bd/devlog_cmds.go` to try `./bd` before falling back to `bd`. Manually updated existing hooks.
+    *   **Result:** Hooks now use the latest built version in the repo root, ensuring reliable auto-sync during development.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** The system now pro-actively identifies and tracks broken file references. The database acts as a reliable mirror of the filesystem state, and the audit tools provide actionable feedback for index maintenance.
