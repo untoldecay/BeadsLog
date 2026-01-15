@@ -125,6 +125,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		if initDBPath == "" {
 			initDBPath = filepath.Join(".beads", beads.CanonicalDatabaseName)
 		}
+		dbPath = initDBPath // Ensure global dbPath is set for downstream calls (e.g., devlog init)
 
 		// Migrate old database files if they exist
 		if err := migrateOldDatabases(initDBPath, quiet); err != nil {
@@ -308,7 +309,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			if err := store.SetMetadata(ctx, "repo_id", repoID); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to set repo_id: %v\n", err)
 			} else if !quiet {
-				fmt.Printf("  Repository ID: %s\n", repoID[:8])
+				fmt.Printf("Repository ID: %s\n", repoID[:8])
 			}
 		}
 
@@ -322,7 +323,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			if err := store.SetMetadata(ctx, "clone_id", cloneID); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to set clone_id: %v\n", err)
 			} else if !quiet {
-				fmt.Printf("  Clone ID: %s\n", cloneID)
+				fmt.Printf("Clone ID: %s\n", cloneID)
 			}
 		}
 
@@ -485,22 +486,17 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
-		// Add "landing the plane" instructions to AGENTS.md and @AGENTS.md
-		// Skip in stealth mode (user wants invisible setup) and quiet mode (suppress all output)
-		if !stealth {
-			addLandingThePlaneInstructions(!quiet)
-		}
+
 
 		// Skip output if quiet mode
 		if quiet {
 			return
 		}
 
-		fmt.Printf("\n%s bd initialized successfully!\n\n", ui.RenderPass("✓"))
+				fmt.Println("[Tasks]")
 		fmt.Printf("  Database: %s\n", ui.RenderAccent(initDBPath))
 		fmt.Printf("  Issue prefix: %s\n", ui.RenderAccent(prefix))
 		fmt.Printf("  Issues will be named: %s\n\n", ui.RenderAccent(prefix+"-<hash> (e.g., "+prefix+"-a3f2dd)"))
-		fmt.Printf("Run %s to get started.\n\n", ui.RenderAccent("bd quickstart"))
 
 		// Run bd doctor diagnostics to catch setup issues early
 		doctorResult := runDiagnostics(cwd)
@@ -513,18 +509,29 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 		if hasIssues {
-			fmt.Printf("%s Setup incomplete. Some issues were detected:\n", ui.RenderWarn("⚠"))
-			// Show just the warnings/errors, not all checks
+			fmt.Println("------------------------------------------------------------")
+			fmt.Printf("⚠ Setup incomplete. Some issues were detected:\n")
+			// Show just the warnings or errors, not all checks
+			// (Note: These are optional enhancements. Beads is fully functional without them.)
 			for _, check := range doctorResult.Checks {
 				if check.Status != statusOK {
 					fmt.Printf("  • %s: %s\n", check.Name, check.Message)
 				}
 			}
-			fmt.Printf("\nRun %s to see details and fix these issues.\n\n", ui.RenderAccent("bd doctor --fix"))
+			fmt.Printf("\nRun %s to see details and fix these issues.\n", ui.RenderAccent("bd doctor --fix"))
+			fmt.Println("------------------------------------------------------------")
 		}
 
 		// BeadsLog: Automatically initialize devlog space
+		if !quiet {
+			fmt.Println("\n[Log Memory]")
+		}
 		initializeDevlog("_rules/_devlog", quiet)
+
+		if !quiet {
+			fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart"))
+			fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd devlog quickstart"))
+		}
 	},
 }
 

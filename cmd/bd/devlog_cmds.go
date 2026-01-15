@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 var devlogCmd = &cobra.Command{
@@ -57,6 +58,9 @@ func initializeDevlog(baseDir string, quiet bool) {
 		}
 		return
 	}
+	if !quiet {
+		fmt.Printf("  %s Devlog space: %s (Created)\n", ui.RenderPass("✓"), baseDir)
+	}
 
 	// Create _index.md
 	indexPath := filepath.Join(baseDir, "_index.md")
@@ -65,8 +69,6 @@ func initializeDevlog(baseDir string, quiet bool) {
 			if !quiet {
 				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
 			}
-		} else if !quiet {
-			fmt.Printf("Created %s\n", indexPath)
 		}
 	}
 
@@ -78,7 +80,7 @@ func initializeDevlog(baseDir string, quiet bool) {
 				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
 			}
 		} else if !quiet {
-			fmt.Printf("Created %s\n", promptPath)
+			fmt.Printf("  %s Devlog prompt: %s (Created)\n", ui.RenderPass("✓"), promptPath)
 		}
 	}
 
@@ -94,14 +96,33 @@ func initializeDevlog(baseDir string, quiet bool) {
 	}
 
 	if !quiet {
-		fmt.Println("✅ Devlog initialized. Use 'bd devlog sync' to ingest.")
+		fmt.Printf("  %s Devlog scaffolding initialized successfully\n", ui.RenderPass("✓"))
+		fmt.Println("  Run 'bd devlog sync' to ingest all devlogs in the system.")
+		fmt.Println() // Added for spacing
 	}
 
 	// Agent Rules Integration
 	configureAgentRules(quiet)
+
+	// Git Hooks Integration
+	if !quiet {
+		fmt.Println("\n  Git hooks:")
+		fmt.Print("    Install auto-sync hooks? [Y/n] ")
+		var response string
+		fmt.Scanln(&response)
+		if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
+			installDevlogHooks(true)
+		} else {
+			fmt.Println("    Skipped hook installation.")
+		}
+	}
 }
 
 func configureAgentRules(quiet bool) {
+	if !quiet {
+		fmt.Println("  Agent behavior:")
+	}
+
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
 
 	candidates := []string{
@@ -124,27 +145,27 @@ func configureAgentRules(quiet bool) {
 
 	if foundFile == "" {
 		if !quiet {
-			fmt.Println("\n💡 Tip: To enforce devlog usage for AI agents, create an AGENTS.md file and add:")
-			fmt.Printf("   %s\n", bootstrapTrigger)
+			fmt.Print("    Let agent automate devlog maintenance? [Y/n] ")
+			var response string
+			fmt.Scanln(&response)
+			if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
+				// Create AGENTS.md
+				f, err := os.OpenFile("AGENTS.md", os.O_CREATE|os.O_WRONLY, 0644)
+				if err == nil {
+					f.WriteString(bootstrapTrigger + "\n")
+					f.Close()
+					fmt.Printf("    %s Agent instruction: AGENTS.md (Created)\n", ui.RenderPass("✓"))
+				}
+			}
 		}
 		return
 	}
 
-	if !quiet {
-		fmt.Printf("\nFound agent configuration: %s\n", foundFile)
-	}
-	
 	// Check if already onboarded or trigger already present
 	content, _ := os.ReadFile(foundFile)
-	if strings.Contains(string(content), "Devlog Protocol") {
+	if strings.Contains(string(content), "Devlog Protocol") || strings.Contains(string(content), bootstrapTrigger) {
 		if !quiet {
-			fmt.Println("✅ Devlog Protocol already present in agent rules.")
-		}
-		return
-	}
-	if strings.Contains(string(content), bootstrapTrigger) {
-		if !quiet {
-			fmt.Println("✅ Bootstrap trigger already present.")
+			fmt.Printf("    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), foundFile)
 		}
 		return
 	}
@@ -159,7 +180,7 @@ func configureAgentRules(quiet bool) {
 		return
 	}
 
-	fmt.Printf("Add Devlog bootstrap trigger to this file? [Y/n] ")
+	fmt.Printf("    Let agent automate devlog maintenance in %s? [Y/n] ", foundFile)
 
 	var response string
 	fmt.Scanln(&response)
@@ -174,12 +195,62 @@ func configureAgentRules(quiet bool) {
 			fmt.Printf("Error writing trigger: %v\n", err)
 			return
 		}
-		fmt.Println("✅ Bootstrap trigger added. Next time an agent starts, it will run 'bd devlog onboard'.")
+		fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), foundFile)
 	} else {
-		fmt.Println("Skipped. You can manually add this to your agent rules:")
-		fmt.Println(bootstrapTrigger)
+		fmt.Println("    Skipped agent configuration.")
 	}
 }
+
+func installDevlogHooks(verbose bool) {
+	gitDir := ".git/hooks"
+	if _, err := os.Stat(".git"); os.IsNotExist(err) {
+		if verbose {
+			fmt.Println("    Error: not a git repository")
+		}
+		return
+	}
+
+	hookContent := `#!/bin/sh
+# Auto-sync devlogs to beads database
+# Try local binary first, then global command
+if [ -f "./bd" ]; then
+    ./bd devlog sync >/dev/null 2>&1 &
+elif command -v bd >/dev/null 2>&1; then
+    bd devlog sync >/dev/null 2>&1 &
+fi
+`
+	hooks := []string{"post-commit", "post-merge"}
+	installed := []string{}
+	for _, hook := range hooks {
+		path := filepath.Join(gitDir, hook)
+		// Read existing hook to check if we're already in it
+		existing, _ := os.ReadFile(path)
+		if strings.Contains(string(existing), "bd devlog sync") {
+			installed = append(installed, hook)
+			continue
+		}
+
+		// Append or create
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			if verbose {
+				fmt.Printf("    Error installing %s: %v\n", hook, err)
+			}
+			continue
+		}
+		if _, err := f.WriteString("\n" + hookContent); err != nil {
+			if verbose {
+				fmt.Printf("    Error writing %s: %v\n", hook, err)
+			}
+		}
+		f.Close()
+		installed = append(installed, hook)
+	}
+	if verbose && len(installed) > 0 {
+		fmt.Printf("    %s Installed hooks (%s)\n", ui.RenderPass("✓"), strings.Join(installed, ", "))
+	}
+}
+
 
 // devlogSyncCmd updates the database from the filesystem
 var devlogSyncCmd = &cobra.Command{
@@ -274,7 +345,7 @@ const indexTemplate = `# Development Log Index
 > [!IMPORTANT]
 > **AI AGENT INSTRUCTIONS:**
 > 1. **APPEND ONLY:** Always add new session rows to the **existing table** at the bottom of this file.
-> 2. **NO DUPLICATES:** Never create a new "## Work Index" header or a second table.
+> 2. **NO DUPLICATES:** Never create a new "Work Index" header or a second table.
 > 3. **STAY AT BOTTOM:** Ensure the table remains the very last element in this file.
 
 This index provides a concise record of all development work for easy scanning and pattern recognition across sessions.
