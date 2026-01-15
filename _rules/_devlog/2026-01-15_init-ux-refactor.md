@@ -132,27 +132,6 @@ To redesign the `bd init` experience, making it a cohesive entry point for both 
 
 ---
 
-### **Final Session Summary**
-
-**Final Status:** The Devlog Protocol enforcement mechanism has been hardened. The `bd devlog onboard` command now reliably detects and injects the mandatory Devlog Protocol into `GEMINI.md`, `CLAUDE.md`, and other specified agent instruction files, ensuring consistent adherence to the devlog system across all AI agents.
-
-**Key Learnings:**
-*   **Candidate List Consistency:** When multiple functions or commands rely on lists of target files (e.g., agent configuration files), it is critical to ensure these lists are consistent and cover all intended targets to avoid gaps in enforcement or functionality.
-*   **Bootstrap vs. Full Protocol:** A bootstrap trigger (`BEFORE ANYTHING ELSE: run 'bd devlog onboard'`) must correctly lead to the injection of the full protocol by the triggered command, which requires the triggered command to recognize the target file.
-*   **Agent Behavioral Expectations:** For AI agents, explicit and consistent instructions are paramount, and the underlying tooling must support the intended enforcement mechanisms.
-
----
-
-### **Architectural Relationships**
-- bd devlog onboard -> GEMINI.md (configures)
-- bd devlog onboard -> CLAUDE.md (configures)
-- bd devlog onboard -> .claude/rules (configures)
-- bd devlog initialize -> configureAgentRules (calls)
-- configureAgentRules -> bd devlog onboard (injects trigger for)
-- cmd/bd/devlog_cmds.go -> Devlog Protocol Enforcement (enhances)
-
----
-
 ### **Phase 8: Sandbox & Project Hygiene**
 
 **Initial Problem:** The root directory was cluttered with python test generation scripts (`setup_init_tests.py` and `setup_sandbox_1.py`), and the generated `_sandbox/Test-*` directories were causing git errors because they contained nested git repositories.
@@ -167,13 +146,26 @@ To redesign the `bd init` experience, making it a cohesive entry point for both 
 
 ---
 
+### **Phase 9: Post-Commit Hook Stabilization**
+
+**Initial Problem:** The "Last Sync" timestamp in `bd devlog status` was not updating after commits, despite the `post-commit` hook being present.
+
+*   **My Assumption/Plan #1:** The background execution (`&`) in the hook was allowing the process to be terminated before completion.
+    *   **Action Taken:** Modified `.git/hooks/post-commit` to remove the `&` operator, forcing `bd devlog sync` to run synchronously.
+    *   **Result:** The hook now waits for the sync to finish, ensuring the database timestamp is reliably updated.
+    *   **Analysis/Correction:** While backgrounding hooks is good for speed, it's unreliable for critical persistence tasks like this. Synchronous execution is safer.
+
+---
+
 ### **Updated Final Session Summary**
 
 **Final Status:** 
 *   **Agent Onboarding:** `bd devlog onboard` now correctly updates `GEMINI.md`, `CLAUDE.md`, and other agent configs.
 *   **Project Hygiene:** Sandbox test generation scripts are organized in `_sandbox/_utils/`, and generated test environments are properly ignored by git.
 *   **Docs & Configs:** `AGENTS.md` and updated `GEMINI.md` are tracked.
+*   **Reliability:** Post-commit hooks now run synchronously to guarantee devlog syncing.
 
 **Key Learnings:**
 *   **Nested Git Repos:** Standard `git add .` fails if it encounters a subdirectory that is its own git repo (unless it's a submodule). Adding the directory to `.gitignore` is the correct way to handle ephemeral test repos.
 *   **Sandbox Organization:** Keeping test generation scripts separate from the generated output prevents accidental commits of massive test data.
+*   **Git Hooks:** Background tasks in git hooks (`&`) can be unreliable because the parent process exit can kill them. For critical data updates, synchronous execution is preferred.
