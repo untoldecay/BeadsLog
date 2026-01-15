@@ -511,8 +511,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		if hasIssues {
 			fmt.Println("------------------------------------------------------------")
 			fmt.Printf("⚠ Setup incomplete. Some issues were detected:\n")
+			fmt.Println("(Note: These are optional enhancements. Beads is fully functional without them.)")
+			fmt.Println()
 			// Show just the warnings or errors, not all checks
-			// (Note: These are optional enhancements. Beads is fully functional without them.)
 			for _, check := range doctorResult.Checks {
 				if check.Status != statusOK {
 					fmt.Printf("  • %s: %s\n", check.Name, check.Message)
