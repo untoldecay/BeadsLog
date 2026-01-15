@@ -154,7 +154,7 @@ func configureAgentRules(quiet bool) {
 				if err == nil {
 					f.WriteString(bootstrapTrigger + "\n")
 					f.Close()
-					fmt.Printf("    %s Agent instruction: AGENTS.md (Created)\n", ui.RenderPass("✓"))
+					fmt.Printf("\n    %s Agent instruction: AGENTS.md (Created)\n", ui.RenderPass("✓"))
 				}
 			}
 		}
@@ -165,7 +165,7 @@ func configureAgentRules(quiet bool) {
 	content, _ := os.ReadFile(foundFile)
 	if strings.Contains(string(content), "Devlog Protocol") || strings.Contains(string(content), bootstrapTrigger) {
 		if !quiet {
-			fmt.Printf("    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), foundFile)
+			fmt.Printf("\n    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), foundFile)
 		}
 		return
 	}
@@ -195,7 +195,7 @@ func configureAgentRules(quiet bool) {
 			fmt.Printf("Error writing trigger: %v\n", err)
 			return
 		}
-		fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), foundFile)
+		fmt.Printf("\n    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), foundFile)
 	} else {
 		fmt.Println("    Skipped agent configuration.")
 	}
@@ -247,7 +247,7 @@ fi
 		installed = append(installed, hook)
 	}
 	if verbose && len(installed) > 0 {
-		fmt.Printf("    %s Installed hooks (%s)\n", ui.RenderPass("✓"), strings.Join(installed, ", "))
+		fmt.Printf("\n    %s Installed hooks (%s)\n", ui.RenderPass("✓"), strings.Join(installed, ", "))
 	}
 }
 

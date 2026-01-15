@@ -134,7 +134,7 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 			if !strings.HasPrefix(line, "|") {
 				// We exited the table area?
 				// But we are strict now: if we were in a table and see garbage, complain
-				continue
+				return nil, fmt.Errorf("line %d: found content after the table. The Work Index table must be the very last element in the file. Delete any footers or text below the table.", i+1)
 			}
 
 			// Critical Check: Double appends (two rows on same line)
