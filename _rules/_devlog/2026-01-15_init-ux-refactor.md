@@ -150,3 +150,30 @@ To redesign the `bd init` experience, making it a cohesive entry point for both 
 - bd devlog initialize -> configureAgentRules (calls)
 - configureAgentRules -> bd devlog onboard (injects trigger for)
 - cmd/bd/devlog_cmds.go -> Devlog Protocol Enforcement (enhances)
+
+---
+
+### **Phase 8: Sandbox & Project Hygiene**
+
+**Initial Problem:** The root directory was cluttered with python test generation scripts (`setup_init_tests.py` and `setup_sandbox_1.py`), and the generated `_sandbox/Test-*` directories were causing git errors because they contained nested git repositories.
+
+*   **My Assumption/Plan #1:** Move the utility scripts to a dedicated location and configure git to ignore the generated test artifacts.
+    *   **Action Taken:** 
+        1. Created `_sandbox/_utils/` directory.
+        2. Moved `setup_init_tests.py` and `setup_sandbox_1.py` into `_sandbox/_utils/`.
+        3. Updated `.gitignore` to specifically exclude `_sandbox/Test-*/` directories.
+    *   **Result:** The file structure is cleaner, and `git add .` successfully staged all relevant project files without erroring on the nested git repos.
+    *   **Analysis/Correction:** This ensures that while the tools to *generate* tests are tracked, the *artifacts* of those tests (which are transient and large) are not.
+
+---
+
+### **Updated Final Session Summary**
+
+**Final Status:** 
+*   **Agent Onboarding:** `bd devlog onboard` now correctly updates `GEMINI.md`, `CLAUDE.md`, and other agent configs.
+*   **Project Hygiene:** Sandbox test generation scripts are organized in `_sandbox/_utils/`, and generated test environments are properly ignored by git.
+*   **Docs & Configs:** `AGENTS.md` and updated `GEMINI.md` are tracked.
+
+**Key Learnings:**
+*   **Nested Git Repos:** Standard `git add .` fails if it encounters a subdirectory that is its own git repo (unless it's a submodule). Adding the directory to `.gitignore` is the correct way to handle ephemeral test repos.
+*   **Sandbox Organization:** Keeping test generation scripts separate from the generated output prevents accidental commits of massive test data.
