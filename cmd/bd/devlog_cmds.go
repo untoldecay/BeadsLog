@@ -1022,5 +1022,7 @@ func init() {
 	devlogCmd.AddCommand(devlogResumeCmd)
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
+	devlogCmd.AddCommand(devlogVerifyCmd)
+	
 	rootCmd.AddCommand(devlogCmd)
 }
