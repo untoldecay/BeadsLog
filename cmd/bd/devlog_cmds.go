@@ -820,7 +820,7 @@ var devlogOnboardCmd = &cobra.Command{
 	Use:   "onboard",
 	Short: "Enroll AI agent into the MANDATORY Devlog Protocol",
 	Run: func(cmd *cobra.Command, args []string) {
-		candidates := []string{
+		_candidatesOld := []string{
 			"AGENTS.md",
 			".windsufrules",
 			".cursorrules",
@@ -859,9 +859,9 @@ This repo uses **Beads Devlog** to persist context and prevent regressions. You 
 `
 
 		found := false
-		for _, file := range candidates {
+		for _, file := range _candidatesOld {
 			if _, err := os.Stat(file); err == nil {
-				injectProtocol(file, protocol)
+				_injectProtocolOld(file, protocol)
 				found = true
 			}
 		}
@@ -883,7 +883,7 @@ This repo uses **Beads Devlog** to persist context and prevent regressions. You 
 	},
 }
 
-func injectProtocol(file, protocol string) {
+func _injectProtocolOld(file, protocol string) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)

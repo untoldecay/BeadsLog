@@ -3,20 +3,90 @@ package main
 import (
 	"fmt"
 	"io/ioutil" // Using ioutil.WriteFile for simplicity, will likely switch to os.WriteFile directly later for more control
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
-// executeOnboard will contain the logic to actively modify agent instruction files.
-// For now, it will create a dummy file to demonstrate active modification.
-func executeOnboard() error {
-	dummyFilePath := "AGENTS.md" // This will be the actual file to modify later
-	dummyContent := []byte("This is a placeholder for agent instructions.")
-	err := ioutil.WriteFile(dummyFilePath, dummyContent, 0644)
+// candidates lists potential agent instruction files
+var candidates = []string{
+	"AGENTS.md",
+	".windsufrules",
+	".cursorrules",
+	"CLAUDE.md",
+	".claude/rules",
+	"GEMINI.md",
+	".github/copilot-instructions.md",
+	".github/COPILOT-INSTRUCTIONS.md",
+}
+
+// injectProtocol reads a file, removes old bootstrap triggers, and appends the new protocol.
+// It includes idempotency checks.
+func injectProtocol(file, protocol string) {
+	content, err := os.ReadFile(file)
 	if err != nil {
-		return fmt.Errorf("failed to write dummy agent instructions: %w", err)
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
+		return
 	}
-	fmt.Printf("✓ Actively modified %s with placeholder instructions.\n", dummyFilePath)
+
+	strContent := string(content)
+	
+	// Self-healing: Remove the old 'bd devlog onboard' bootstrap trigger if present
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
+	if strings.Contains(strContent, bootstrapTrigger) {
+		strContent = strings.ReplaceAll(strContent, bootstrapTrigger, "")
+		// Clean up potentially empty lines left behind
+		strContent = strings.TrimSpace(strContent) + "\n"
+	}
+
+	// Idempotency: Don't inject if already present
+	// For this issue, we will just check for the basic Devlog Protocol header.
+	// More robust idempotency will be handled in later issues.
+	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
+		fmt.Printf("Skipping %s (protocol already present)\n", file)
+		// Still save to apply the bootstrap removal
+		if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
+		}
+		return
+	}
+
+	// Append protocol
+	newContent := strContent + "\n" + protocol
+	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
+		return
+	}
+	fmt.Printf("Updated %s\n", file)
+}
+
+
+// executeOnboard will contain the logic to actively modify agent instruction files.
+func executeOnboard() error {
+	// For this issue, we will use a simple placeholder protocol string.
+	// The full merged protocol will be implemented in a later issue.
+	placeholderProtocol := "## Devlog Protocol (MANDATORY)\nThis is a placeholder protocol."
+
+	found := false
+	for _, file := range candidates {
+		if _, err := os.Stat(file); err == nil {
+			injectProtocol(file, placeholderProtocol)
+			found = true
+		}
+	}
+
+	if !found {
+		// If no specific agent file, suggest creating AGENTS.md
+		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with placeholder protocol...")
+		if err := ioutil.WriteFile("AGENTS.md", []byte(placeholderProtocol), 0644); err != nil {
+			return fmt.Errorf("error creating AGENTS.md: %w", err)
+		}
+		fmt.Println("✓ Created AGENTS.md")
+	} else {
+		fmt.Println("✓ Onboarding process completed for existing agent files.")
+	}
+
 	return nil
 }
 
