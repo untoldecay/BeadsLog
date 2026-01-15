@@ -815,113 +815,8 @@ fi
 	},
 }
 
-// devlogOnboardCmd injects the Devlog Protocol into agent instruction files
-var devlogOnboardCmd = &cobra.Command{
-	Use:   "onboard",
-	Short: "Enroll AI agent into the MANDATORY Devlog Protocol",
-	Run: func(cmd *cobra.Command, args []string) {
-		_candidatesOld := []string{
-			"AGENTS.md",
-			".windsufrules",
-			".cursorrules",
-			"CLAUDE.md",
-			".claude/rules",
-			"GEMINI.md",
-			".github/copilot-instructions.md",
-			".github/COPILOT-INSTRUCTIONS.md",
-		}
 
-		protocol := `
-## Devlog Protocol (MANDATORY)
 
-This repo uses **Beads Devlog** to persist context and prevent regressions. You must follow this protocol:
-
-### 1. 🟢 Start of Session
-- **Resume Context:** Run ` + "`bd devlog resume --last 1`" + ` to load the immediate history.
-- **Goal:** Understand what happened last time to avoid repeating mistakes.
-
-### 2. 🟡 During Work
-- **Bug Encounter:** If you hit a bug, run ` + "`bd devlog search \"error message\"`" + ` to see if it's a known issue.
-- **Information Request:** If asking about a component, run ` + "`bd devlog impact <component>`" + ` to understand dependencies.
-- **Planning:** If making a plan, check ` + "`bd devlog graph <entity>`" + ` to verify architectural assumptions.
-
-### 3. 🔴 End of Session
-- **Log & Sync:**
-  1. Generate the session log using ` + "`_rules/_devlog/_generate-devlog.md`" + `.
-  2. Run ` + "`bd devlog sync`" + ` to persist it to the database.
-
-### 4. 🔎 Metadata Audit
-- **Verification:** Occasionally run ` + "`bd devlog verify`" + `.
-- **Self-Fix:** If sessions are missing metadata, run ` + "`bd devlog verify --fix`" + ` and follow the instructions to re-analyze them.
-
-### 5. 🩹 Self-Correction
-- **Directives:** If a command output starts with ` + "`🚀 **AI ... DIRECTIVE**`" + `, you MUST prioritize fixing the reported issue and then **RE-RUN** the failed command immediately.
-`
-
-		found := false
-		for _, file := range _candidatesOld {
-			if _, err := os.Stat(file); err == nil {
-				_injectProtocolOld(file, protocol)
-				found = true
-			}
-		}
-
-		if !found {
-			// If no specific agent file, suggest creating AGENTS.md
-			if verboseFlag {
-				fmt.Println("No standard agent instruction file found.")
-				fmt.Println("Creating AGENTS.md with Devlog Protocol...")
-			}
-			if err := os.WriteFile("AGENTS.md", []byte(protocol), 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating AGENTS.md: %v\n", err)
-			} else {
-				fmt.Println("✅ Created AGENTS.md")
-			}
-		} else {
-			fmt.Println("✅ Devlog Protocol enforced in agent rules.")
-		}
-	},
-}
-
-func _injectProtocolOld(file, protocol string) {
-	content, err := os.ReadFile(file)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
-		return
-	}
-
-	strContent := string(content)
-	
-	// Self-healing: Remove the bootstrap trigger if present
-	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
-	if strings.Contains(strContent, bootstrapTrigger) {
-		strContent = strings.ReplaceAll(strContent, bootstrapTrigger, "")
-		// Clean up potentially empty lines left behind
-		strContent = strings.TrimSpace(strContent) + "\n"
-	}
-
-	// Idempotency: Don't inject if already present
-	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
-		if verboseFlag {
-			fmt.Printf("Skipping %s (protocol already present)\n", file)
-		}
-		// Still save to apply the bootstrap removal
-		if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
-		}
-		return
-	}
-
-	// Append protocol
-	newContent := strContent + "\n" + protocol
-	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
-		return
-	}
-	if verboseFlag {
-		fmt.Printf("Updated %s\n", file)
-	}
-}
 
 // devlogStatusCmd shows current devlog configuration and stats
 var devlogStatusCmd = &cobra.Command{
@@ -1127,8 +1022,5 @@ func init() {
 	devlogCmd.AddCommand(devlogResumeCmd)
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
-	devlogCmd.AddCommand(devlogOnboardCmd)
-	devlogCmd.AddCommand(devlogVerifyCmd)
-	
 	rootCmd.AddCommand(devlogCmd)
 }
