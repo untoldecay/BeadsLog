@@ -93,3 +93,60 @@ To redesign the `bd init` experience, making it a cohesive entry point for both 
 - initializeDevlog -> .git/hooks (installs scripts)
 - bd devlog sync -> parseIndexMD (validates structure)
 - parseIndexMD -> IndexRow (struct)
+
+---
+
+### **Phase 5: Diagnosis of Inconsistent Agent Onboarding**
+
+**Initial Problem:** The user observed that the Gemini agent (myself) did not automatically use `bd devlog resume` on startup, raising questions about the effectiveness of the `bd devlog onboard` command in enforcing the Devlog Protocol across all intended agent configuration files, particularly `GEMINI.md` and `CLAUDE.md`.
+
+*   **My Assumption/Plan #1:** The `bd devlog onboard` command or the `configureAgentRules` function might not be checking for `GEMINI.md` or `CLAUDE.md` correctly.
+    *   **Action Taken:** Inspected the source code of `cmd/bd/devlog_cmds.go`, specifically the `candidates` lists within `devlogOnboardCmd` and `configureAgentRules`.
+    *   **Result:** Identified an inconsistency. The `configureAgentRules` function (called during `bd devlog initialize`) included `GEMINI.md` and `.claude/rules`, but the `devlogOnboardCmd` (which an agent is instructed to run) was missing `GEMINI.md` and `.claude/rules`, while `configureAgentRules` was missing `CLAUDE.md`. This meant that while `bd devlog initialize` might add a bootstrap trigger to `GEMINI.md`, the subsequent `bd devlog onboard` command would not necessarily inject the full protocol into `GEMINI.md` because it wasn't looking for it in its own candidate list.
+    *   **Analysis/Correction:** The differing `candidates` lists were the root cause. The `devlogOnboardCmd` was not designed to detect and update all files that `configureAgentRules` might bootstrap.
+
+---
+
+### **Phase 6: Harmonizing Agent Configuration File Detection**
+
+**Initial Problem:** Inconsistent detection and updating of agent configuration files (`GEMINI.md`, `CLAUDE.md`, `.claude/rules`) by the `bd devlog` system, leading to incomplete protocol enforcement.
+
+*   **My Assumption/Plan #1:** Consolidate and expand the `candidates` lists in both `configureAgentRules` and `devlogOnboardCmd` to cover all potential agent instruction files.
+    *   **Action Taken:** Modified `cmd/bd/devlog_cmds.go` to update both `candidates` lists to include a comprehensive set: `AGENTS.md`, `.windsufrules`, `.cursorrules`, `CLAUDE.md`, `.claude/rules`, `GEMINI.md`, `.github/copilot-instructions.md`, `.github/COPILOT-INSTRUCTIONS.md`.
+    *   **Result:** The code was successfully updated to ensure both functions target the same set of agent instruction files.
+    *   **Analysis/Correction:** This change ensures that any agent configuration file (like `GEMINI.md`) that receives the `bd devlog onboard` trigger from `bd devlog initialize` will then be properly processed by `bd devlog onboard` to receive the full Devlog Protocol.
+
+---
+
+### **Phase 7: Verification of Protocol Enforcement**
+
+**Initial Problem:** Uncertainty about whether the updated code correctly injected the Devlog Protocol into `GEMINI.md`.
+
+*   **My Assumption/Plan #1:** Rebuild the `bd` binary and manually execute the `onboard` command, then inspect `GEMINI.md`.
+    *   **Action Taken:**
+        1. Executed `go build -o bd ./cmd/bd` to rebuild the CLI tool.
+        2. Executed `./bd devlog onboard`.
+        3. Read the content of `GEMINI.md`.
+    *   **Result:** The `bd devlog onboard` command successfully ran and appended the "Devlog Protocol" section to `GEMINI.md`.
+    *   **Analysis/Correction:** This confirmed that the code changes effectively resolved the enforcement inconsistency and that `GEMINI.md` now correctly contains the mandatory Devlog Protocol.
+
+---
+
+### **Final Session Summary**
+
+**Final Status:** The Devlog Protocol enforcement mechanism has been hardened. The `bd devlog onboard` command now reliably detects and injects the mandatory Devlog Protocol into `GEMINI.md`, `CLAUDE.md`, and other specified agent instruction files, ensuring consistent adherence to the devlog system across all AI agents.
+
+**Key Learnings:**
+*   **Candidate List Consistency:** When multiple functions or commands rely on lists of target files (e.g., agent configuration files), it is critical to ensure these lists are consistent and cover all intended targets to avoid gaps in enforcement or functionality.
+*   **Bootstrap vs. Full Protocol:** A bootstrap trigger (`BEFORE ANYTHING ELSE: run 'bd devlog onboard'`) must correctly lead to the injection of the full protocol by the triggered command, which requires the triggered command to recognize the target file.
+*   **Agent Behavioral Expectations:** For AI agents, explicit and consistent instructions are paramount, and the underlying tooling must support the intended enforcement mechanisms.
+
+---
+
+### **Architectural Relationships**
+- bd devlog onboard -> GEMINI.md (configures)
+- bd devlog onboard -> CLAUDE.md (configures)
+- bd devlog onboard -> .claude/rules (configures)
+- bd devlog initialize -> configureAgentRules (calls)
+- configureAgentRules -> bd devlog onboard (injects trigger for)
+- cmd/bd/devlog_cmds.go -> Devlog Protocol Enforcement (enhances)

@@ -125,3 +125,6 @@ state.json
 .augment/
 .agents/
 output
+
+# Sandbox generated tests
+_sandbox/Test-*/

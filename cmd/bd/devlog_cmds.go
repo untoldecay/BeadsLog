@@ -136,6 +136,7 @@ func configureAgentRules(quiet bool) {
 		"AGENTS.md",
 		".windsufrules",
 		".cursorrules",
+		"CLAUDE.md",
 		".claude/rules",
 		"GEMINI.md",
 		".github/copilot-instructions.md",
@@ -821,9 +822,11 @@ var devlogOnboardCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		candidates := []string{
 			"AGENTS.md",
-			".cursorrules",
 			".windsufrules",
+			".cursorrules",
 			"CLAUDE.md",
+			".claude/rules",
+			"GEMINI.md",
 			".github/copilot-instructions.md",
 			".github/COPILOT-INSTRUCTIONS.md",
 		}
