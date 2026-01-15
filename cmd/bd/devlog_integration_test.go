@@ -1,73 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
-// TestOnboardCommandInjectsDevlogProtocol tests that the onboard command
-// properly injects the Devlog Protocol into agent rule files
-func TestOnboardCommandInjectsDevlogProtocol(t *testing.T) {
-	tmpDir := t.TempDir()
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-	defer os.Chdir(originalDir)
 
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Failed to change to temp directory: %v", err)
-	}
-
-	t.Run("onboard output contains Devlog Protocol pointer", func(t *testing.T) {
-		var buf bytes.Buffer
-		if err := renderOnboardInstructions(&buf); err != nil {
-			t.Fatalf("renderOnboardInstructions() error = %v", err)
-		}
-		output := buf.String()
-
-		// Verify output references Devlog Protocol/bd prime
-		if !strings.Contains(output, "bd prime") {
-			t.Error("Expected output to contain 'bd prime' for dynamic workflow context")
-		}
-		if !strings.Contains(output, "AGENTS.md") {
-			t.Error("Expected output to reference AGENTS.md")
-		}
-	})
-
-	t.Run("agents content is minimal and injected correctly", func(t *testing.T) {
-		// Verify agentsContent contains minimal Devlog Protocol instructions
-		if !strings.Contains(agentsContent, "bd prime") {
-			t.Error("agentsContent should point to 'bd prime' for Devlog Protocol")
-		}
-
-		// Verify it's actually minimal (should avoid bloating AGENTS.md)
-		if len(agentsContent) > 600 {
-			t.Errorf("agentsContent should be minimal (<600 chars), got %d chars", len(agentsContent))
-		}
-
-		// Verify quick reference commands are present
-		quickRefs := []string{"bd ready", "bd create", "bd close", "bd sync"}
-		for _, ref := range quickRefs {
-			if !strings.Contains(agentsContent, ref) {
-				t.Errorf("agentsContent should include quick reference to '%s'", ref)
-			}
-		}
-	})
-
-	t.Run("copilot instructions content includes Devlog Protocol", func(t *testing.T) {
-		if !strings.Contains(copilotInstructionsContent, "bd prime") {
-			t.Error("copilotInstructionsContent should point to 'bd prime'")
-		}
-	})
-}
 
 // TestResetCommandTruncatesDevlogTables tests that the reset command
 // properly truncates all devlog tables and starts fresh

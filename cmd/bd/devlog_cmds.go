@@ -130,7 +130,7 @@ func configureAgentRules(quiet bool) {
 		fmt.Println("  Agent behavior:")
 	}
 
-	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard'"
 
 	candidates := []string{
 		"AGENTS.md",
@@ -259,6 +259,17 @@ fi
 	}
 }
 
+
+// devlogOnboardCmd is deprecated and aliases to 'bd onboard'
+var devlogOnboardCmd = &cobra.Command{
+	Use:        "onboard",
+	Short:      "Set up agent instruction files (Deprecated: use 'bd onboard')",
+	Deprecated: "use 'bd onboard' instead",
+	Run: func(cmd *cobra.Command, args []string) {
+		// Forward to the new command
+		onboardCmd.Run(cmd, args)
+	},
+}
 
 // devlogSyncCmd updates the database from the filesystem
 var devlogSyncCmd = &cobra.Command{
@@ -1011,6 +1022,7 @@ func init() {
 	devlogVerifyCmd.Flags().Bool("fix", false, "Generate re-investigation directive for AI agents")
 
 	devlogCmd.AddCommand(devlogInitCmd)
+	devlogCmd.AddCommand(devlogOnboardCmd)
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)

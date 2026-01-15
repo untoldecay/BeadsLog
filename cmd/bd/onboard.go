@@ -31,12 +31,26 @@ func injectProtocol(file, protocol string) {
 
 	strContent := string(content)
 	
-	// Self-healing: Remove the old 'bd devlog onboard' bootstrap trigger if present
-	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd devlog onboard'"
-	if strings.Contains(strContent, bootstrapTrigger) {
-		strContent = strings.ReplaceAll(strContent, bootstrapTrigger, "")
-		// Clean up potentially empty lines left behind
-		strContent = strings.TrimSpace(strContent) + "\n"
+	// Self-healing: Remove bootstrap triggers
+	triggers := []string{
+		"BEFORE ANYTHING ELSE: run 'bd devlog onboard'",
+		"BEFORE ANYTHING ELSE: run 'bd onboard'",
+	}
+	
+	modified := false
+	for _, t := range triggers {
+		if strings.Contains(strContent, t) {
+			strContent = strings.ReplaceAll(strContent, t, "")
+			modified = true
+		}
+	}
+	
+	if modified {
+		// Clean up potentially empty lines left behind, but preserve file structure generally
+		strContent = strings.TrimSpace(strContent)
+		if len(strContent) > 0 {
+			strContent += "\n"
+		}
 	}
 
 	// Idempotency: Don't inject if already present
@@ -44,15 +58,23 @@ func injectProtocol(file, protocol string) {
 	// More robust idempotency will be handled in later issues.
 	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
 		fmt.Printf("Skipping %s (protocol already present)\n", file)
-		// Still save to apply the bootstrap removal
-		if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
+		// Still save to apply the bootstrap removal if happened
+		if modified {
+			if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
+			}
 		}
 		return
 	}
 
-	// Append protocol
-	newContent := strContent + "\n" + protocol
+	// Clean slate or Append
+	var newContent string
+	if strings.TrimSpace(strContent) == "" {
+		newContent = protocol
+	} else {
+		newContent = strContent + "\n" + protocol
+	}
+
 	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
 		return

@@ -1,69 +1,91 @@
 package main
 
 import (
-	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestOnboardCommand(t *testing.T) {
-	t.Run("onboard output contains key sections", func(t *testing.T) {
-		var buf bytes.Buffer
-		if err := renderOnboardInstructions(&buf); err != nil {
-			t.Fatalf("renderOnboardInstructions() error = %v", err)
-		}
-		output := buf.String()
+func TestInjectProtocol(t *testing.T) {
+	tempDir := t.TempDir()
+	protocol := "## Devlog Protocol (MANDATORY)\n1. Do this.\n2. Do that."
 
-		// Verify output contains expected sections
-		expectedSections := []string{
-			"bd Onboarding",
-			"AGENTS.md",
-			"BEGIN AGENTS.MD CONTENT",
-			"END AGENTS.MD CONTENT",
-			"bd prime",
-			"How it works",
-		}
+	t.Run("Empty file (Clean Slate)", func(t *testing.T) {
+		f := filepath.Join(tempDir, "empty.md")
+		os.WriteFile(f, []byte("   \n"), 0644) // Whitespace only
 
-		for _, section := range expectedSections {
-			if !strings.Contains(output, section) {
-				t.Errorf("Expected output to contain '%s', but it was missing", section)
-			}
+		injectProtocol(f, protocol)
+
+		content, _ := os.ReadFile(f)
+		if string(content) != protocol {
+			t.Errorf("Expected content to be just protocol, got:\n%q", string(content))
 		}
 	})
 
-	t.Run("agents content is minimal and points to bd prime", func(t *testing.T) {
-		// Verify the agentsContent constant is minimal and points to bd prime
-		if !strings.Contains(agentsContent, "bd prime") {
-			t.Error("agentsContent should point to 'bd prime' for full workflow")
-		}
-		if !strings.Contains(agentsContent, "bd ready") {
-			t.Error("agentsContent should include quick reference to 'bd ready'")
-		}
-		if !strings.Contains(agentsContent, "bd create") {
-			t.Error("agentsContent should include quick reference to 'bd create'")
-		}
-		if !strings.Contains(agentsContent, "bd close") {
-			t.Error("agentsContent should include quick reference to 'bd close'")
-		}
-		if !strings.Contains(agentsContent, "bd sync") {
-			t.Error("agentsContent should include quick reference to 'bd sync'")
-		}
+	t.Run("File with old trigger", func(t *testing.T) {
+		f := filepath.Join(tempDir, "old_trigger.md")
+		initial := "Some intro.\nBEFORE ANYTHING ELSE: run 'bd devlog onboard'\nSome footer."
+		os.WriteFile(f, []byte(initial), 0644)
 
-		// Verify it's actually minimal (less than 500 chars)
-		if len(agentsContent) > 500 {
-			t.Errorf("agentsContent should be minimal (<500 chars), got %d chars", len(agentsContent))
+		injectProtocol(f, protocol)
+
+		content, _ := os.ReadFile(f)
+		strContent := string(content)
+
+		if strings.Contains(strContent, "BEFORE ANYTHING ELSE") {
+			t.Error("Old trigger should be removed")
+		}
+		if !strings.Contains(strContent, "## Devlog Protocol") {
+			t.Error("Protocol should be injected")
+		}
+		if !strings.Contains(strContent, "Some intro.") {
+			t.Error("Original content should be preserved")
 		}
 	})
 
-	t.Run("copilot instructions content is minimal", func(t *testing.T) {
-		// Verify copilotInstructionsContent is also minimal
-		if !strings.Contains(copilotInstructionsContent, "bd prime") {
-			t.Error("copilotInstructionsContent should point to 'bd prime'")
-		}
+	t.Run("File with new trigger", func(t *testing.T) {
+		f := filepath.Join(tempDir, "new_trigger.md")
+		initial := "Start.\nBEFORE ANYTHING ELSE: run 'bd onboard'\nEnd."
+		os.WriteFile(f, []byte(initial), 0644)
 
-		// Verify it's minimal (less than 500 chars)
-		if len(copilotInstructionsContent) > 500 {
-			t.Errorf("copilotInstructionsContent should be minimal (<500 chars), got %d chars", len(copilotInstructionsContent))
+		injectProtocol(f, protocol)
+
+		content, _ := os.ReadFile(f)
+		strContent := string(content)
+
+		if strings.Contains(strContent, "BEFORE ANYTHING ELSE") {
+			t.Error("New trigger should be removed")
+		}
+		if !strings.Contains(strContent, "## Devlog Protocol") {
+			t.Error("Protocol should be injected")
+		}
+	})
+
+	t.Run("Idempotency", func(t *testing.T) {
+		f := filepath.Join(tempDir, "idempotent.md")
+		initial := "Existing content.\n" + protocol
+		os.WriteFile(f, []byte(initial), 0644)
+
+		injectProtocol(f, protocol)
+
+		content, _ := os.ReadFile(f)
+		if string(content) != initial {
+			t.Errorf("Content changed despite protocol being present. Got:\n%q", string(content))
+		}
+	})
+
+	t.Run("Append to existing", func(t *testing.T) {
+		f := filepath.Join(tempDir, "append.md")
+		initial := "Existing content."
+		os.WriteFile(f, []byte(initial), 0644)
+
+		injectProtocol(f, protocol)
+
+		content, _ := os.ReadFile(f)
+		expected := initial + "\n" + protocol
+		if string(content) != expected {
+			t.Errorf("Expected appended content. Got:\n%q", string(content))
 		}
 	})
 }
