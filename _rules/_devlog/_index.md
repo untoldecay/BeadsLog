@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > **AI AGENT INSTRUCTIONS:**
 > 1. **APPEND ONLY:** Always add new session rows to the **existing table** at the bottom of this file.
-> 2. **NO DUPLICATES:** Never create a new "## Work Index" header or a second table.
+> 2. **NO DUPLICATES:** Never create a new "Work Index" header or a second table.
 > 3. **STAY AT BOTTOM:** Ensure the table remains the very last element in this file.
 
 This index provides a concise record of all development work for easy scanning and pattern recognition across sessions.
