@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil" // Using ioutil.WriteFile for simplicity, will likely switch to os.WriteFile directly later for more control
 	"os"
 	"strings"
 
@@ -64,22 +63,26 @@ func injectProtocol(file, protocol string) {
 
 // executeOnboard will contain the logic to actively modify agent instruction files.
 func executeOnboard() error {
-	// For this issue, we will use a simple placeholder protocol string.
-	// The full merged protocol will be implemented in a later issue.
-	placeholderProtocol := "## Devlog Protocol (MANDATORY)\nThis is a placeholder protocol."
+	protocolFilePath := "_rules/AGENTS.md.protocol" // Path to the external protocol file
+
+	protocolContentBytes, err := os.ReadFile(protocolFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read unified agent protocol from %s: %w", protocolFilePath, err)
+	}
+	unifiedProtocol := string(protocolContentBytes)
 
 	found := false
 	for _, file := range candidates {
 		if _, err := os.Stat(file); err == nil {
-			injectProtocol(file, placeholderProtocol)
+			injectProtocol(file, unifiedProtocol)
 			found = true
 		}
 	}
 
 	if !found {
 		// If no specific agent file, suggest creating AGENTS.md
-		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with placeholder protocol...")
-		if err := ioutil.WriteFile("AGENTS.md", []byte(placeholderProtocol), 0644); err != nil {
+		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with the unified protocol...")
+		if err := os.WriteFile("AGENTS.md", []byte(unifiedProtocol), 0644); err != nil {
 			return fmt.Errorf("error creating AGENTS.md: %w", err)
 		}
 		fmt.Println("✓ Created AGENTS.md")
@@ -95,17 +98,17 @@ var onboardCmd = &cobra.Command{
 	GroupID: "setup",
 	Short:   "Set up agent instruction files for Beads and Devlog integration",
 	Long: `This command actively modifies agent instruction files (e.g., AGENTS.md)
-to integrate Beads and Beads Devlog workflows. It injects a unified
-protocol that guides agents on issue tracking, session memory, and proper
-workflow.
+	to integrate Beads and Beads Devlog workflows. It injects a unified
+	protocol that guides agents on issue tracking, session memory, and proper
+	workflow.
 
-This approach replaces the old method of printing instructions for manual
-copy-pasting, ensuring consistency and correctness across agent setups.`,
+	This approach replaces the old method of printing instructions for manual
+	copy-pasting, ensuring consistency and correctness across agent setups.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := executeOnboard(); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-		}
-	},
+			if err := executeOnboard(); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+			}
+		},
 }
 
 func init() {
