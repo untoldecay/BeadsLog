@@ -219,7 +219,15 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Handle --version flag on root command
 		if v, _ := cmd.Flags().GetBool("version"); v {
-			fmt.Printf("bd version %s (%s)\n", Version, Build)
+			commit := resolveCommitHash()
+			branch := resolveBranch()
+			if commit != "" && branch != "" {
+				fmt.Printf("bd version %s (%s: %s@%s)\n", Version, Build, branch, shortCommit(commit))
+			} else if commit != "" {
+				fmt.Printf("bd version %s (%s: %s)\n", Version, Build, shortCommit(commit))
+			} else {
+				fmt.Printf("bd version %s (%s)\n", Version, Build)
+			}
 			return
 		}
 		// No subcommand - show help

@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, and automatic versioning was implemented.
 
 ---
 
@@ -95,6 +95,26 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 
 ---
 
+### **Phase 5: Init Hardening & Auto-Versioning**
+
+**Initial Problem:**
+`bd init` only looked for the first available agent file and appended instructions, ignoring other agents (multi-agent setup). Also, `bd --version` was showing a hardcoded version without git hash context.
+
+*   **My Assumption/Plan #1:** Update `bd init` to find all candidate files.
+    *   **Action Taken:** Refactored `configureAgentRules` in `devlog_cmds.go` to iterate over all `Candidates` (exported from `onboard.go`) and offer to update them all. Changed injection logic to **prepend** the bootstrap trigger.
+
+*   **My Assumption/Plan #2:** Use `ldflags` to inject version info.
+    *   **Action Taken:**
+        *   Updated `Makefile` to inject `main.Commit`, `main.Branch`, and `main.Build`.
+        *   Fixed `cmd/bd/main.go` to use the same rich printing logic as the `bd version` subcommand (which was correctly showing commit info, unlike the root command).
+        *   Added `bd version bump [major|minor|patch]` command to automate version increments.
+
+*   **Result:**
+    *   `bd init` is now multi-agent aware and enforces top-posting of triggers.
+    *   `bd --version` shows full context: `bd version 0.47.1 (e592d692: dev/beads-devlog-synergy@e592d6926f46)`.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
@@ -103,6 +123,8 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
     *   **Embedded:** No external dependencies.
     *   **Top-Posted:** Protocol is always at the top of the file.
     *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
+*   **Init:** Multi-agent aware, prepends triggers.
+*   **Versioning:** Fully automated build injection and `bump` command.
 *   **Testing:** Full coverage via sandbox scenarios.
 
 **Key Learnings:**
@@ -110,6 +132,7 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 *   **Agent Prompts:** Mandatory instructions must be at the top.
 *   **Tool Portability:** Never rely on local source files (like `_rules/`) for a distributed binary. Always embed assets.
 *   **Idempotency:** Tag-based content replacement is far superior to simple append/prepend for managing injected code/text in user files.
+*   **Go LDFlags:** When building from root, `-X main.Var` works if the variables are in `package main`, even if the file is in a subdirectory like `cmd/bd`. Be careful with `cobra` command execution paths—root flags (`--version`) use different handlers than subcommands (`version`).
 
 ---
 
@@ -118,3 +141,6 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 - bd onboard -> injectProtocol (modifies files)
 - injectProtocol -> GEMINI.md (prepends/updates content)
 - injectProtocol -> protocol.go (reads const)
+- bd init -> configureAgentRules (calls)
+- configureAgentRules -> injectBootstrapTrigger (modifies files)
+- Makefile -> main.Commit (injects build var)

@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// candidates lists potential agent instruction files
-var candidates = []string{
+// Candidates lists potential agent instruction files
+var Candidates = []string{
 	"AGENTS.md",
 	".windsufrules",
 	".cursorrules",
@@ -106,7 +106,7 @@ func executeOnboard() error {
 	unifiedProtocol := AgentProtocol
 
 	found := false
-	for _, file := range candidates {
+	for _, file := range Candidates {
 		if _, err := os.Stat(file); err == nil {
 			injectProtocol(file, unifiedProtocol)
 			found = true

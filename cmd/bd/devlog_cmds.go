@@ -132,26 +132,15 @@ func configureAgentRules(quiet bool) {
 
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard'"
 
-	candidates := []string{
-		"AGENTS.md",
-		".windsufrules",
-		".cursorrules",
-		"CLAUDE.md",
-		".claude/rules",
-		"GEMINI.md",
-		".github/copilot-instructions.md",
-		".github/COPILOT-INSTRUCTIONS.md",
-	}
-
-	foundFile := ""
-	for _, f := range candidates {
+	// Find all existing agent files
+	var foundFiles []string
+	for _, f := range Candidates {
 		if _, err := os.Stat(f); err == nil {
-			foundFile = f
-			break
+			foundFiles = append(foundFiles, f)
 		}
 	}
 
-	if foundFile == "" {
+	if len(foundFiles) == 0 {
 		if !quiet {
 			fmt.Print("    Let agent automate devlog maintenance? [Y/n] ")
 			var response string
@@ -169,44 +158,47 @@ func configureAgentRules(quiet bool) {
 		return
 	}
 
-	// Check if already onboarded or trigger already present
-	content, _ := os.ReadFile(foundFile)
-	if strings.Contains(string(content), "Devlog Protocol") || strings.Contains(string(content), bootstrapTrigger) {
-		if !quiet {
-			fmt.Printf("    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), foundFile)
-		}
-		return
-	}
-
 	if quiet {
-		// In quiet mode, just append the trigger silently
-		f, err := os.OpenFile(foundFile, os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
-			_, _ = f.WriteString("\n" + bootstrapTrigger + "\n")
-			f.Close()
+		// Quietly update all
+		for _, file := range foundFiles {
+			injectBootstrapTrigger(file, bootstrapTrigger)
 		}
 		return
 	}
 
-	fmt.Printf("    Let agent automate devlog maintenance in %s? [Y/n] ", foundFile)
+	fmt.Printf("    Found agent rules: %s\n", strings.Join(foundFiles, ", "))
+	fmt.Print("    Enable auto-maintenance for these agents? [Y/n] ")
 
 	var response string
 	fmt.Scanln(&response)
 	if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-		f, err := os.OpenFile(foundFile, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			fmt.Printf("Error opening file: %v\n", err)
-			return
+		for _, file := range foundFiles {
+			if injectBootstrapTrigger(file, bootstrapTrigger) {
+				fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), file)
+			} else {
+				fmt.Printf("    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), file)
+			}
 		}
-		defer f.Close()
-		if _, err := f.WriteString("\n" + bootstrapTrigger + "\n"); err != nil {
-			fmt.Printf("Error writing trigger: %v\n", err)
-			return
-		}
-		fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), foundFile)
 	} else {
 		fmt.Println("    Skipped agent configuration.")
 	}
+}
+
+func injectBootstrapTrigger(file, trigger string) bool {
+	content, err := os.ReadFile(file)
+	if err != nil {
+		return false
+	}
+
+	sContent := string(content)
+	if strings.Contains(sContent, trigger) || strings.Contains(sContent, "Devlog Protocol") {
+		return false // Already configured
+	}
+
+	// Prepend
+	newContent := trigger + "\n\n" + sContent
+	_ = os.WriteFile(file, []byte(newContent), 0644)
+	return true
 }
 
 func installDevlogHooks(verbose bool) {

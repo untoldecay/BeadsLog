@@ -5,10 +5,18 @@
 # Default target
 all: build
 
+# Build info
+COMMIT=$(shell git rev-parse HEAD)
+BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+BUILD=$(shell git rev-parse --short HEAD)
+
 # Build the bd binary
 build:
 	@echo "Building bd..."
-	go build -ldflags="-X main.Build=$$(git rev-parse --short HEAD)" -o bd ./cmd/bd
+	@echo "Build: $(BUILD)"
+	@echo "Commit: $(COMMIT)"
+	@echo "Branch: $(BRANCH)"
+	go build -ldflags="-X main.Build=$(BUILD) -X main.Commit=$(COMMIT) -X main.Branch=$(BRANCH)" -o bd ./cmd/bd
 
 # Run all tests (skips known broken tests listed in .test-skip)
 test:
