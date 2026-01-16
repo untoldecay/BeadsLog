@@ -530,6 +530,7 @@ var devlogGraphCmd = &cobra.Command{
 func printGraph(graph *queries.EntityGraph) {
 	if len(graph.Nodes) == 0 {
 		fmt.Println("No entities found.")
+		fmt.Println("Tip: Run 'bd devlog verify --fix' to audit sessions for missing metadata.")
 		return
 	}
 
@@ -736,6 +737,7 @@ var devlogImpactCmd = &cobra.Command{
 		}
 		if !found {
 			fmt.Println("  (No known dependencies found)")
+			fmt.Println("  Tip: Run 'bd devlog verify --fix' to audit sessions for missing metadata.")
 		}
 	},
 }
