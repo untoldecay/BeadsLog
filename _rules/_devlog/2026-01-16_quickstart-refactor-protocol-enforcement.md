@@ -146,9 +146,19 @@ The `bd devlog verify` command was returning "All sessions have linked entities"
 **Initial Problem:**
 Despite adding `### Architectural Relationships` blocks, graphs remained empty. The regex parser was failing to match entities with spaces or special characters (e.g., `POST /api/v1/user` or `User Profile`).
 
-*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9–]+` was too strict.
-    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^ *- *(.+?) *-> *(.+?)(?: +\(([^)]+)\))?$`. 
+*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9\-_]+` was too strict.
+    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^\s*-\s+(.+?)\s+->\s+(.+?)(?:\s+\(([^)]+)\))?$`. 
     *   **Result:** This non-greedy match anchored to the arrow and line end correctly captures complex entity names, allowing graphs to populate correctly.
+
+---
+
+### **Phase 9: Sync Verbosity**
+
+**Initial Problem:**
+`bd devlog sync` was silent on success (no changes), confusing users who expected confirmation.
+
+*   **My Assumption/Plan #1:** Explicit confirmation is better for interactive CLI.
+    *   **Action Taken:** Updated `devlogSyncCmd` to print "Already up to date." unless `-q` is used.
 
 ---
 
@@ -161,14 +171,15 @@ Despite adding `### Architectural Relationships` blocks, graphs remained empty. 
 *   **Versioning:** Fully automated build injection, monotonic counters.
 *   **Verify:** Audits missing relationships.
 *   **Parsing:** Supports complex entity names in relationship graphs.
+*   **UX:** Explicit success messages.
 
 **Key Learnings:**
-*   **CLI UX:** Unified entry points reduce confusion.
+*   **CLI UX:** Unified entry points reduce confusion. Silence is not always golden.
 *   **Agent Prompts:** Mandatory instructions must be at the top.
 *   **Tool Portability:** Always embed assets.
 *   **Idempotency:** Tag-based content replacement is superior.
-*   **Regex:** Always test regex against "real world" messy data (spaces, paths) not just simple identifiers.
-*   **Audit Logic:** Verify must check all data dimensions (entities AND relationships).
+*   **Regex:** Always test regex against "real world" messy data.
+*   **Audit Logic:** Verify must check all data dimensions.
 
 ---
 
@@ -183,3 +194,4 @@ Despite adding `### Architectural Relationships` blocks, graphs remained empty. 
 - Makefile -> main.Commit (injects build var)
 - bd verify -> entity_deps (audits relationships)
 - devlog_core.go -> regexp (extracts relationships)
+- bd sync -> stdout (reports status)

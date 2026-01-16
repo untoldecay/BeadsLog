@@ -352,7 +352,7 @@ var devlogSyncCmd = &cobra.Command{
 				flushToJSONLWithState(flushState{forceDirty: true})
 			}
 			fmt.Printf("✅ Synced %d sessions\n", updatedCount)
-		} else if verboseFlag {
+		} else if !quietFlag {
 			fmt.Println("Already up to date.")
 		}
 	},
