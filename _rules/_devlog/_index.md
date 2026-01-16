@@ -35,3 +35,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Init Hardening | Updated init to support multi-agent detection and prepend triggers | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [feature] Auto-Versioning | Implemented ldflags injection and version bump command | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [feature] Build Counters | Added monotonic build counter to version string via Makefile | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [enhance] Init Integrity Check | Added _index.md corruption check to bd init output | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |

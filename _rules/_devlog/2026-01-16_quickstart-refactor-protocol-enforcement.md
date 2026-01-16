@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, and automatic versioning was implemented.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, and index integrity checks were added.
 
 ---
 
@@ -98,7 +98,7 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 ### **Phase 5: Init Hardening & Auto-Versioning**
 
 **Initial Problem:**
-`bd init` only looked for the first available agent file and appended instructions, ignoring other agents (multi-agent setup). Also, `bd --version` was showing a hardcoded version without git hash context.
+`bd init` only looked for the first available agent file and appended instructions, ignoring other agents (multi-agent setup). Also, `bd --version` was showing a hardcoded version without git hash context. Finally, `bd init` was silent about pre-existing index corruption.
 
 *   **My Assumption/Plan #1:** Update `bd init` to find all candidate files.
     *   **Action Taken:** Refactored `configureAgentRules` in `devlog_cmds.go` to iterate over all `Candidates` (exported from `onboard.go`) and offer to update them all. Changed injection logic to **prepend** the bootstrap trigger.
@@ -106,11 +106,14 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 *   **My Assumption/Plan #2:** Use `ldflags` to inject version info.
     *   **Action Taken:**
         *   Updated `Makefile` to inject `main.Commit`, `main.Branch`, and `main.Build`.
-        *   Fixed `cmd/bd/main.go` to use the same rich printing logic as the `bd version` subcommand (which was correctly showing commit info, unlike the root command).
-        *   Added `bd version bump [major|minor|patch]` command to automate version increments.
+        *   Fixed `cmd/bd/main.go` to use the same rich printing logic as the `bd version` subcommand.
+        *   Added `bd version bump [major|minor|patch]` command.
+
+*   **My Assumption/Plan #3:** Add integrity check to `init`.
+    *   **Action Taken:** Modified `initializeDevlog` to call `parseIndexMD` on existing `_index.md` files. If it fails, `bd init` now warns the user and suggests running `bd devlog sync` for the fix.
 
 *   **Result:**
-    *   `bd init` is now multi-agent aware and enforces top-posting of triggers.
+    *   `bd init` is now multi-agent aware, enforces top-posting, and checks data integrity.
     *   `bd --version` shows full context: `bd version 0.47.1 (e592d692: dev/beads-devlog-synergy@e592d6926f46)`.
 
 ---
@@ -134,7 +137,7 @@ The version string was static (`dev` or short hash), making it hard to order bui
     *   **Embedded:** No external dependencies.
     *   **Top-Posted:** Protocol is always at the top of the file.
     *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
-*   **Init:** Multi-agent aware, prepends triggers.
+*   **Init:** Multi-agent aware, prepends triggers, checks index integrity.
 *   **Versioning:** Fully automated build injection, monotonic counters, and `bump` command.
 *   **Testing:** Full coverage via sandbox scenarios.
 
@@ -143,7 +146,8 @@ The version string was static (`dev` or short hash), making it hard to order bui
 *   **Agent Prompts:** Mandatory instructions must be at the top.
 *   **Tool Portability:** Never rely on local source files (like `_rules/`) for a distributed binary. Always embed assets.
 *   **Idempotency:** Tag-based content replacement is far superior to simple append/prepend for managing injected code/text in user files.
-*   **Go LDFlags:** When building from root, `-X main.Var` works if the variables are in `package main`, even if the file is in a subdirectory like `cmd/bd`. Be careful with `cobra` command execution paths—root flags (`--version`) use different handlers than subcommands (`version`).
+*   **Go LDFlags:** When building from root, `-X main.Var` works if the variables are in `package main`.
+*   **Parsing Logic:** `parseIndexMD` only returns errors on *malformed* tables, not *missing* tables. Integrity checks need to align with parser strictness.
 
 ---
 
@@ -153,5 +157,6 @@ The version string was static (`dev` or short hash), making it hard to order bui
 - injectProtocol -> GEMINI.md (prepends/updates content)
 - injectProtocol -> protocol.go (reads const)
 - bd init -> configureAgentRules (calls)
+- bd init -> parseIndexMD (checks integrity)
 - configureAgentRules -> injectBootstrapTrigger (modifies files)
 - Makefile -> main.Commit (injects build var)

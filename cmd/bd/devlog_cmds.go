@@ -103,8 +103,15 @@ func initializeDevlog(baseDir string, quiet bool) {
 	}
 
 	if !quiet {
-		fmt.Printf("  %s Devlog scaffolding initialized successfully\n", ui.RenderPass("✓"))
-		fmt.Println("  Run 'bd devlog sync' to ingest all devlogs in the system.")
+		// Integrity Check
+		indexPath := filepath.Join(baseDir, "_index.md")
+		if _, err := parseIndexMD(indexPath); err != nil {
+			fmt.Printf("  %s Devlog index corrupted: %s\n", ui.RenderWarn("⚠"), indexPath)
+			fmt.Println("    Run 'bd devlog sync' to see error and get AI repair directive.")
+		} else {
+			fmt.Printf("  %s Devlog scaffolding initialized successfully\n", ui.RenderPass("✓"))
+			fmt.Println("  Run 'bd devlog sync' to ingest all devlogs in the system.")
+		}
 		fmt.Println() // Added for spacing
 	}
 
