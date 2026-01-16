@@ -222,7 +222,7 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string)
 
 	// Phase 2: Extract explicit relationships
 	// Looking for pattern: "- EntityA -> EntityB (relationship)"
-	relPat := regexp.MustCompile(`(?m)^\s*-\s+([a-zA-Z0-9\-_]+)\s+->\s+([a-zA-Z0-9\-_]+)(?:\s+\(([^)]+)\))?`)
+	relPat := regexp.MustCompile(`(?m)^\s*-\s+(.+?)\s+->\s+(.+?)(?:\s+\(([^)]+)\))?$`)
 	relMatches := relPat.FindAllStringSubmatch(text, -1)
 
 	for _, match := range relMatches {

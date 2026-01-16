@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, index integrity checks were added, and the `verify` command was enhanced.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, index integrity checks were added, the `verify` command was enhanced, and regex parsing for relationships was fixed.
 
 ---
 
@@ -141,27 +141,34 @@ The `bd devlog verify` command was returning "All sessions have linked entities"
 
 ---
 
+### **Phase 8: Relationship Parsing Fix**
+
+**Initial Problem:**
+Despite adding `### Architectural Relationships` blocks, graphs remained empty. The regex parser was failing to match entities with spaces or special characters (e.g., `POST /api/v1/user` or `User Profile`).
+
+*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9–]+` was too strict.
+    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^ *- *(.+?) *-> *(.+?)(?: +\(([^)]+)\))?$`. 
+    *   **Result:** This non-greedy match anchored to the arrow and line end correctly captures complex entity names, allowing graphs to populate correctly.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
 *   **Quickstart:** Unified `--tasks` and `--devlog` modes.
-*   **Onboarding:**
-    *   **Embedded:** No external dependencies.
-    *   **Top-Posted:** Protocol is always at the top of the file.
-    *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
-*   **Init:** Multi-agent aware, prepends triggers, checks index integrity.
-*   **Versioning:** Fully automated build injection, monotonic counters, and `bump` command.
-*   **Verify:** Now audits for missing relationships, bridging the gap between "mentions" and "graph".
-*   **Testing:** Full coverage via sandbox scenarios.
+*   **Onboarding:** Embedded, Top-Posted, Tag-Managed.
+*   **Init:** Multi-agent aware, prepends triggers, integrity checks.
+*   **Versioning:** Fully automated build injection, monotonic counters.
+*   **Verify:** Audits missing relationships.
+*   **Parsing:** Supports complex entity names in relationship graphs.
 
 **Key Learnings:**
 *   **CLI UX:** Unified entry points reduce confusion.
 *   **Agent Prompts:** Mandatory instructions must be at the top.
-*   **Tool Portability:** Never rely on local source files (like `_rules/`) for a distributed binary. Always embed assets.
-*   **Idempotency:** Tag-based content replacement is far superior to simple append/prepend for managing injected code/text in user files.
-*   **Go LDFlags:** When building from root, `-X main.Var` works if the variables are in `package main`.
-*   **Parsing Logic:** `parseIndexMD` only returns errors on *malformed* tables, not *missing* tables. Integrity checks need to align with parser strictness.
-*   **Audit Logic:** "Completeness" means different things. Entities are easy (regex), but relationships require semantic understanding. An audit tool must check for both to ensure downstream features (graphs) work.
+*   **Tool Portability:** Always embed assets.
+*   **Idempotency:** Tag-based content replacement is superior.
+*   **Regex:** Always test regex against "real world" messy data (spaces, paths) not just simple identifiers.
+*   **Audit Logic:** Verify must check all data dimensions (entities AND relationships).
 
 ---
 
@@ -175,3 +182,4 @@ The `bd devlog verify` command was returning "All sessions have linked entities"
 - configureAgentRules -> injectBootstrapTrigger (modifies files)
 - Makefile -> main.Commit (injects build var)
 - bd verify -> entity_deps (audits relationships)
+- devlog_core.go -> regexp (extracts relationships)
