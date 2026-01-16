@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, and index integrity checks were added.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, index integrity checks were added, and the `verify` command was enhanced.
 
 ---
 
@@ -129,6 +129,18 @@ The version string was static (`dev` or short hash), making it hard to order bui
 
 ---
 
+### **Phase 7: Verify Enhancement**
+
+**Initial Problem:**
+The `bd devlog verify` command was returning "All sessions have linked entities" even when sessions had zero architectural relationships defined, leading to empty graphs. Users were confused why `verify --fix` didn't help.
+
+*   **My Assumption/Plan #1:** Expand the audit criteria.
+    *   **Action Taken:** Updated `devlogVerifyCmd` in `cmd/bd/devlog_cmds.go` to check for sessions missing entries in `entity_deps` (discovered_in).
+    *   **Result:** The command now correctly flags sessions that lack structural data, prompting the AI to extract `EntityA -> EntityB` relationships.
+    *   **UX:** Added hints to `graph` and `impact` commands to run `verify --fix` if results are empty.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
@@ -139,6 +151,7 @@ The version string was static (`dev` or short hash), making it hard to order bui
     *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
 *   **Init:** Multi-agent aware, prepends triggers, checks index integrity.
 *   **Versioning:** Fully automated build injection, monotonic counters, and `bump` command.
+*   **Verify:** Now audits for missing relationships, bridging the gap between "mentions" and "graph".
 *   **Testing:** Full coverage via sandbox scenarios.
 
 **Key Learnings:**
@@ -148,6 +161,7 @@ The version string was static (`dev` or short hash), making it hard to order bui
 *   **Idempotency:** Tag-based content replacement is far superior to simple append/prepend for managing injected code/text in user files.
 *   **Go LDFlags:** When building from root, `-X main.Var` works if the variables are in `package main`.
 *   **Parsing Logic:** `parseIndexMD` only returns errors on *malformed* tables, not *missing* tables. Integrity checks need to align with parser strictness.
+*   **Audit Logic:** "Completeness" means different things. Entities are easy (regex), but relationships require semantic understanding. An audit tool must check for both to ensure downstream features (graphs) work.
 
 ---
 
@@ -160,3 +174,4 @@ The version string was static (`dev` or short hash), making it hard to order bui
 - bd init -> parseIndexMD (checks integrity)
 - configureAgentRules -> injectBootstrapTrigger (modifies files)
 - Makefile -> main.Commit (injects build var)
+- bd verify -> entity_deps (audits relationships)

@@ -969,11 +969,12 @@ var devlogVerifyCmd = &cobra.Command{
 			if foundMissing { fmt.Println() }
 		}
 
-		// 2. Sessions without entities
+		// 2. Sessions without entities OR relationships
 		rows, err := db.Query(`
-			SELECT id, title, filename 
+			SELECT DISTINCT id, title, filename 
 			FROM sessions 
 			WHERE id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps)
 		`)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error querying sessions: %v\n", err)
@@ -989,20 +990,20 @@ var devlogVerifyCmd = &cobra.Command{
 		}
 
 		if len(incomplete) == 0 {
-			fmt.Println("✅ All sessions have linked entities.")
+			fmt.Println("✅ All sessions have linked entities and relationships.")
 			return
 		}
 
 		if !fix {
-			fmt.Println("Sessions missing entities:")
+			fmt.Println("Sessions missing entities or architectural relationships:")
 			for _, s := range incomplete {
 				fmt.Printf("- [%s] %s (%s)\n", s.ID, s.Title, s.Filename)
 			}
-			fmt.Printf("\nFound %d sessions without metadata.\n", len(incomplete))
+			fmt.Printf("\nFound %d sessions with missing metadata.\n", len(incomplete))
 			fmt.Println("Tip: Run 'bd devlog verify --fix' to trigger AI re-investigation.")
 		} else {
 			fmt.Println("🚀 **AI RE-INVESTIGATION DIRECTIVE**")
-			fmt.Println("The following sessions are missing architectural metadata. For EACH file below:")
+			fmt.Println("The following sessions are missing architectural metadata (entities or relationships). For EACH file below:")
 			fmt.Println("1. **READ** the entire file to understand the session journey.")
 			fmt.Println("2. **IDENTIFY** the final architectural state (focus on 'Final Session Summary' and the last successful implementation phases).")
 			fmt.Println("3. **IGNORE** discarded hypotheses, failed tests, or deprecated assumptions from earlier phases.")
