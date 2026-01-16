@@ -28,3 +28,5 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Init UX Overhaul | Redesigned bd init experience and fixed index corruption | 2026-01-15 | [2026-01-15_init-ux-refactor.md](2026-01-15_init-ux-refactor.md) |
 | [fix] Agent Onboarding Enforcement | Fixed inconsistent agent onboarding across various configuration files | 2026-01-15 | [2026-01-15_init-ux-refactor.md](2026-01-15_init-ux-refactor.md) |
 | [rationalize] Sandbox Hygiene | Moved scripts to _utils and ignored generated tests | 2026-01-15 | [2026-01-15_init-ux-refactor.md](2026-01-15_init-ux-refactor.md) |
+| [enhance] Quickstart Refactor | Unified quickstart command with --tasks and --devlog modes | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [enhance] Protocol Enforcement | Updated onboard command to prepend protocol to agent files | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |

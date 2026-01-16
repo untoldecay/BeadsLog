@@ -530,8 +530,8 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		initializeDevlog("_rules/_devlog", quiet)
 
 		if !quiet {
-			fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart"))
-			fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd devlog quickstart"))
+			fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart --tasks"))
+			fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd quickstart --devlog"))
 		}
 	},
 }

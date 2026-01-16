@@ -72,7 +72,7 @@ func injectProtocol(file, protocol string) {
 	if strings.TrimSpace(strContent) == "" {
 		newContent = protocol
 	} else {
-		newContent = strContent + "\n" + protocol
+		newContent = protocol + "\n\n" + strContent
 	}
 
 	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
