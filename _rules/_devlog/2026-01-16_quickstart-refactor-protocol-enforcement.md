@@ -115,6 +115,17 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
 
 ---
 
+### **Phase 6: Automatic Build Counters**
+
+**Initial Problem:**
+The version string was static (`dev` or short hash), making it hard to order builds chronologically without checking git history.
+
+*   **My Assumption/Plan #1:** Add a monotonic counter to the version string.
+    *   **Action Taken:** Updated `Makefile` to include `git rev-list --count HEAD` in the `BUILD` variable injected via `ldflags`.
+    *   **Result:** Version output is now `0.47.1 (dev.<count>.<hash>)`, providing immediate visual ordering of builds.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
@@ -124,7 +135,7 @@ I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix
     *   **Top-Posted:** Protocol is always at the top of the file.
     *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
 *   **Init:** Multi-agent aware, prepends triggers.
-*   **Versioning:** Fully automated build injection and `bump` command.
+*   **Versioning:** Fully automated build injection, monotonic counters, and `bump` command.
 *   **Testing:** Full coverage via sandbox scenarios.
 
 **Key Learnings:**

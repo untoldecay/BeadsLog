@@ -8,7 +8,8 @@ all: build
 # Build info
 COMMIT=$(shell git rev-parse HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-BUILD=$(shell git rev-parse --short HEAD)
+# Build string: dev.<commit-count>.<short-hash>
+BUILD=dev.$(shell git rev-list --count HEAD).$(shell git rev-parse --short HEAD)
 
 # Build the bd binary
 build:
