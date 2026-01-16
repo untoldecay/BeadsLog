@@ -30,3 +30,5 @@ This index provides a concise record of all development work for easy scanning a
 | [rationalize] Sandbox Hygiene | Moved scripts to _utils and ignored generated tests | 2026-01-15 | [2026-01-15_init-ux-refactor.md](2026-01-15_init-ux-refactor.md) |
 | [enhance] Quickstart Refactor | Unified quickstart command with --tasks and --devlog modes | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [enhance] Protocol Enforcement | Updated onboard command to prepend protocol to agent files | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [feature] Protocol Embedding | Embedded protocol string in binary and implemented tag-based updates | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [test] Onboarding Sandbox | Added comprehensive test scenarios for onboarding logic | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |

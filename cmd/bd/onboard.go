@@ -20,8 +20,8 @@ var candidates = []string{
 	".github/COPILOT-INSTRUCTIONS.md",
 }
 
-// injectProtocol reads a file, removes old bootstrap triggers, and appends the new protocol.
-// It includes idempotency checks.
+// injectProtocol reads a file, removes old bootstrap triggers, and injects the new protocol.
+// It uses tags for safe replacement.
 func injectProtocol(file, protocol string) {
 	content, err := os.ReadFile(file)
 	if err != nil {
@@ -30,68 +30,80 @@ func injectProtocol(file, protocol string) {
 	}
 
 	strContent := string(content)
-	
+
 	// Self-healing: Remove bootstrap triggers
 	triggers := []string{
 		"BEFORE ANYTHING ELSE: run 'bd devlog onboard'",
 		"BEFORE ANYTHING ELSE: run 'bd onboard'",
 	}
-	
-	modified := false
+
+	modifiedTrigger := false
 	for _, t := range triggers {
 		if strings.Contains(strContent, t) {
 			strContent = strings.ReplaceAll(strContent, t, "")
-			modified = true
-		}
-	}
-	
-	if modified {
-		// Clean up potentially empty lines left behind, but preserve file structure generally
-		strContent = strings.TrimSpace(strContent)
-		if len(strContent) > 0 {
-			strContent += "\n"
+			modifiedTrigger = true
 		}
 	}
 
-	// Idempotency: Don't inject if already present
-	// For this issue, we will just check for the basic Devlog Protocol header.
-	// More robust idempotency will be handled in later issues.
-	if strings.Contains(strContent, "## Devlog Protocol (MANDATORY)") {
-		fmt.Printf("Skipping %s (protocol already present)\n", file)
-		// Still save to apply the bootstrap removal if happened
-		if modified {
-			if err := os.WriteFile(file, []byte(strContent), 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", file, err)
-			}
-		}
-		return
-	}
+	// Prepare the full protocol block with tags
+	fullProtocolBlock := ProtocolStartTag + "\n" + protocol + "\n" + ProtocolEndTag
 
-	// Clean slate or Append
+	// Tag-based replacement logic
+	startIndex := strings.Index(strContent, ProtocolStartTag)
+	endIndex := strings.Index(strContent, ProtocolEndTag)
+
 	var newContent string
-	if strings.TrimSpace(strContent) == "" {
-		newContent = protocol
+	var action string
+
+	if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
+		// Tags found: Replace content between them
+		preBlock := strContent[:startIndex]
+		postBlock := strContent[endIndex+len(ProtocolEndTag):]
+		
+		// Normalize whitespace around blocks
+		preBlock = strings.TrimRight(preBlock, "\n")
+		postBlock = strings.TrimLeft(postBlock, "\n")
+		
+		if preBlock != "" {
+			newContent = preBlock + "\n\n" + fullProtocolBlock
+		} else {
+			newContent = fullProtocolBlock
+		}
+		
+		if postBlock != "" {
+			newContent += "\n\n" + postBlock
+		}
+		action = "refreshed existing protocol"
+
 	} else {
-		newContent = protocol + "\n\n" + strContent
+		// Tags not found or broken: Prepend to top
+		strContent = strings.TrimSpace(strContent)
+		if strContent == "" {
+			newContent = fullProtocolBlock
+		} else {
+			newContent = fullProtocolBlock + "\n\n" + strContent
+		}
+		action = "prepended new protocol"
+	}
+
+	// Idempotency check
+	// Note: We compare trimmed versions to avoid noise from trailing newlines
+	if strings.TrimSpace(newContent) == strings.TrimSpace(string(content)) && !modifiedTrigger {
+		fmt.Printf("Skipping %s (protocol up to date)\n", file)
+		return
 	}
 
 	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error appending to %s: %v\n", file, err)
+		fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", file, err)
 		return
 	}
-	fmt.Printf("Updated %s\n", file)
+	fmt.Printf("Updated %s (%s)\n", file, action)
 }
 
-
-// executeOnboard will contain the logic to actively modify agent instruction files.
+// executeOnboard actively modifies agent instruction files.
 func executeOnboard() error {
-	protocolFilePath := "_rules/AGENTS.md.protocol" // Path to the external protocol file
-
-	protocolContentBytes, err := os.ReadFile(protocolFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read unified agent protocol from %s: %w", protocolFilePath, err)
-	}
-	unifiedProtocol := string(protocolContentBytes)
+	// Use the embedded AgentProtocol directly
+	unifiedProtocol := AgentProtocol
 
 	found := false
 	for _, file := range candidates {
@@ -104,7 +116,8 @@ func executeOnboard() error {
 	if !found {
 		// If no specific agent file, suggest creating AGENTS.md
 		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with the unified protocol...")
-		if err := os.WriteFile("AGENTS.md", []byte(unifiedProtocol), 0644); err != nil {
+		fullBlock := ProtocolStartTag + "\n" + unifiedProtocol + "\n" + ProtocolEndTag
+		if err := os.WriteFile("AGENTS.md", []byte(fullBlock), 0644); err != nil {
 			return fmt.Errorf("error creating AGENTS.md: %w", err)
 		}
 		fmt.Println("✓ Created AGENTS.md")

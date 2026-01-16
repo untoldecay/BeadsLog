@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates.
 
 ---
 
@@ -54,20 +54,67 @@ The `bd onboard` command (formerly `bd devlog onboard`) was appending the mandat
 
 ---
 
+### **Phase 3: Protocol Embedding and Tag-Based Replacement**
+
+**Initial Problem:**
+The `bd onboard` command failed when run in other repositories because it tried to read `_rules/AGENTS.md.protocol`, a file that only exists in the BeadsLog source repo. Additionally, blindly prepending the protocol on every run would cause duplication if the user edited the file.
+
+*   **My Assumption/Plan #1:** Go `embed` is the standard way to handle this.
+    *   **Action Taken:** Created `cmd/bd/protocol.go` with the protocol content as a const string (simulating embed to avoid directory structure complexities with `go:embed` across packages).
+
+*   **My Assumption/Plan #2:** Use HTML comments as tags to mark the protocol section for future updates.
+    *   **Action Taken:**
+        *   Defined `<!-- BD_PROTOCOL_START -->` and `<!-- BD_PROTOCOL_END -->`.
+        *   Rewrote `injectProtocol` in `cmd/bd/onboard.go` to search for these tags.
+        *   **Logic:**
+            *   **Tags Found:** Replace content *between* tags with the new protocol (Update).
+            *   **Tags Missing/Broken:** Prepend the full block (Start Tag + Protocol + End Tag) to the file (Install).
+            *   **Idempotency:** If content is identical, do nothing.
+
+*   **Result:**
+    *   The binary is now self-contained (no external file dependency).
+    *   Updates are safe and targeted.
+
+---
+
+### **Phase 4: Comprehensive Sandbox Testing**
+
+**Initial Problem:**
+I needed to verify the complex logic of "Fresh Install", "Update Existing", "Fix Broken Tags", and "Fresh No-Tag File" without risking my own `GEMINI.md`.
+
+*   **My Assumption/Plan #1:** Use the existing `_sandbox/_utils/setup_init_tests.py` framework.
+    *   **Action Taken:**
+        *   Added scenarios `Test-11` to `Test-15` covering all edge cases.
+        *   Generated the sandbox environments.
+        *   Manually ran `bd onboard` in each environment and inspected the output.
+    *   **Result:**
+        *   **Fresh:** Created file with tags.
+        *   **Existing:** Prepended block with tags.
+        *   **Outdated:** Replaced content between tags correctly.
+        *   **Garbage:** Detected broken tags and prepended a fresh block (safety fallback).
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
-*   **Quickstart:** Fully refactored into a unified, dual-mode help system (`--tasks` vs `--devlog`).
-*   **Init:** UX is polished and points to valid commands.
-*   **Onboarding:** Strict protocol enforcement now places instructions at the top of agent files.
+*   **Quickstart:** Unified `--tasks` and `--devlog` modes.
+*   **Onboarding:**
+    *   **Embedded:** No external dependencies.
+    *   **Top-Posted:** Protocol is always at the top of the file.
+    *   **Tag-Managed:** Safe, idempotent updates using `<!-- BD_PROTOCOL_... -->` tags.
+*   **Testing:** Full coverage via sandbox scenarios.
 
 **Key Learnings:**
-*   **CLI UX:** When a tool has two distinct modes (Tasks vs. Memory), a unified entry point (`quickstart` menu) is better than fragmented subcommands.
-*   **Agent Prompts:** "Top-posting" mandatory instructions is critical for reliable agent behavior. Appended instructions are too easily ignored.
+*   **CLI UX:** Unified entry points reduce confusion.
+*   **Agent Prompts:** Mandatory instructions must be at the top.
+*   **Tool Portability:** Never rely on local source files (like `_rules/`) for a distributed binary. Always embed assets.
+*   **Idempotency:** Tag-based content replacement is far superior to simple append/prepend for managing injected code/text in user files.
 
 ---
 
 ### **Architectural Relationships**
 - bd quickstart -> printDevlogQuickstart (calls)
 - bd onboard -> injectProtocol (modifies files)
-- injectProtocol -> GEMINI.md (prepends content)
+- injectProtocol -> GEMINI.md (prepends/updates content)
+- injectProtocol -> protocol.go (reads const)
