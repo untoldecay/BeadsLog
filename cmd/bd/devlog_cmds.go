@@ -520,38 +520,20 @@ var devlogGraphCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
-		type Target struct {
-			ID   string
-			Name string
-		}
-		var targets []Target
+		var targets []queries.ResolvedEntity
 
 		if strict {
 			var id, name string
 			err := db.QueryRowContext(rootCtx, "SELECT id, name FROM entities WHERE name = ?", term).Scan(&id, &name)
 			if err == nil {
-				targets = append(targets, Target{id, name})
+				targets = append(targets, queries.ResolvedEntity{ID: id, Name: name})
 			}
 		} else {
-			// Fuzzy (FTS)
-			query := "SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT ?"
-			matchTerm := term
-			if !strings.ContainsAny(term, "*\"") {
-				matchTerm = term + "*"
-			}
-
-			rows, err := db.QueryContext(rootCtx, query, matchTerm, limit)
-			if err == nil {
-				defer rows.Close()
-				for rows.Next() {
-					var name string
-					if err := rows.Scan(&name); err == nil {
-						var id string
-						if err := db.QueryRowContext(rootCtx, "SELECT id FROM entities WHERE name = ?", name).Scan(&id); err == nil {
-							targets = append(targets, Target{id, name})
-						}
-					}
-				}
+			// Fuzzy (Hybrid FTS + LIKE) via centralized resolver
+			var err error
+			targets, err = queries.ResolveEntities(rootCtx, db, term, limit)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error resolving entities: %v\n", err)
 			}
 		}
 
@@ -568,6 +550,8 @@ var devlogGraphCmd = &cobra.Command{
 			}
 			return
 		}
+
+		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 
 		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 
@@ -810,40 +794,20 @@ var devlogImpactCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
-		type Target struct {
-			ID   string
-			Name string
-		}
-		var targets []Target
+		var targets []queries.ResolvedEntity
 
 		if strict {
 			var id, name string
 			err := db.QueryRowContext(rootCtx, "SELECT id, name FROM entities WHERE name = ?", term).Scan(&id, &name)
 			if err == nil {
-				targets = append(targets, Target{id, name})
+				targets = append(targets, queries.ResolvedEntity{ID: id, Name: name})
 			}
 		} else {
-			// Fuzzy (FTS)
-			query := "SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT ?"
-			matchTerm := term
-			// Basic UX: append * if simple term
-			if !strings.ContainsAny(term, "*\"") {
-				matchTerm = term + "*"
-			}
-
-			rows, err := db.QueryContext(rootCtx, query, matchTerm, limit)
-			if err == nil {
-				defer rows.Close()
-				for rows.Next() {
-					var name string
-					if err := rows.Scan(&name); err == nil {
-						// Resolve ID
-						var id string
-						if err := db.QueryRowContext(rootCtx, "SELECT id FROM entities WHERE name = ?", name).Scan(&id); err == nil {
-							targets = append(targets, Target{id, name})
-						}
-					}
-				}
+			// Fuzzy (Hybrid FTS + LIKE) via centralized resolver
+			var err error
+			targets, err = queries.ResolveEntities(rootCtx, db, term, limit)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error resolving entities: %v\n", err)
 			}
 		}
 
@@ -1177,7 +1141,13 @@ var devlogVerifyCmd = &cobra.Command{
 
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
+	
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
+	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
+	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
+
+	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
+	devlogImpactCmd.Flags().Int("limit", 25, "Max matching entities to show")
 	
 	devlogSearchCmd.Flags().Bool("strict", false, "Disable fuzzy matching and entity expansion")
 	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
