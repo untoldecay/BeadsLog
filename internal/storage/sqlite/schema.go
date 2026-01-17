@@ -304,4 +304,57 @@ WHERE i.status IN ('open', 'in_progress', 'blocked', 'deferred', 'hooked')
   AND d.type = 'blocks'
   AND blocker.status IN ('open', 'in_progress', 'blocked', 'deferred', 'hooked')
 GROUP BY i.id;
+
+-- Full-text search for sessions
+CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+    title,
+    narrative,
+    content='sessions',
+    content_rowid='rowid',
+    tokenize='porter unicode61'
+);
+
+-- Triggers to keep sessions_fts in sync
+CREATE TRIGGER IF NOT EXISTS sessions_ai AFTER INSERT ON sessions BEGIN
+    INSERT INTO sessions_fts(rowid, title, narrative)
+    VALUES (new.rowid, new.title, new.narrative);
+END;
+
+CREATE TRIGGER IF NOT EXISTS sessions_ad AFTER DELETE ON sessions BEGIN
+    INSERT INTO sessions_fts(sessions_fts, rowid, title, narrative)
+    VALUES('delete', old.rowid, old.title, old.narrative);
+END;
+
+CREATE TRIGGER IF NOT EXISTS sessions_au AFTER UPDATE ON sessions BEGIN
+    INSERT INTO sessions_fts(sessions_fts, rowid, title, narrative)
+    VALUES('delete', old.rowid, old.title, old.narrative);
+    INSERT INTO sessions_fts(rowid, title, narrative)
+    VALUES (new.rowid, new.title, new.narrative);
+END;
+
+-- Full-text search for entities
+CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
+    name,
+    content='entities',
+    content_rowid='rowid',
+    tokenize='porter unicode61'
+);
+
+-- Triggers to keep entities_fts in sync
+CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
+    INSERT INTO entities_fts(rowid, name)
+    VALUES (new.rowid, new.name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS entities_ad AFTER DELETE ON entities BEGIN
+    INSERT INTO entities_fts(entities_fts, rowid, name)
+    VALUES('delete', old.rowid, old.name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS entities_au AFTER UPDATE ON entities BEGIN
+    INSERT INTO entities_fts(entities_fts, rowid, name)
+    VALUES('delete', old.rowid, old.name);
+    INSERT INTO entities_fts(rowid, name)
+    VALUES (new.rowid, new.name);
+END;
 `

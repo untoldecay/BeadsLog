@@ -60,6 +60,7 @@ var migrationsList = []Migration{
 			{"devlog_schema", migrations.MigrateDevlogSchema},
 			{"devlog_file_hash", migrations.MigrateDevlogFileHash},
 			{"devlog_missing_flag", migrations.MigrateDevlogMissingFlag},
+			{"populate_fts", migrations.MigratePopulateFTS},
 		}
 		
 		// MigrationInfo contains metadata about a migration for inspection
@@ -126,6 +127,7 @@ func getMigrationDescription(name string) string {
 		"devlog_schema":                "Adds devlog tables: sessions, entities, session_entities, entity_deps",
 		"devlog_file_hash":             "Adds file_hash column to sessions table for content change detection",
 		"devlog_missing_flag":          "Adds is_missing column to sessions table for file existence tracking",
+		"populate_fts":                 "Populates FTS5 indexes for existing sessions and entities",
 	}
 
 	if desc, ok := descriptions[name]; ok {

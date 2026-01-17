@@ -756,6 +756,57 @@ See also:
 - [AIDER_INTEGRATION.md](AIDER_INTEGRATION.md) - Detailed Aider guide
 - [CLAUDE_INTEGRATION.md](CLAUDE_INTEGRATION.md) - Claude integration design
 
+## Devlog Management
+
+### Search
+
+```bash
+# Default hybrid search (BM25 + Graph Expansion)
+bd devlog search "modal"
+
+# Strict text match only
+bd devlog search "modal" --strict
+
+# BM25 only (no graph expansion)
+bd devlog search "modal" --text-only
+
+# JSON output
+bd devlog search "modal" --json
+```
+
+### Dependency Graph
+
+```bash
+# Visualize dependencies (Multi-root, Fuzzy)
+bd devlog graph "modal"
+
+# Exact match with depth control
+bd devlog graph "AddColumnModal" --depth 2 --strict
+```
+
+### Impact Analysis
+
+```bash
+# Check what depends on an entity (Fuzzy)
+bd devlog impact "modal"
+
+# Check exact entity
+bd devlog impact "AddColumnModal" --strict
+```
+
+### Session Management
+
+```bash
+# List all sessions
+bd devlog list
+
+# Show specific session
+bd devlog show [date/filename]
+
+# Resume context (last N sessions)
+bd devlog resume --last 3
+```
+
 ## See Also
 
 - [AGENTS.md](../AGENTS.md) - Main agent workflow guide

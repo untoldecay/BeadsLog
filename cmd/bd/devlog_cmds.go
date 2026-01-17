@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -503,27 +504,83 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 var devlogGraphCmd = &cobra.Command{
 	Use:   "graph [entity]",
-	Short: "Display entity dependency graph",
+	Short: "Display entity dependency graph (Fuzzy)",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		entityName := args[0]
+		term := args[0]
 		depth, _ := cmd.Flags().GetInt("depth")
+		strict, _ := cmd.Flags().GetBool("strict")
+		limit, _ := cmd.Flags().GetInt("limit")
 
-		// Initialize store
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
 			os.Exit(1)
 		}
 		defer store.Close()
+		db := store.UnderlyingDB()
 
-		graph, err := queries.GetEntityGraph(rootCtx, store.UnderlyingDB(), entityName, depth)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error querying graph: %v\n", err)
-			os.Exit(1)
+		type Target struct {
+			ID   string
+			Name string
+		}
+		var targets []Target
+
+		if strict {
+			var id, name string
+			err := db.QueryRowContext(rootCtx, "SELECT id, name FROM entities WHERE name = ?", term).Scan(&id, &name)
+			if err == nil {
+				targets = append(targets, Target{id, name})
+			}
+		} else {
+			// Fuzzy (FTS)
+			query := "SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT ?"
+			matchTerm := term
+			if !strings.ContainsAny(term, "*\"") {
+				matchTerm = term + "*"
+			}
+
+			rows, err := db.QueryContext(rootCtx, query, matchTerm, limit)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var name string
+					if err := rows.Scan(&name); err == nil {
+						var id string
+						if err := db.QueryRowContext(rootCtx, "SELECT id FROM entities WHERE name = ?", name).Scan(&id); err == nil {
+							targets = append(targets, Target{id, name})
+						}
+					}
+				}
+			}
 		}
 
-		printGraph(graph)
+		if len(targets) == 0 {
+			fmt.Printf("No entity found matching '%s'.\n", term)
+
+			// Suggestions
+			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
+			if len(suggestions) > 0 {
+				fmt.Println("\nDid you mean?")
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s)
+				}
+			}
+			return
+		}
+
+		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
+
+		for _, t := range targets {
+			fmt.Printf("=== %s ===\n", t.Name)
+			graph, err := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
+			if err != nil {
+				fmt.Printf("Error querying graph: %v\n", err)
+			} else {
+				printGraph(graph)
+			}
+			fmt.Println()
+		}
 	},
 }
 
@@ -659,10 +716,20 @@ var devlogShowCmd = &cobra.Command{
 
 var devlogSearchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search sessions and entities",
+	Short: "Search sessions and entities (Hybrid BM25 + Graph)",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := args[0]
+		strict, _ := cmd.Flags().GetBool("strict")
+		textOnly, _ := cmd.Flags().GetBool("text-only")
+		limit, _ := cmd.Flags().GetInt("limit")
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+
+		// Fallback to global json flag if not explicitly set on command
+		if !cmd.Flags().Changed("json") {
+			jsonOutput, _ = cmd.InheritedFlags().GetBool("json")
+		}
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
@@ -670,74 +737,165 @@ var devlogSearchCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		fmt.Printf("Searching for: %s\n\n", query)
-		
-		fmt.Println("Sessions:")
-		rows, _ := store.UnderlyingDB().QueryContext(rootCtx, "SELECT title FROM sessions WHERE title LIKE ? OR narrative LIKE ?", "%"+query+"%", "%"+query+"%")
-		foundSessions := false
-		for rows != nil && rows.Next() {
-			foundSessions = true
-			var title string
-			rows.Scan(&title)
-			fmt.Printf("- %s\n", title)
-		}
-		if rows != nil { rows.Close() }
-		if !foundSessions {
-			fmt.Println("  (No sessions found)")
+		opts := queries.SearchOptions{
+			Query:    query,
+			Limit:    limit,
+			Strict:   strict,
+			TextOnly: textOnly,
 		}
 
-		fmt.Println("\nEntities:")
-		rows, _ = store.UnderlyingDB().QueryContext(rootCtx, "SELECT name FROM entities WHERE name LIKE ?", "%"+query+"%")
-		foundEntities := false
-		for rows != nil && rows.Next() {
-			foundEntities = true
-			var name string
-			rows.Scan(&name)
-			fmt.Printf("- %s\n", name)
+		results, err := queries.HybridSearch(rootCtx, store.UnderlyingDB(), opts)
+		if err != nil {
+			// If FTS tables missing (migration issue), fallback or error?
+			// Error is better.
+			fmt.Fprintf(os.Stderr, "Error executing search: %v\n", err)
+			os.Exit(1)
 		}
-		if rows != nil { rows.Close() }
-		if !foundEntities {
-			fmt.Println("  (No entities found)")
+
+		if jsonOutput {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			enc.Encode(results)
+			return
+		}
+
+		if len(results) == 0 {
+			fmt.Println("No results found.")
+
+			// Try "Did you mean?"
+			suggestions, _ := queries.SuggestEntities(rootCtx, store.UnderlyingDB(), query)
+			if len(suggestions) > 0 {
+				fmt.Println("\nDid you mean one of these entities?")
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s)
+				}
+			}
+			return
+		}
+
+		fmt.Printf("Found %d matches for '%s':\n\n", len(results), query)
+		for _, r := range results {
+			reason := ""
+			// Only show reason if it's interesting (not just text match)
+			if !strict && !textOnly && r.Reason != "text match" {
+				reason = fmt.Sprintf(" (%s)", r.Reason)
+			}
+
+			fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
+			if r.Narrative != "" {
+				// Clean up snippet bold tags for CLI
+				clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
+				clean = strings.ReplaceAll(clean, "</b>", "**")
+				fmt.Printf("  %s\n", clean)
+			}
+			fmt.Println()
 		}
 	},
 }
 
 var devlogImpactCmd = &cobra.Command{
 	Use:   "impact [entity]",
-	Short: "Show what depends on an entity",
+	Short: "Show what depends on an entity (Fuzzy)",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		entityName := args[0]
+		term := args[0]
+		strict, _ := cmd.Flags().GetBool("strict")
+		limit, _ := cmd.Flags().GetInt("limit")
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
 			os.Exit(1)
 		}
 		defer store.Close()
+		db := store.UnderlyingDB()
 
-		rows, err := store.UnderlyingDB().QueryContext(rootCtx, `
-			SELECT e.name, ed.relationship 
-			FROM entity_deps ed 
-			JOIN entities e ON ed.from_entity = e.id 
-			WHERE ed.to_entity IN (SELECT id FROM entities WHERE LOWER(name) = LOWER(?))
-		`, entityName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+		type Target struct {
+			ID   string
+			Name string
 		}
-		defer rows.Close()
+		var targets []Target
 
-		fmt.Printf("Impact of %s:\n", entityName)
-		found := false
-		for rows.Next() {
-			found = true
-			var name, rel string
-			rows.Scan(&name, &rel)
-			fmt.Printf("- %s (%s)\n", name, rel)
+		if strict {
+			var id, name string
+			err := db.QueryRowContext(rootCtx, "SELECT id, name FROM entities WHERE name = ?", term).Scan(&id, &name)
+			if err == nil {
+				targets = append(targets, Target{id, name})
+			}
+		} else {
+			// Fuzzy (FTS)
+			query := "SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT ?"
+			matchTerm := term
+			// Basic UX: append * if simple term
+			if !strings.ContainsAny(term, "*\"") {
+				matchTerm = term + "*"
+			}
+
+			rows, err := db.QueryContext(rootCtx, query, matchTerm, limit)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var name string
+					if err := rows.Scan(&name); err == nil {
+						// Resolve ID
+						var id string
+						if err := db.QueryRowContext(rootCtx, "SELECT id FROM entities WHERE name = ?", name).Scan(&id); err == nil {
+							targets = append(targets, Target{id, name})
+						}
+					}
+				}
+			}
 		}
-		if !found {
-			fmt.Println("  (No known dependencies found)")
-			fmt.Println("  Tip: Run 'bd devlog verify --fix' to audit sessions for missing metadata.")
+
+		if len(targets) == 0 {
+			fmt.Printf("No entity found matching '%s'.\n", term)
+
+			// Suggestions
+			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
+			if len(suggestions) > 0 {
+				fmt.Println("\nDid you mean?")
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s)
+				}
+			}
+			return
+		}
+
+		fmt.Printf("Impact of '%s' (%d matches):\n\n", term, len(targets))
+
+		for _, t := range targets {
+			fmt.Printf("[%s]\n", t.Name)
+
+			rows, err := db.QueryContext(rootCtx, `
+				SELECT e.name, ed.relationship 
+				FROM entity_deps ed 
+				JOIN entities e ON ed.from_entity = e.id 
+				WHERE ed.to_entity = ?
+			`, t.ID)
+
+			if err != nil {
+				fmt.Printf("  Error querying deps: %v\n", err)
+				continue
+			}
+			
+			// Must iterate completely or close explicitly inside loop if using defer rows.Close() in loop?
+			// Better to just iterate and close manually or use a func closure.
+			// Re-using 'rows' variable in loop is risky if deferred.
+			// Let's iterate and not defer inside loop, just Close() at end of iteration.
+			
+			foundDeps := false
+			for rows.Next() {
+				foundDeps = true
+				var name, rel string
+				rows.Scan(&name, &rel)
+				fmt.Printf("- %s (%s)\n", name, rel)
+			}
+			rows.Close()
+			
+			if !foundDeps {
+				fmt.Println("  (No known dependencies)")
+			}
+			fmt.Println()
 		}
 	},
 }
@@ -1020,6 +1178,11 @@ var devlogVerifyCmd = &cobra.Command{
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
+	
+	devlogSearchCmd.Flags().Bool("strict", false, "Disable fuzzy matching and entity expansion")
+	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
+	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
+
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
 	devlogVerifyCmd.Flags().Bool("fix", false, "Generate re-investigation directive for AI agents")
 

@@ -42,3 +42,7 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Sync Verbosity | Made 'bd devlog sync' report 'Already up to date' by default | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [analysis] Fuzzy Logic Plan | Created plan for fuzzy matching and graph optimizations | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [chore] Future Planning | Created issue to consolidate search optimization strategies | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [feature] Hybrid Search | Implemented FTS5 BM25 + Entity Graph expansion for smart search | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
+| [enhance] Fuzzy Commands | Updated graph/impact commands to be fuzzy and multi-root aware | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
+| [feature] FTS Foundation | Added virtual tables and auto-sync triggers to SQLite schema | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
+| [enhance] CLI Suggestions | Added "Did you mean?" suggestions to empty search results | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
