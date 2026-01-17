@@ -146,8 +146,8 @@ The `bd devlog verify` command was returning "All sessions have linked entities"
 **Initial Problem:**
 Despite adding `### Architectural Relationships` blocks, graphs remained empty. The regex parser was failing to match entities with spaces or special characters (e.g., `POST /api/v1/user` or `User Profile`).
 
-*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9–_]+` was too strict.
-    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^S* *-S* *(.+?)S* *->S* *(.+?)(?:S* *(([^)]+)))?$`. 
+*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9\-_]+` was too strict.
+    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^\s*-\s+(.+?)\s+->\s+(.+?)(?:\s+\(([^)]+)\))?$`. 
     *   **Result:** This non-greedy match anchored to the arrow and line end correctly captures complex entity names, allowing graphs to populate correctly.
 
 ---
@@ -162,12 +162,10 @@ Despite adding `### Architectural Relationships` blocks, graphs remained empty. 
 
 ---
 
-### **Phase 10: Fuzzy Logic Plan Analysis**
+### **Phase 10: Future Planning**
 
-**Initial Problem:**
-Strict matching on graph and impact commands leads to "false empty" results when users don't know the exact entity name (e.g. "modal" vs "AddColumnModal").
-
-*   **Action Taken:** Created a comprehensive analysis plan `_rules/_analysis/2026-01-16_fuzzy-graph-optimization-plan.md` to guide future improvements for fuzzy matching, grouping, and noise control.
+**Action:**
+Created `_rules/_analysis/2026-01-16_confront-search-optimisation.md` and `_rules/_analysis/2026-01-16_fuzzy-graph-optimization-plan.md`. Initiated `bd-x1s` (Chore) to merge these plans and define the roadmap for BM25 search, fuzzy matching, and graph visual improvements.
 
 ---
 
@@ -181,7 +179,7 @@ Strict matching on graph and impact commands leads to "false empty" results when
 *   **Verify:** Audits missing relationships.
 *   **Parsing:** Supports complex entity names in relationship graphs.
 *   **UX:** Explicit success messages.
-*   **Future:** Fuzzy logic plan defined.
+*   **Future:** Search & Fuzzy optimization plans drafted.
 
 **Key Learnings:**
 *   **CLI UX:** Unified entry points reduce confusion. Silence is not always golden.
