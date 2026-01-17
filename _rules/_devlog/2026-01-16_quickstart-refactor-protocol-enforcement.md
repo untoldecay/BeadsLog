@@ -3,7 +3,7 @@
 **Date:** 2026-01-16
 
 ### **Objective:**
-To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, index integrity checks were added, the `verify` command was enhanced, and regex parsing for relationships was fixed.
+To refactor the `bd quickstart` command into a unified entry point supporting both Task (forward) and Devlog (backward) workflows, fix outdated references in `bd init`, and enforce the placement of the Devlog Protocol at the top of agent instruction files for better visibility. Later in the session, the focus shifted to hardening the `bd onboard` command by embedding the protocol into the binary and implementing tag-based replacement for safer updates. Finally, `bd init` was updated to support multi-agent files, automatic versioning was implemented, index integrity checks were added, the `verify` command was enhanced, regex parsing for relationships was fixed, and sync verbosity was improved.
 
 ---
 
@@ -146,8 +146,8 @@ The `bd devlog verify` command was returning "All sessions have linked entities"
 **Initial Problem:**
 Despite adding `### Architectural Relationships` blocks, graphs remained empty. The regex parser was failing to match entities with spaces or special characters (e.g., `POST /api/v1/user` or `User Profile`).
 
-*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9\-_]+` was too strict.
-    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^\s*-\s+(.+?)\s+->\s+(.+?)(?:\s+\(([^)]+)\))?$`. 
+*   **My Assumption/Plan #1:** The regex `[a-zA-Z0-9–_]+` was too strict.
+    *   **Action Taken:** Updated the regex in `cmd/bd/devlog_core.go` to `(?m)^S* *-S* *(.+?)S* *->S* *(.+?)(?:S* *(([^)]+)))?$`. 
     *   **Result:** This non-greedy match anchored to the arrow and line end correctly captures complex entity names, allowing graphs to populate correctly.
 
 ---
@@ -162,6 +162,15 @@ Despite adding `### Architectural Relationships` blocks, graphs remained empty. 
 
 ---
 
+### **Phase 10: Fuzzy Logic Plan Analysis**
+
+**Initial Problem:**
+Strict matching on graph and impact commands leads to "false empty" results when users don't know the exact entity name (e.g. "modal" vs "AddColumnModal").
+
+*   **Action Taken:** Created a comprehensive analysis plan `_rules/_analysis/2026-01-16_fuzzy-graph-optimization-plan.md` to guide future improvements for fuzzy matching, grouping, and noise control.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:**
@@ -172,6 +181,7 @@ Despite adding `### Architectural Relationships` blocks, graphs remained empty. 
 *   **Verify:** Audits missing relationships.
 *   **Parsing:** Supports complex entity names in relationship graphs.
 *   **UX:** Explicit success messages.
+*   **Future:** Fuzzy logic plan defined.
 
 **Key Learnings:**
 *   **CLI UX:** Unified entry points reduce confusion. Silence is not always golden.

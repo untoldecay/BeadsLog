@@ -40,3 +40,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Verify Relationships | Enhanced verify command to audit for missing relationship data | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [fix] Relationship Parsing | Relaxed regex to support spaces/symbols in entity relationships | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
 | [enhance] Sync Verbosity | Made 'bd devlog sync' report 'Already up to date' by default | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
+| [analysis] Fuzzy Logic Plan | Created plan for fuzzy matching and graph optimizations | 2026-01-16 | [2026-01-16_quickstart-refactor-protocol-enforcement.md](2026-01-16_quickstart-refactor-protocol-enforcement.md) |
