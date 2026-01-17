@@ -46,3 +46,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Fuzzy Commands | Updated graph/impact commands to be fuzzy and multi-root aware | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
 | [feature] FTS Foundation | Added virtual tables and auto-sync triggers to SQLite schema | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
 | [enhance] CLI Suggestions | Added "Did you mean?" suggestions to empty search results | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
+| [debug] Fuzzy Search Resolution | Diagnosed and fixed the "No entity found" bug in graph/impact commands | 2026-01-17 | [2026-01-17_fuzzy-search-graph-debug.md](2026-01-17_fuzzy-search-graph-debug.md) |
