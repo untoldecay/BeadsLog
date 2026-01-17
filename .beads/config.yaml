@@ -52,3 +52,5 @@ sync-branch: "beads-metadata"
 # - linear.api-key
 # - github.org
 # - github.repo
+
+devlog.enforce-on-commit: true

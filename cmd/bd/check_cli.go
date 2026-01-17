@@ -85,6 +85,12 @@ func runPreCommitCheck() {
 				hasIndexChange = true
 			}
 		} else {
+			// Ignore .beads directory changes (metadata updates)
+			if strings.HasPrefix(cleanFile, ".beads"+string(filepath.Separator)) {
+				continue
+			}
+			// Ignore .gitignore and other common non-code files if desired?
+			// For now, let's keep it strict but allow metadata syncs.
 			hasCodeChange = true
 		}
 	}

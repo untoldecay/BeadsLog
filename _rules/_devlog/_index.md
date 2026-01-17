@@ -48,3 +48,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] CLI Suggestions | Added "Did you mean?" suggestions to empty search results | 2026-01-17 | [2026-01-17_search-optimization.md](2026-01-17_search-optimization.md) |
 | [debug] Fuzzy Search Resolution | Diagnosed and fixed the "No entity found" bug in graph/impact commands | 2026-01-17 | [2026-01-17_fuzzy-search-graph-debug.md](2026-01-17_fuzzy-search-graph-debug.md) |
 | [feature] Devlog Enforcement | Implemented 'bd check' and pre-commit hook to block commits without devlog updates | 2026-01-17 | [2026-01-17_devlog-enforcement-implementation.md](2026-01-17_devlog-enforcement-implementation.md) |
+| [fix] Devlog Pre-Commit Check | Refined pre-commit check to ignore .beads/ changes to prevent redundant devlog updates | 2026-01-17 | [2026-01-17_fix-devlog-precommit-check.md](2026-01-17_fix-devlog-precommit-check.md) |
