@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/debug"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
 
@@ -175,44 +177,83 @@ var configListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all configuration",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Config operations work in direct mode only
-		if err := ensureDirectMode("config list requires direct database access"); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
+		// Get all settings from Viper (config.yaml and defaults)
+		allViperSettings := config.AllSettings()
 
-		ctx := rootCtx
-		config, err := store.GetAllConfig(ctx)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listing config: %v\n", err)
-			os.Exit(1)
+		// Try to get database-stored config (if DB is accessible)
+		dbConfig := make(map[string]string)
+		var dbErr error
+		if storeActive && store != nil { // Check if store is initialized and active
+			dbConfig, dbErr = store.GetAllConfig(rootCtx)
+			if dbErr != nil && dbErr != storage.ErrDBNotInitialized {
+				fmt.Fprintf(os.Stderr, "Warning: failed to retrieve database config: %v\n", dbErr)
+			}
+		} else {
+			// If store is not active or initialized, ensure direct mode error is shown if it's a DB operation.
+			// For list, we're okay showing YAML config even without DB.
+			debug.Logf("database not active or initialized, skipping DB config list")
 		}
 
 		if jsonOutput {
-			outputJSON(config)
+			outputJSON(map[string]interface{}{
+				"yaml_settings": allViperSettings,
+				"db_settings":   dbConfig,
+				"db_error":      dbErr.Error(), // Only if error occurred
+			})
 			return
 		}
-
-		if len(config) == 0 {
-			fmt.Println("No configuration set")
-			return
-		}
-
-		// Sort keys for consistent output
-		keys := make([]string, 0, len(config))
-		for k := range config {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
 
 		fmt.Println("\nConfiguration:")
-		for _, k := range keys {
-			fmt.Printf("  %s = %s\n", k, config[k])
+
+		// Collect all unique keys from both sources for sorted display
+		allKeys := make(map[string]bool)
+		for k := range allViperSettings {
+			allKeys[k] = true
+		}
+		for k := range dbConfig {
+			allKeys[k] = true
 		}
 
-		// Check for config.yaml overrides that take precedence (bd-20j)
-		// This helps diagnose when effective config differs from database config
-		showConfigYAMLOverrides(config)
+		sortedKeys := make([]string, 0, len(allKeys))
+		for k := range allKeys {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+
+		// Display settings
+		var yamlCount, dbCount int
+		for _, k := range sortedKeys {
+			// Check if it's a YAML-only key or explicitly set in YAML
+			isYamlOnly := config.IsYamlOnlyKey(k)
+			valFromViper := config.GetYamlConfig(k) // Gets effective value from Viper (which considers defaults)
+
+			if dbVal, ok := dbConfig[k]; ok {
+				// Key exists in DB
+				if isYamlOnly {
+					// Should not happen for IsYamlOnlyKey to be in DB config, but handle defensively
+					fmt.Printf("  %s = %s (DB/YAML conflict, DB value shown)\n", k, dbVal)
+				} else {
+					// DB-stored config
+					fmt.Printf("  %s = %s (DB)\n", k, dbVal)
+				}
+				dbCount++
+			} else if valFromViper != "" {
+				// Key is not in DB, but has a value from Viper (YAML or default)
+				source := "YAML"
+				if config.GetValueSource(k) == config.SourceDefault {
+					source = "Default"
+				}
+				fmt.Printf("  %s = %s (%s)\n", k, valFromViper, source)
+				yamlCount++
+			}
+		}
+
+		if yamlCount == 0 && dbCount == 0 {
+			fmt.Println("  No configuration set.")
+		}
+
+		// Show config.yaml overrides for DB values
+		showConfigYAMLOverrides(dbConfig)
 	},
 }
 

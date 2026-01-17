@@ -486,6 +486,34 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
+		// Prompt for Devlog Enforcement (Interactive Mode Only)
+		// Only ask if not stealth, not quiet, and config doesn't already exist
+		// Check if enforcement is already configured to avoid re-asking
+		enforceConfigured := config.GetYamlConfig("devlog.enforce-on-commit") != ""
+		if !quiet && !stealth && !enforceConfigured {
+			// Use simple fmt Scan for y/n prompt
+			fmt.Print("\n[Devlog Policy]\n")
+			fmt.Print("Do you want to ENFORCE devlog updates on every commit? [y/N] ")
+			
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+			
+			if response == "y" || response == "yes" {
+				if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to set devlog enforcement: %v\n", err)
+				} else {
+					fmt.Printf("  %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
+				}
+			} else {
+				// Explicitly set to false so we don't ask again next time? 
+				// Or leave unset (default false). Let's set false for clarity.
+				if err := config.SetYamlConfig("devlog.enforce-on-commit", "false"); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to set devlog enforcement: %v\n", err)
+				}
+				fmt.Printf("  %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
+			}
+		}
 
 
 		// Skip output if quiet mode

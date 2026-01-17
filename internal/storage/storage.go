@@ -4,9 +4,14 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/untoldecay/BeadsLog/internal/types"
 )
+
+// ErrDBNotInitialized is returned when attempting to use a database storage feature
+// (like GetConfig) when the database has not been initialized.
+var ErrDBNotInitialized = errors.New("database not initialized")
 
 // Transaction provides atomic multi-operation support within a single database transaction.
 //

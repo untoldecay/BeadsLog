@@ -66,6 +66,10 @@ var YamlOnlyKeys = map[string]bool{
 	"validation.on-create": true,
 	"validation.on-sync":   true,
 
+	// Devlog settings (bd-tod)
+	"devlog.enforce-on-commit": true,
+	"devlog.dir":               true,
+
 	// Hierarchy settings (GH#995)
 	"hierarchy.max-depth": true,
 }

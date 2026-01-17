@@ -377,6 +377,22 @@ func GetStringMapString(key string) map[string]string {
 	return v.GetStringMapString(key)
 }
 
+// GetDevlogEnforceOnCommit retrieves the devlog.enforce-on-commit configuration value
+func GetDevlogEnforceOnCommit() bool {
+	if v == nil {
+		return false
+	}
+	return v.GetBool("devlog.enforce-on-commit")
+}
+
+// GetDevlogDir retrieves the devlog.dir configuration value
+func GetDevlogDir() string {
+	if v == nil {
+		return ""
+	}
+	return v.GetString("devlog.dir")
+}
+
 // GetDirectoryLabels returns labels for the current working directory based on config.
 // It checks directory.labels config for matching patterns.
 // Returns nil if no labels are configured for the current directory.
