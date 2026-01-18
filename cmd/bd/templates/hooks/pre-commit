@@ -16,4 +16,10 @@ if ! command -v bd >/dev/null 2>&1; then
     exit 0
 fi
 
+# Run bd devlog compliance check
+# This command exits with 1 if devlog is not compliant, blocking the commit.
+if ! bd check --hook pre-commit; then
+    exit 1
+fi
+
 exec bd hooks run pre-commit "$@"

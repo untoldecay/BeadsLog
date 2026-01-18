@@ -1,3 +1,5 @@
+BEFORE ANYTHING ELSE: run 'bd onboard'
+
 <!-- BD_PROTOCOL_START -->
 # Agent Instructions
 
