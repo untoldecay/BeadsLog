@@ -291,6 +291,12 @@ if [ -z "$BEADS_DIR" ]; then
     exit 0
 fi
 
+# Run bd devlog compliance check
+# This command exits with 1 if devlog is not compliant, blocking the commit.
+if ! bd check --hook pre-commit; then
+    exit 1
+fi
+
 # Flush pending changes to JSONL
 if ! bd sync --flush-only >/dev/null 2>&1; then
     echo "Error: Failed to flush bd changes to JSONL" >&2
