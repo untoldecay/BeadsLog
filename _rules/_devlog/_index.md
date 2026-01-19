@@ -54,3 +54,4 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] bd init hook prompt | Fixed regression where bd init skipped enforcement prompt | 2026-01-19 | [2026-01-19_debug-hook-init-prompt.md](2026-01-19_debug-hook-init-prompt.md) |
 | [fix] Bootstrap trigger verification | Fixed init to replace protocol with trigger, forcing agent refresh | 2026-01-19 | [2026-01-19_debug-hook-init-prompt.md](2026-01-19_debug-hook-init-prompt.md) |
 | [verify] Agent trap system | Verified bootstrap injection, protocol install, self-healing, idempotency | 2026-01-20 | [2026-01-20_agent-trap-verification.md](2026-01-20_agent-trap-verification.md) |
+| [enhance] Init UX improvement | Added devlog database status check to guide users on existing devlogs | 2026-01-20 | [2026-01-20_agent-trap-verification.md](2026-01-20_agent-trap-verification.md) |

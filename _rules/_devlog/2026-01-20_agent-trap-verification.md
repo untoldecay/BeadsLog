@@ -127,6 +127,39 @@ To verify the complete Agent Trap system functionality, including bootstrap trig
 
 ---
 
+### **Phase 7: Init UX Improvement - Devlog Database Status Check**
+
+**Initial Problem:** When users run `bd init` on projects that already have devlog data, the initialization would complete silently. Users might think they're in the wrong project or that devlog is broken when they query/search and get no results.
+
+*   **My Assumption/Plan #1:** Instead of relying on users to figure out they need to run `bd devlog sync`, add a database status check after devlog scaffolding initialization.
+    *   **Action Taken:** Modified `initializeDevlog` function in `cmd/bd/devlog_cmds.go` to add a database session count check after scaffolding is created.
+    *   **Result:** After devlog scaffolding is initialized, the system now:
+        1. Checks if devlog database has any existing sessions
+        2. If database is empty or error occurs → shows status as ready for import (this is normal for new setup)
+        3. If database has existing sessions → shows warning with helpful next steps
+        4. Continues with initialization regardless (non-blocking)
+    *   **Analysis/Correction:** This improves user onboarding experience:
+        - Non-blocking: Initialization completes even with existing devlogs (doesn't interrupt mid-flow)
+        - Clear guidance: Users see exactly what to do next (sync, status, reset)
+        - Consistent UX: Uses warning icon (⚠) similar to Beads doctor output
+        - Context awareness: Users understand their project already has devlog data before they start using commands
+
+**Example Output with Existing Devlogs:**
+```
+  ✓ Checking devlog database...
+    ⚠ Devlog database has 1 existing session(s)
+
+    Your project already has devlog data. To continue:
+
+      • To update: Run 'bd devlog sync' to import new devlogs
+      • To view: Run 'bd devlog status' to check your devlog system
+      • To reset: Run 'bd devlog reset' to clear all devlog data
+
+    Continuing with initialization...
+```
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** The Agent Trap system is fully functional and verified. All components work correctly:
@@ -158,3 +191,5 @@ To verify the complete Agent Trap system functionality, including bootstrap trig
 - injectProtocol -> Agent instruction files (removes trigger, injects protocol)
 - cmd/bd/protocol.go -> AgentProtocol (defines protocol content)
 - AgentProtocol -> bd onboard command (embedded as constant)
+- cmd/bd/devlog_cmds.go -> initializeDevlog (adds database status check)
+- initializeDevlog -> SQLite (queries session count)

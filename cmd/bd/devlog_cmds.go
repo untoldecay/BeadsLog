@@ -115,6 +115,42 @@ func initializeDevlog(baseDir string, quiet bool) {
 			fmt.Println("  Run 'bd devlog sync' to ingest all devlogs in the system.")
 		}
 		fmt.Println() // Added for spacing
+
+		// Devlog Database Status Check
+		fmt.Printf("  %s Checking devlog database...\n", ui.RenderPass("✓"))
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			// Database not available yet (this is ok for fresh init)
+			fmt.Printf("    Devlog database not ready (this is normal for new setup)\n")
+			fmt.Println()
+		} else {
+			defer store.Close()
+
+			// Check if there are existing sessions in the database
+			var sessionCount int
+			err := store.UnderlyingDB().QueryRowContext(rootCtx, "SELECT COUNT(*) FROM sessions").Scan(&sessionCount)
+
+			if err != nil || sessionCount == 0 {
+				// No sessions or error checking - this is ok for fresh init
+				if err != nil {
+					fmt.Printf("    Unable to check existing sessions (this is normal for new setup)\n")
+				} else {
+					fmt.Printf("    %s Devlog database is empty (ready for import)\n", ui.RenderPass("✓"))
+				}
+				fmt.Println()
+			} else {
+				// Sessions exist - user may think they're in base project
+				fmt.Printf("    %s Devlog database has %d existing session(s)\n", ui.RenderWarn("⚠"), sessionCount)
+				fmt.Println()
+				fmt.Println("    Your project already has devlog data. To continue:")
+				fmt.Println()
+				fmt.Println("      • To update: Run 'bd devlog sync' to import new devlogs")
+				fmt.Println("      • To view: Run 'bd devlog status' to check your devlog system")
+				fmt.Println("      • To reset: Run 'bd devlog reset' to clear all devlog data")
+				fmt.Println()
+				fmt.Println("    Continuing with initialization...")
+			}
+		}
 	}
 
 	// Agent Rules Integration
