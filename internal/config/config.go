@@ -122,6 +122,10 @@ func Initialize() error {
 	v.SetDefault("validation.on-create", "none")
 	v.SetDefault("validation.on-sync", "none")
 
+	// Devlog configuration defaults
+	v.SetDefault("devlog.enforce-on-commit", false)
+	v.SetDefault("devlog.dir", "")
+
 	// Hierarchy configuration defaults (GH#995)
 	// Maximum nesting depth for hierarchical IDs (e.g., bd-abc.1.2.3)
 	// Default matches types.MaxHierarchyDepth constant

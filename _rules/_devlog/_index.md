@@ -50,3 +50,4 @@ This index provides a concise record of all development work for easy scanning a
 | [feature] Devlog Enforcement | Implemented 'bd check' and pre-commit hook to block commits without devlog updates | 2026-01-17 | [2026-01-17_devlog-enforcement-implementation.md](2026-01-17_devlog-enforcement-implementation.md) |
 | [fix] Devlog Pre-Commit Check | Refined pre-commit check to ignore .beads/ changes to prevent redundant devlog updates | 2026-01-17 | [2026-01-17_fix-devlog-precommit-check.md](2026-01-17_fix-devlog-precommit-check.md) |
 | [fix] Devlog Enforcement Recovery | Restored missing hook wiring and verified enforcement | 2026-01-18 | [2026-01-18_devlog-enforcement-recovery.md](2026-01-18_devlog-enforcement-recovery.md) |
+| [fix] bd config devlog settings | bd config help/list incomplete for devlog | 2026-01-19 | [2026-01-19_fix-bd-config-devlog-settings.md](2026-01-19_fix-bd-config-devlog-settings.md) |

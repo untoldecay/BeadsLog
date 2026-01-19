@@ -25,6 +25,7 @@ Common namespaces:
   - jira.*       Jira integration settings
   - linear.*     Linear integration settings
   - github.*     GitHub integration settings
+  - devlog.*     Devlog configuration settings
   - custom.*     Custom integration settings
   - status.*     Issue status configuration
 
@@ -207,9 +208,8 @@ var configListCmd = &cobra.Command{
 
 		// Collect all unique keys from both sources for sorted display
 		allKeys := make(map[string]bool)
-		for k := range allViperSettings {
-			allKeys[k] = true
-		}
+		flattenMap(allViperSettings, "", allKeys)
+
 		for k := range dbConfig {
 			allKeys[k] = true
 		}
@@ -315,4 +315,20 @@ func init() {
 	configCmd.AddCommand(configListCmd)
 	configCmd.AddCommand(configUnsetCmd)
 	rootCmd.AddCommand(configCmd)
+}
+
+// flattenMap recursively flattens a map[string]interface{} into a map[string]bool
+// where keys are dot-separated paths.
+func flattenMap(m map[string]interface{}, prefix string, result map[string]bool) {
+	for k, v := range m {
+		fullKey := k
+		if prefix != "" {
+			fullKey = prefix + "." + k
+		}
+		if nested, ok := v.(map[string]interface{}); ok {
+			flattenMap(nested, fullKey, result)
+		} else {
+			result[fullKey] = true
+		}
+	}
 }
