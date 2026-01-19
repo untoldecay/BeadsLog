@@ -49,17 +49,34 @@ To address issue `bd-agz` by integrating Levenshtein distance for typo correctio
 
 ---
 
+### **Phase 4: Vendoring Dependencies**
+
+**Initial Problem:** To minimize external dependencies and keep the project self-contained (adhering to core mandates), relying on `agnivade/levenshtein` and `lithammer/fuzzysearch` was suboptimal.
+
+*   **Action Taken:**
+    *   Implemented a simple, standard Levenshtein distance algorithm in `internal/utils/string_distance.go`.
+    *   Implemented a basic substring fuzzy match algorithm in `internal/utils/string_fuzzy.go`.
+    *   Refactored `internal/queries/fuzzy.go` to use these internal utilities instead of external packages.
+    *   Removed `internal/queries/entity_utils.go` as its logic was merged into `fuzzy.go` and `internal/utils`.
+    *   Cleaned up `go.mod` to remove the external dependencies.
+*   **Result:** The search functionality remains identical, but the project now has zero new external dependencies.
+*   **Analysis/Correction:** This approach ensures better long-term maintainability and reduced build complexity.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Issue `bd-agz` is closed. The core logic for typo correction (Levenshtein) and fuzzy entity matching has been implemented and integrated into the `bd devlog search` command. The multi-tier search orchestration is in place, providing more intelligent suggestions to the user.
+**Final Status:** Issue `bd-agz` is closed. The core logic for typo correction (Levenshtein) and fuzzy entity matching has been implemented and integrated into the `bd devlog search` command. The implementation was refined to use internal utility functions, eliminating the need for external dependencies. The multi-tier search orchestration is in place, providing more intelligent suggestions to the user.
 **Key Learnings:**
 *   Integrating external Go libraries for string distance and fuzzy matching significantly enhances search capabilities.
 *   Careful orchestration in the CLI layer is needed to present a multi-tier search experience, moving from exact matches to more forgiving suggestions.
+*   Vendoring simple algorithms (like Levenshtein) is often preferable to adding small external dependencies for project hygiene.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd-agz -> internal/queries/entity_utils.go (creates)
+- bd-agz -> internal/utils/string_distance.go (creates)
+- bd-agz -> internal/utils/string_fuzzy.go (creates)
 - bd-agz -> internal/queries/fuzzy.go (modifies)
 - bd-agz -> cmd/bd/devlog_cmds.go (modifies)

@@ -5,11 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
-	"strings"
 
-	"github.com/lithammer/fuzzysearch/fuzzy"
-	entity_queries "github.com/untoldecay/BeadsLog/internal/queries/entity_utils"
-)
+	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
 type ResolvedEntity struct {
@@ -106,14 +103,14 @@ func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, er
 		return names, nil // Return direct matches if any
 	}
 
-	// No direct matches, try typo correction (Levenshtein)
-	allEntityNames, err := entity_queries.GetAllEntityNames(ctx, db) // Get all entity names
+	// No direct matches, try typo correction (Levenshtein) and fuzzy matching
+	allEntityNames, err := getAllEntityNames(ctx, db) // Get all entity names
 	if err != nil {
 		return nil, err
 	}
 
 	// Max Levenshtein distance of 2 for a suggestion (configurable)
-	closestName, dist := entity_queries.FindClosestEntity(term, allEntityNames, 2)
+	closestName, dist := findClosestEntity(term, allEntityNames, 2)
 	if closestName != "" {
 		return []string{fmt.Sprintf("%s (distance: %d) ⭐", closestName, dist)}, nil
 	}
@@ -121,13 +118,11 @@ func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, er
 	// No Levenshtein match, try fuzzy matching (e.g., "mod" -> "managecolumnsmodal")
 	var fuzzySuggestions []string
 	for _, candidate := range allEntityNames {
-		// Use fuzzy.RuneMatchFold for case-insensitive matching
-		if fuzzy.MatchFold(term, candidate) {
+		if utils.FuzzyMatch(term, candidate) {
 			fuzzySuggestions = append(fuzzySuggestions, candidate)
 		}
 	}
-	// Sort fuzzy suggestions by relevance (e.g., shortest match first, or score)
-	// For simplicity, just sort alphabetically for now
+	// Sort fuzzy suggestions alphabetically
 	sort.Strings(fuzzySuggestions)
 	if len(fuzzySuggestions) > 0 {
 		// Limit to top 5 fuzzy suggestions
@@ -140,3 +135,49 @@ func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, er
 	return nil, nil // No suggestions found
 }
 
+// getAllEntityNames retrieves all entity names from the database.
+func getAllEntityNames(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name FROM entities ORDER BY name ASC")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query entity names: %w", err)
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("failed to scan entity name: %w", err)
+		}
+		names = append(names, name)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating entity names: %w", err)
+	}
+
+	return names, nil
+}
+
+// findClosestEntity uses Levenshtein distance to find the closest entity name
+func findClosestEntity(query string, candidates []string, maxDistance int) (string, int) {
+	if query == "" || len(candidates) == 0 {
+		return "", -1
+	}
+
+	closestName := ""
+	minDistance := maxDistance + 1
+
+	for _, candidate := range candidates {
+		dist := utils.ComputeDistance(query, candidate)
+		if dist < minDistance {
+			minDistance = dist
+			closestName = candidate
+		}
+	}
+
+	if minDistance <= maxDistance {
+		return closestName, minDistance
+	}
+	return "", -1
+}
