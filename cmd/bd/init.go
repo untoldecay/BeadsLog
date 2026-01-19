@@ -477,69 +477,19 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
-		// Check if we're in a git repo and merge driver isn't configured
-		// Install by default unless --skip-merge-driver is passed
-		if !skipMergeDriver && isGitRepo() && !mergeDriverInstalled() {
-			if err := installMergeDriver(); err != nil && !quiet {
-				fmt.Fprintf(os.Stderr, "\n%s Failed to install merge driver: %v\n", ui.RenderWarn("⚠"), err)
-				fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
-			}
-		}
-
-		// Prompt for Devlog Enforcement (Interactive Mode Only)
-		// Only ask if not stealth, not quiet, and config doesn't already exist
-		// Check if enforcement is already configured to avoid re-asking
-		// We check the source because GetYamlConfig now returns default "false" (bd-k7o)
-		enforceSource := config.GetValueSource("devlog.enforce-on-commit")
-		enforceConfigured := enforceSource != config.SourceDefault
-
-		// If configured via file, ensure it's the LOCAL config file, not a parent one
-		if enforceSource == config.SourceConfigFile {
-			usedConfig := config.GetConfigFileUsed()
-			expectedConfig := filepath.Join(beadsDirAbs, "config.yaml")
-
-			// Normalize paths for comparison
-			usedAbs, _ := filepath.Abs(usedConfig)
-			expectedAbs, _ := filepath.Abs(expectedConfig)
-
-			// If we picked up a parent config, treat as unconfigured for this new repo
-			if usedAbs != expectedAbs {
-				enforceConfigured = false
-			}
-		}
-
-		if !quiet && !stealth && !enforceConfigured {
-			// Use simple fmt Scan for y/n prompt
-			// Use simple fmt Scan for y/n prompt
-			fmt.Print("\n[Devlog Policy]\n")
-			fmt.Print("Do you want to ENFORCE devlog updates on every commit? [y/N] ")
-			
-			var response string
-			fmt.Scanln(&response)
-			response = strings.ToLower(strings.TrimSpace(response))
-			
-			if response == "y" || response == "yes" {
-				if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to set devlog enforcement: %v\n", err)
-				} else {
-					fmt.Printf("  %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
+		        // Check if we're in a git repo and merge driver isn't configured
+				// Install by default unless --skip-merge-driver is passed
+				if !skipMergeDriver && isGitRepo() && !mergeDriverInstalled() {
+					if err := installMergeDriver(); err != nil && !quiet {
+						fmt.Fprintf(os.Stderr, "\n%s Failed to install merge driver: %v\n", ui.RenderWarn("⚠"), err)
+						fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
+					}
 				}
-			} else {
-				// Explicitly set to false so we don't ask again next time? 
-				// Or leave unset (default false). Let's set false for clarity.
-				if err := config.SetYamlConfig("devlog.enforce-on-commit", "false"); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to set devlog enforcement: %v\n", err)
+		
+				// Skip output if quiet mode
+				if quiet {
+					return
 				}
-				fmt.Printf("  %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
-			}
-		}
-
-
-		// Skip output if quiet mode
-		if quiet {
-			return
-		}
-
 				fmt.Println("[Tasks]")
 		fmt.Printf("  Database: %s\n", ui.RenderAccent(initDBPath))
 		fmt.Printf("  Issue prefix: %s\n", ui.RenderAccent(prefix))

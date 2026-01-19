@@ -3,7 +3,7 @@
 **Date:** 2026-01-19
 
 ### **Objective:**
-To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt for enabling devlog enforcement was being skipped. Additionally, implemented a minor UX enhancement for `bd config --help`.
+To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt for enabling devlog enforcement was being skipped. Additionally, implemented a minor UX enhancement for `bd config --help` and improved the flow of the `bd init` prompts.
 
 ---
 
@@ -39,9 +39,21 @@ To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt fo
 
 ---
 
+### **Phase 3: Relocating the Prompt**
+
+**Initial Problem:** The "Devlog Enforcement" question was appearing before the "Git Hooks" section, which felt disjointed since enforcement relies on hooks.
+
+*   **Action Taken:**
+    *   Moved the enforcement prompt logic from `cmd/bd/init.go` to `cmd/bd/devlog_cmds.go` inside the `initializeDevlog` function.
+    *   Placed it immediately after the "Install auto-sync hooks?" prompt.
+    *   Adapted the logic to work within `devlog_cmds.go` (calculating expected config path from `dbPath`).
+*   **Result:** The `bd init` flow is now smoother, with all git-hook related questions grouped under the `[Log Memory]` -> `Git hooks` section.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Issue `bd-52o` is fixed. `bd init` now correctly prompts for devlog enforcement in interactive mode, even if run inside another Beads repository or if defaults are set.
+**Final Status:** Issue `bd-52o` is fixed and refined. `bd init` now correctly prompts for devlog enforcement in interactive mode, even if run inside another Beads repository or if defaults are set. The prompt location has been optimized for better UX.
 **Key Learnings:**
 *   **Viper Configuration Inheritance:** Viper's config loading strategy (walking up directories) can interfere with initialization logic when running nested instances (e.g., tests or sub-repos). Explicitly checking the config file path is necessary to distinguish between "inherited" and "local" configuration.
 *   **Defaults vs. "Not Set":** When default values are defined in Viper, checking for empty strings is no longer a valid way to determine if a user has explicitly configured a setting. `GetValueSource` or `InConfig` must be used.
@@ -50,3 +62,4 @@ To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt fo
 
 ### **Architectural Relationships**
 - cmd/bd/init.go -> internal/config/config.go (uses GetValueSource, GetConfigFileUsed)
+- cmd/bd/devlog_cmds.go -> internal/config/config.go (uses GetValueSource, SetYamlConfig)

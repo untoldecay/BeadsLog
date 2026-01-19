@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -129,6 +130,45 @@ func initializeDevlog(baseDir string, quiet bool) {
 			installDevlogHooks(true)
 		} else {
 			fmt.Println("    Skipped hook installation.")
+		}
+
+		// Prompt for Devlog Enforcement
+		enforceSource := config.GetValueSource("devlog.enforce-on-commit")
+		enforceConfigured := enforceSource != config.SourceDefault
+
+		// If configured via file, ensure it's the LOCAL config file, not a parent one
+		if enforceSource == config.SourceConfigFile {
+			usedConfig := config.GetConfigFileUsed()
+			// Assume config is next to DB
+			dbDir := filepath.Dir(dbPath)
+			expectedConfig := filepath.Join(dbDir, "config.yaml")
+
+			usedAbs, _ := filepath.Abs(usedConfig)
+			expectedAbs, _ := filepath.Abs(expectedConfig)
+
+			if usedAbs != expectedAbs {
+				enforceConfigured = false
+			}
+		}
+
+		if !enforceConfigured {
+			fmt.Print("    Enforce devlog on commit? [y/N] ")
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "y" || response == "yes" {
+				if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil {
+					fmt.Fprintf(os.Stderr, "    Warning: failed to set devlog enforcement: %v\n", err)
+				} else {
+					fmt.Printf("    %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
+				}
+			} else {
+				if err := config.SetYamlConfig("devlog.enforce-on-commit", "false"); err != nil {
+					fmt.Fprintf(os.Stderr, "    Warning: failed to set devlog enforcement: %v\n", err)
+				}
+				fmt.Printf("    %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
+			}
 		}
 	}
 }
