@@ -4,6 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/lithammer/fuzzysearch/fuzzy"
+	entity_queries "github.com/untoldecay/BeadsLog/internal/queries/entity_utils"
+)
 )
 
 type ResolvedEntity struct {
@@ -85,15 +91,52 @@ func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([
 }
 
 // SuggestEntities finds potential entity matches for a term that yielded no results.
-// Wraps ResolveEntities but returns only names.
+// It uses fuzzy matching and Levenshtein distance for typo correction.
 func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, error) {
-	entities, err := ResolveEntities(ctx, db, term, 5) // Always limit suggestions to 5
+	// First, try FTS/LIKE to get direct matches or close prefixes
+	entities, err := ResolveEntities(ctx, db, term, 5) // Limit initial suggestions
 	if err != nil {
 		return nil, err
 	}
-	var names []string
-	for _, e := range entities {
-		names = append(names, e.Name)
+	if len(entities) > 0 {
+		var names []string
+		for _, e := range entities {
+			names = append(names, e.Name)
+		}
+		return names, nil // Return direct matches if any
 	}
-	return names, nil
+
+	// No direct matches, try typo correction (Levenshtein)
+	allEntityNames, err := entity_queries.GetAllEntityNames(ctx, db) // Get all entity names
+	if err != nil {
+		return nil, err
+	}
+
+	// Max Levenshtein distance of 2 for a suggestion (configurable)
+	closestName, dist := entity_queries.FindClosestEntity(term, allEntityNames, 2)
+	if closestName != "" {
+		return []string{fmt.Sprintf("%s (distance: %d) ⭐", closestName, dist)}, nil
+	}
+
+	// No Levenshtein match, try fuzzy matching (e.g., "mod" -> "managecolumnsmodal")
+	var fuzzySuggestions []string
+	for _, candidate := range allEntityNames {
+		// Use fuzzy.RuneMatchFold for case-insensitive matching
+		if fuzzy.MatchFold(term, candidate) {
+			fuzzySuggestions = append(fuzzySuggestions, candidate)
+		}
+	}
+	// Sort fuzzy suggestions by relevance (e.g., shortest match first, or score)
+	// For simplicity, just sort alphabetically for now
+	sort.Strings(fuzzySuggestions)
+	if len(fuzzySuggestions) > 0 {
+		// Limit to top 5 fuzzy suggestions
+		if len(fuzzySuggestions) > 5 {
+			fuzzySuggestions = fuzzySuggestions[:5]
+		}
+		return fuzzySuggestions, nil
+	}
+
+	return nil, nil // No suggestions found
 }
+

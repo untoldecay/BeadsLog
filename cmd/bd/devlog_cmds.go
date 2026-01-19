@@ -767,18 +767,17 @@ var devlogSearchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		defer store.Close()
+		db := store.UnderlyingDB() // Get the underlying *sql.DB for queries package
 
+		// Tier 1: HybridSearch (Exact Match + Entity Expansion)
 		opts := queries.SearchOptions{
 			Query:    query,
 			Limit:    limit,
 			Strict:   strict,
 			TextOnly: textOnly,
 		}
-
-		results, err := queries.HybridSearch(rootCtx, store.UnderlyingDB(), opts)
+		results, err := queries.HybridSearch(rootCtx, db, opts)
 		if err != nil {
-			// If FTS tables missing (migration issue), fallback or error?
-			// Error is better.
 			fmt.Fprintf(os.Stderr, "Error executing search: %v\n", err)
 			os.Exit(1)
 		}
@@ -790,36 +789,76 @@ var devlogSearchCmd = &cobra.Command{
 			return
 		}
 
-		if len(results) == 0 {
-			fmt.Println("No results found.")
-
-			// Try "Did you mean?"
-			suggestions, _ := queries.SuggestEntities(rootCtx, store.UnderlyingDB(), query)
-			if len(suggestions) > 0 {
-				fmt.Println("\nDid you mean one of these entities?")
-				for _, s := range suggestions {
-					fmt.Printf("- %s\n", s)
+		if len(results) > 0 {
+			// Display results as before
+			fmt.Printf("Found %d matches for '%s':\n\n", len(results), query)
+			for _, r := range results {
+				reason := ""
+				if !strict && !textOnly && r.Reason != "text match" {
+					reason = fmt.Sprintf(" (%s)", r.Reason)
 				}
+				fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
+				if r.Narrative != "" {
+					clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
+					clean = strings.ReplaceAll(clean, "</b>", "**")
+					fmt.Printf("  %s\n", clean)
+				}
+				fmt.Println()
 			}
 			return
 		}
 
-		fmt.Printf("Found %d matches for '%s':\n\n", len(results), query)
-		for _, r := range results {
-			reason := ""
-			// Only show reason if it's interesting (not just text match)
-			if !strict && !textOnly && r.Reason != "text match" {
-				reason = fmt.Sprintf(" (%s)", r.Reason)
-			}
+		// If no direct results, try suggestions (Tier 2, 3, 4)
+		fmt.Printf("No direct results found for '%s'.\n", query)
+		suggestions, err := queries.SuggestEntities(rootCtx, db, query)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting suggestions: %v\n", err)
+			return
+		}
 
-			fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
-			if r.Narrative != "" {
-				// Clean up snippet bold tags for CLI
-				clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
-				clean = strings.ReplaceAll(clean, "</b>", "**")
-				fmt.Printf("  %s\n", clean)
+		if len(suggestions) > 0 {
+			// This part will need careful output formatting as per PRD templates
+			if strings.Contains(suggestions[0], "distance:") { // Heuristic for typo suggestion
+				// Typo detected, auto-search
+				fmt.Printf("Did you mean: %s?\n", suggestions[0])
+				correctedQuery := strings.Split(suggestions[0], " ")[0] // Extract "nginx" from "nginx (distance: 1)"
+				fmt.Printf("Auto-searching for '%s'...\n", correctedQuery)
+
+				// Rerun search with corrected query
+				correctedOpts := queries.SearchOptions{Query: correctedQuery, Limit: limit, Strict: strict, TextOnly: textOnly}
+				correctedResults, err := queries.HybridSearch(rootCtx, db, correctedOpts)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error auto-searching: %v\n", err)
+					return
+				}
+				if len(correctedResults) > 0 {
+					fmt.Printf("Found %d matches for '%s':\n\n", len(correctedResults), correctedQuery)
+					for _, r := range correctedResults {
+						reason := ""
+						if !strict && !textOnly && r.Reason != "text match" {
+							reason = fmt.Sprintf(" (%s)", r.Reason)
+						}
+						fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
+						if r.Narrative != "" {
+							clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
+							clean = strings.ReplaceAll(clean, "</b>", "**")
+							fmt.Printf("  %s\n", clean)
+						}
+						fmt.Println()
+					}
+				} else {
+					fmt.Printf("No results found for corrected query '%s' either.\n", correctedQuery)
+				}
+			} else {
+				// Regular entity suggestions or fuzzy suggestions
+				fmt.Println("Perhaps you meant one of these entities?")
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s)
+				}
 			}
-			fmt.Println()
+		} else {
+			// Tier 4: No suggestions at all
+			fmt.Println("Consider broadening your search or checking for related terms in the codebase.")
 		}
 	},
 }
