@@ -71,9 +71,50 @@ To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt fo
 
 ---
 
+### **Phase 5: Bootstrap Trigger Verification Fix**
+
+**Initial Problem:** When running `bd init` on a project that already had agent files with full "Devlog Protocol" (e.g., from a previous installation), only CLAUDE.md was getting the bootstrap trigger, while GEMINI.md was being skipped. This prevented agents from running `bd onboard` to get protocol updates.
+
+*   **My Assumption/Plan #1:** The `injectBootstrapTrigger` function was checking if a file contained "Devlog Protocol" text and skipping it.
+    *   **Action Taken:** Analyzed `cmd/bd/devlog_cmds.go` line 249. Confirmed the logic:
+        ```go
+        if strings.Contains(sContent, trigger) || strings.Contains(sContent, "Devlog Protocol") {
+            return false // Already configured
+        }
+        ```
+    *   **Result:** This prevented any file with an existing protocol from getting the bootstrap trigger, breaking the agent trap cycle.
+
+*   **My Assumption/Plan #2:** Instead of skipping files with protocols, replace them with the bootstrap trigger so agents will run `bd onboard` to get the latest version.
+    *   **Action Taken:** Refactored `injectBootstrapTrigger` function to:
+        1. Check if file has bootstrap trigger → skip (idempotent)
+        2. Check if file has full protocol (with start/end tags) → replace protocol block with bootstrap trigger
+        3. Check if file has broken/incomplete protocol → prepend bootstrap trigger
+        4. Check if file has neither → prepend bootstrap trigger
+    *   **Result:** All edge cases now handled correctly. Verified with test suite:
+        - ✅ Full protocol → replaced with bootstrap trigger
+        - ✅ Bootstrap trigger present → skipped (idempotent)
+        - ✅ Broken protocol → prepends bootstrap trigger
+        - ✅ Empty file → adds bootstrap trigger
+
+*   **Analysis/Correction:** This creates a clean reset cycle:
+    1. User runs `bd init` → replaces any existing protocol with bootstrap trigger
+    2. Agent starts session → sees "BEFORE ANYTHING ELSE: run 'bd onboard'"
+    3. Agent runs `bd onboard` → gets latest protocol from embedded binary
+    This ensures every `bd init` forces agents to refresh to the current protocol version.
+
+*   **My Assumption/Plan #3:** Handle edge case where file has both bootstrap trigger AND full protocol (leftover cruft from previous updates).
+    *   **Action Taken:** Added check at the beginning of `injectBootstrapTrigger` to detect if file contains both trigger and protocol tags. If so:
+        1. Remove old bootstrap trigger from beforeProtocol content
+        2. Remove entire protocol block between tags
+        3. Rebuild with just bootstrap trigger and user content outside protocol
+    *   **Result:** Files with leftover cruft (both trigger and protocol) are now cleaned up correctly.
+    *   **Analysis/Correction:** The "both trigger and protocol" case should never happen in normal usage, but handles situations where previous updates left breadcrumbs. By removing the old trigger from beforeProtocol, we prevent duplicate triggers in the final output.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Issue `bd-52o` is fixed and significantly improved. `bd init` logic for prompting is robust against inherited config, and the user experience for setting up automation is now structured, clear, and value-focused.
+**Final Status:** Issue `bd-52o` is fixed and significantly improved. `bd init` logic for prompting is robust against inherited config, the user experience for setting up automation is now structured and clear, and the bootstrap trigger mechanism now correctly enforces protocol updates across all agent files.
 **Key Learnings:**
 *   **Viper Configuration Inheritance:** Viper's config loading strategy (walking up directories) can interfere with initialization logic when running nested instances (e.g., tests or sub-repos). Explicitly checking the config file path is necessary to distinguish between "inherited" and "local" configuration.
 *   **UX Grouping:** Grouping related configuration options (like git hooks and enforcement policies) under a single header ("Automation Setup") reduces cognitive load compared to scattering them across different phases of initialization.
@@ -83,3 +124,6 @@ To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt fo
 ### **Architectural Relationships**
 - cmd/bd/init.go -> internal/config/config.go (uses GetValueSource, GetConfigFileUsed)
 - cmd/bd/devlog_cmds.go -> internal/config/config.go (uses GetValueSource, SetYamlConfig)
+- cmd/bd/devlog_cmds.go -> injectBootstrapTrigger (modifies agent files)
+- injectBootstrapTrigger -> Agent instruction files (replaces protocol with trigger)
+- bd onboard -> injectProtocol (replaces trigger with full protocol)

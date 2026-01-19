@@ -246,11 +246,62 @@ func injectBootstrapTrigger(file, trigger string) bool {
 	}
 
 	sContent := string(content)
-	if strings.Contains(sContent, trigger) || strings.Contains(sContent, "Devlog Protocol") {
-		return false // Already configured
+
+	// Check if file has BOTH bootstrap trigger AND protocol tags (leftover cruft)
+	// Replace everything with just bootstrap trigger to clean up (preserve user content outside protocol block)
+	if strings.Contains(sContent, trigger) && strings.Contains(sContent, ProtocolStartTag) && strings.Contains(sContent, ProtocolEndTag) {
+		startIdx := strings.Index(sContent, ProtocolStartTag)
+		endIdx := strings.Index(sContent, ProtocolEndTag)
+		if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
+			// Remove the old bootstrap trigger from beforeProtocol if present
+			beforeProtocol := sContent[:startIdx]
+			beforeProtocol = strings.ReplaceAll(beforeProtocol, trigger, "")
+			beforeProtocol = strings.TrimSpace(beforeProtocol)
+
+			afterProtocol := sContent[endIdx+len(ProtocolEndTag):]
+			afterProtocol = strings.TrimSpace(afterProtocol)
+
+			// Rebuild with just bootstrap trigger
+			newContent := trigger + "\n\n"
+			if beforeProtocol != "" {
+				newContent += beforeProtocol + "\n\n"
+			}
+			if afterProtocol != "" {
+				newContent += afterProtocol + "\n"
+			}
+			_ = os.WriteFile(file, []byte(newContent), 0644)
+			return true
+		}
 	}
 
-	// Prepend
+	// Check if file already has bootstrap trigger (without protocol tags)
+	if strings.Contains(sContent, trigger) {
+		return false // Already has trigger, no action needed
+	}
+
+	// If file has full protocol (with tags), replace it with bootstrap trigger
+	// This forces protocol refresh on init - agent will run `bd onboard` to get latest
+	if strings.Contains(sContent, ProtocolStartTag) && strings.Contains(sContent, ProtocolEndTag) {
+		startIdx := strings.Index(sContent, ProtocolStartTag)
+		endIdx := strings.Index(sContent, ProtocolEndTag)
+		if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
+			beforeProtocol := sContent[:startIdx]
+			afterProtocol := sContent[endIdx+len(ProtocolEndTag):]
+			// Clean up surrounding whitespace
+			beforeProtocol = strings.TrimRight(beforeProtocol, "\n")
+			afterProtocol = strings.TrimLeft(afterProtocol, "\n")
+			// Rebuild with just bootstrap trigger
+			newContent := trigger + "\n\n"
+			if beforeProtocol != "" {
+				newContent += beforeProtocol + "\n\n"
+			}
+			newContent += afterProtocol
+			_ = os.WriteFile(file, []byte(newContent), 0644)
+			return true
+		}
+	}
+
+	// No protocol, no trigger - prepend bootstrap trigger
 	newContent := trigger + "\n\n" + sContent
 	_ = os.WriteFile(file, []byte(newContent), 0644)
 	return true
@@ -305,7 +356,6 @@ fi
 		fmt.Printf("    %s Installed hooks (%s)\n", ui.RenderPass("✓"), strings.Join(installed, ", "))
 	}
 }
-
 
 // devlogOnboardCmd is deprecated and aliases to 'bd onboard'
 var devlogOnboardCmd = &cobra.Command{
@@ -394,7 +444,7 @@ var devlogSyncCmd = &cobra.Command{
 
 		// Store last sync time
 		_ = store.SetMetadata(rootCtx, "last_devlog_sync", time.Now().Format(time.RFC3339))
-		
+
 		if updatedCount > 0 {
 			if !noAutoFlush {
 				flushToJSONLWithState(flushState{forceDirty: true})
@@ -630,7 +680,7 @@ func printGraph(graph *queries.EntityGraph) {
 		} else {
 			indent = strings.Repeat("  ", node.Depth-1)
 		}
-		
+
 		fmt.Printf("%s%s %s (%d)\n", indent, marker, node.Name, node.Depth)
 	}
 }
@@ -640,7 +690,7 @@ var devlogListCmd = &cobra.Command{
 	Short: "List devlog sessions",
 	Run: func(cmd *cobra.Command, args []string) {
 		sessionType, _ := cmd.Flags().GetString("type")
-		
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
@@ -888,12 +938,12 @@ var devlogImpactCmd = &cobra.Command{
 				fmt.Printf("  Error querying deps: %v\n", err)
 				continue
 			}
-			
+
 			// Must iterate completely or close explicitly inside loop if using defer rows.Close() in loop?
 			// Better to just iterate and close manually or use a func closure.
 			// Re-using 'rows' variable in loop is risky if deferred.
 			// Let's iterate and not defer inside loop, just Close() at end of iteration.
-			
+
 			foundDeps := false
 			for rows.Next() {
 				foundDeps = true
@@ -902,7 +952,7 @@ var devlogImpactCmd = &cobra.Command{
 				fmt.Printf("- %s (%s)\n", name, rel)
 			}
 			rows.Close()
-			
+
 			if !foundDeps {
 				fmt.Println("  (No known dependencies)")
 			}
@@ -917,10 +967,12 @@ var devlogResumeCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		lastN, _ := cmd.Flags().GetInt("last")
-		
+
 		if lastN > 0 || len(args) == 0 {
-			if lastN == 0 { lastN = 1 } // Default to last 1 if no arg and no flag
-			
+			if lastN == 0 {
+				lastN = 1
+			} // Default to last 1 if no arg and no flag
+
 			store, err := sqlite.New(rootCtx, dbPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
@@ -996,9 +1048,6 @@ fi
 	},
 }
 
-
-
-
 // devlogStatusCmd shows current devlog configuration and stats
 var devlogStatusCmd = &cobra.Command{
 	Use:   "status",
@@ -1024,7 +1073,7 @@ var devlogStatusCmd = &cobra.Command{
 
 		fmt.Println("\nDevlog System Status")
 		fmt.Println("====================")
-		
+
 		if devlogDir == "" {
 			fmt.Println("Status: Not configured")
 			fmt.Println("Action: Run 'bd devlog initialize' to set up a devlog space.")
@@ -1037,7 +1086,7 @@ var devlogStatusCmd = &cobra.Command{
 		// Get stats
 		db := store.UnderlyingDB()
 		var sessionsCount, entitiesCount, relationshipsCount int
-		
+
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessionsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entitiesCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps").Scan(&relationshipsCount)
@@ -1064,7 +1113,7 @@ var devlogStatusCmd = &cobra.Command{
 			}
 			fmt.Printf("  %s %s\n", status, h)
 		}
-		
+
 		fmt.Println()
 	},
 }
@@ -1090,7 +1139,7 @@ var devlogResetCmd = &cobra.Command{
 		defer store.Close()
 
 		db := store.UnderlyingDB()
-		
+
 		tables := []string{"session_entities", "entity_deps", "sessions", "entities"}
 		for _, table := range tables {
 			if _, err := db.Exec(fmt.Sprintf("DELETE FROM %s", table)); err != nil {
@@ -1135,7 +1184,9 @@ var devlogVerifyCmd = &cobra.Command{
 				fmt.Printf("- [%s] %s (file: %s)\n", id, title, filename)
 			}
 			missingRows.Close()
-			if foundMissing { fmt.Println() }
+			if foundMissing {
+				fmt.Println()
+			}
 		}
 
 		// 2. Sessions without entities OR relationships
@@ -1188,14 +1239,14 @@ var devlogVerifyCmd = &cobra.Command{
 
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
-	
+
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
 	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
 
 	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogImpactCmd.Flags().Int("limit", 25, "Max matching entities to show")
-	
+
 	devlogSearchCmd.Flags().Bool("strict", false, "Disable fuzzy matching and entity expansion")
 	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
@@ -1217,6 +1268,6 @@ func init() {
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
 	devlogCmd.AddCommand(devlogVerifyCmd)
-	
+
 	rootCmd.AddCommand(devlogCmd)
 }
