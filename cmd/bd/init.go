@@ -489,8 +489,27 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		// Prompt for Devlog Enforcement (Interactive Mode Only)
 		// Only ask if not stealth, not quiet, and config doesn't already exist
 		// Check if enforcement is already configured to avoid re-asking
-		enforceConfigured := config.GetYamlConfig("devlog.enforce-on-commit") != ""
+		// We check the source because GetYamlConfig now returns default "false" (bd-k7o)
+		enforceSource := config.GetValueSource("devlog.enforce-on-commit")
+		enforceConfigured := enforceSource != config.SourceDefault
+
+		// If configured via file, ensure it's the LOCAL config file, not a parent one
+		if enforceSource == config.SourceConfigFile {
+			usedConfig := config.GetConfigFileUsed()
+			expectedConfig := filepath.Join(beadsDirAbs, "config.yaml")
+
+			// Normalize paths for comparison
+			usedAbs, _ := filepath.Abs(usedConfig)
+			expectedAbs, _ := filepath.Abs(expectedConfig)
+
+			// If we picked up a parent config, treat as unconfigured for this new repo
+			if usedAbs != expectedAbs {
+				enforceConfigured = false
+			}
+		}
+
 		if !quiet && !stealth && !enforceConfigured {
+			// Use simple fmt Scan for y/n prompt
 			// Use simple fmt Scan for y/n prompt
 			fmt.Print("\n[Devlog Policy]\n")
 			fmt.Print("Do you want to ENFORCE devlog updates on every commit? [y/N] ")

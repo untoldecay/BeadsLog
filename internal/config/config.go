@@ -523,3 +523,12 @@ func GetIdentity(flagValue string) string {
 
 	return "unknown"
 }
+
+// GetConfigFileUsed returns the path to the config file used by viper.
+// Returns empty string if no config file was found.
+func GetConfigFileUsed() string {
+	if v == nil {
+		return ""
+	}
+	return v.ConfigFileUsed()
+}

@@ -21,6 +21,8 @@ var configCmd = &cobra.Command{
 
 Configuration is stored per-project in .beads/*.db and is version-control-friendly.
 
+Run bd config list to list all configuration available.
+
 Common namespaces:
   - jira.*       Jira integration settings
   - linear.*     Linear integration settings
