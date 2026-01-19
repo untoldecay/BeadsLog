@@ -51,12 +51,32 @@ To investigate and fix issue `bd-52o`, where the `bd init` interactive prompt fo
 
 ---
 
+### **Phase 4: UX Polish**
+
+**Initial Problem:** The prompts were technically accurate but mixed mechanisms (hooks) with value (automation). The flow was also a bit dense.
+
+*   **Action Taken:**
+    *   Redesigned the "Git Hooks Integration" section in `cmd/bd/devlog_cmds.go` to be an "[Automation Setup]" block.
+    *   Separated "Auto-Sync" and "Enforcement" into numbered steps 1 and 2.
+    *   Added clear value-proposition descriptions to each prompt.
+    *   Updated the enforcement prompt to explicitly mention the `git commit --no-verify` bypass.
+*   **Result:** `bd init` now presents a clear, value-driven automation menu:
+    ```text
+    [Automation Setup]
+      1. Enable Auto-Sync? [Y/n]
+         (Keeps your issue tracker up-to-date in the background)
+      2. Enforce Devlogs? [y/N]
+         (Prevents commits until you update the devlog...)
+    ```
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Issue `bd-52o` is fixed and refined. `bd init` now correctly prompts for devlog enforcement in interactive mode, even if run inside another Beads repository or if defaults are set. The prompt location has been optimized for better UX.
+**Final Status:** Issue `bd-52o` is fixed and significantly improved. `bd init` logic for prompting is robust against inherited config, and the user experience for setting up automation is now structured, clear, and value-focused.
 **Key Learnings:**
 *   **Viper Configuration Inheritance:** Viper's config loading strategy (walking up directories) can interfere with initialization logic when running nested instances (e.g., tests or sub-repos). Explicitly checking the config file path is necessary to distinguish between "inherited" and "local" configuration.
-*   **Defaults vs. "Not Set":** When default values are defined in Viper, checking for empty strings is no longer a valid way to determine if a user has explicitly configured a setting. `GetValueSource` or `InConfig` must be used.
+*   **UX Grouping:** Grouping related configuration options (like git hooks and enforcement policies) under a single header ("Automation Setup") reduces cognitive load compared to scattering them across different phases of initialization.
 
 ---
 

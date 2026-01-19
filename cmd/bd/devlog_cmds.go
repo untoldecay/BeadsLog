@@ -120,19 +120,24 @@ func initializeDevlog(baseDir string, quiet bool) {
 	// Agent Rules Integration
 	configureAgentRules(quiet)
 
-	// Git Hooks Integration
+	// Automation Setup
 	if !quiet {
-		fmt.Println("\n  Git hooks:")
-		fmt.Print("    Install auto-sync hooks? [Y/n] ")
+		fmt.Println("\n[Automation Setup]")
+		fmt.Println()
+
+		// 1. Auto-Sync
+		fmt.Println("  1. Enable Auto-Sync? [Y/n]")
+		fmt.Print("     (Keeps your issue tracker up-to-date in the background) ")
 		var response string
 		fmt.Scanln(&response)
 		if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
 			installDevlogHooks(true)
 		} else {
-			fmt.Println("    Skipped hook installation.")
+			fmt.Println("     Skipped auto-sync setup.")
 		}
+		fmt.Println()
 
-		// Prompt for Devlog Enforcement
+		// 2. Enforcement
 		enforceSource := config.GetValueSource("devlog.enforce-on-commit")
 		enforceConfigured := enforceSource != config.SourceDefault
 
@@ -152,22 +157,24 @@ func initializeDevlog(baseDir string, quiet bool) {
 		}
 
 		if !enforceConfigured {
-			fmt.Print("    Enforce devlog on commit? [y/N] ")
+			fmt.Println("  2. Enforce Devlogs? [y/N]")
+			fmt.Print("     (Prevents commits until you update the devlog—ensures AI has perfect memory) ")
+
 			var response string
 			fmt.Scanln(&response)
 			response = strings.ToLower(strings.TrimSpace(response))
 
 			if response == "y" || response == "yes" {
 				if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil {
-					fmt.Fprintf(os.Stderr, "    Warning: failed to set devlog enforcement: %v\n", err)
+					fmt.Fprintf(os.Stderr, "     Warning: failed to set devlog enforcement: %v\n", err)
 				} else {
-					fmt.Printf("    %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
+					fmt.Printf("     %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
 				}
 			} else {
 				if err := config.SetYamlConfig("devlog.enforce-on-commit", "false"); err != nil {
-					fmt.Fprintf(os.Stderr, "    Warning: failed to set devlog enforcement: %v\n", err)
+					fmt.Fprintf(os.Stderr, "     Warning: failed to set devlog enforcement: %v\n", err)
 				}
-				fmt.Printf("    %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
+				fmt.Printf("     %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
 			}
 		}
 	}
