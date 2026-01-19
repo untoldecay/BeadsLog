@@ -54,3 +54,4 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] bd init hook prompt | Fixed regression where bd init skipped enforcement prompt | 2026-01-19 | [2026-01-19_debug-hook-init-prompt.md](2026-01-19_debug-hook-init-prompt.md) |
 | [chore] Add search dependencies | Added levenshtein and fuzzysearch libraries | 2026-01-19 | [2026-01-19_add-search-dependencies.md](2026-01-19_add-search-dependencies.md) |
 | [feature] Implement Typo & Fuzzy Search | Integrated Levenshtein and fuzzy matching into search | 2026-01-19 | [2026-01-19_implement-typo-fuzzy-search.md](2026-01-19_implement-typo-fuzzy-search.md) |
+| [enhance] Update Search CLI Output | Refined search output with contextual box and suggestions | 2026-01-19 | [2026-01-19_update-search-cli.md](2026-01-19_update-search-cli.md) |

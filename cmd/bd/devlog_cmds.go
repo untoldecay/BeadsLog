@@ -767,7 +767,7 @@ var devlogSearchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		defer store.Close()
-		db := store.UnderlyingDB() // Get the underlying *sql.DB for queries package
+		db := store.UnderlyingDB()
 
 		// Tier 1: HybridSearch (Exact Match + Entity Expansion)
 		opts := queries.SearchOptions{
@@ -789,27 +789,20 @@ var devlogSearchCmd = &cobra.Command{
 			return
 		}
 
+		vm := ui.SearchViewModel{
+			Query:        query,
+			ResultsCount: len(results),
+		}
+
 		if len(results) > 0 {
-			// Display results as before
-			fmt.Printf("Found %d matches for '%s':\n\n", len(results), query)
-			for _, r := range results {
-				reason := ""
-				if !strict && !textOnly && r.Reason != "text match" {
-					reason = fmt.Sprintf(" (%s)", r.Reason)
-				}
-				fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
-				if r.Narrative != "" {
-					clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
-					clean = strings.ReplaceAll(clean, "</b>", "**")
-					fmt.Printf("  %s\n", clean)
-				}
-				fmt.Println()
-			}
+			// Found direct results
+			fmt.Println(ui.RenderSearchBox(vm))
+			printSearchResults(results, strict, textOnly)
 			return
 		}
 
-		// If no direct results, try suggestions (Tier 2, 3, 4)
-		fmt.Printf("No direct results found for '%s'.\n", query)
+		// Tier 2, 3, 4: Suggestions
+		vm.NoResults = true
 		suggestions, err := queries.SuggestEntities(rootCtx, db, query)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting suggestions: %v\n", err)
@@ -817,49 +810,34 @@ var devlogSearchCmd = &cobra.Command{
 		}
 
 		if len(suggestions) > 0 {
-			// This part will need careful output formatting as per PRD templates
-			if strings.Contains(suggestions[0], "distance:") { // Heuristic for typo suggestion
-				// Typo detected, auto-search
-				fmt.Printf("Did you mean: %s?\n", suggestions[0])
-				correctedQuery := strings.Split(suggestions[0], " ")[0] // Extract "nginx" from "nginx (distance: 1)"
-				fmt.Printf("Auto-searching for '%s'...\n", correctedQuery)
+			// Check if first suggestion is a typo correction
+			first := suggestions[0]
+			if first.Type == "typo" {
+				vm.TypoCorrection = first.Name
+				vm.TypoDistance = first.Distance
+				vm.AutoSearching = true
 
-				// Rerun search with corrected query
-				correctedOpts := queries.SearchOptions{Query: correctedQuery, Limit: limit, Strict: strict, TextOnly: textOnly}
+				// Render box immediately to show "Auto-searching..."
+				fmt.Println(ui.RenderSearchBox(vm))
+
+				// Perform auto-search
+				correctedOpts := queries.SearchOptions{Query: first.Name, Limit: limit, Strict: strict, TextOnly: textOnly}
 				correctedResults, err := queries.HybridSearch(rootCtx, db, correctedOpts)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error auto-searching: %v\n", err)
-					return
-				}
-				if len(correctedResults) > 0 {
-					fmt.Printf("Found %d matches for '%s':\n\n", len(correctedResults), correctedQuery)
-					for _, r := range correctedResults {
-						reason := ""
-						if !strict && !textOnly && r.Reason != "text match" {
-							reason = fmt.Sprintf(" (%s)", r.Reason)
-						}
-						fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
-						if r.Narrative != "" {
-							clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
-							clean = strings.ReplaceAll(clean, "</b>", "**")
-							fmt.Printf("  %s\n", clean)
-						}
-						fmt.Println()
-					}
+				if err == nil && len(correctedResults) > 0 {
+					printSearchResults(correctedResults, strict, textOnly)
 				} else {
-					fmt.Printf("No results found for corrected query '%s' either.\n", correctedQuery)
+					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
-			} else {
-				// Regular entity suggestions or fuzzy suggestions
-				fmt.Println("Perhaps you meant one of these entities?")
-				for _, s := range suggestions {
-					fmt.Printf("- %s\n", s)
-				}
+				return
 			}
-		} else {
-			// Tier 4: No suggestions at all
-			fmt.Println("Consider broadening your search or checking for related terms in the codebase.")
+
+			// Just suggestions
+			for _, s := range suggestions {
+				vm.Suggestions = append(vm.Suggestions, s.Name)
+			}
 		}
+
+		fmt.Println(ui.RenderSearchBox(vm))
 	},
 }
 
@@ -1258,4 +1236,20 @@ func init() {
 	devlogCmd.AddCommand(devlogVerifyCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
+}
+
+func printSearchResults(results []queries.SearchResult, strict, textOnly bool) {
+	for _, r := range results {
+		reason := ""
+		if !strict && !textOnly && r.Reason != "text match" {
+			reason = fmt.Sprintf(" (%s)", r.Reason)
+		}
+		fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
+		if r.Narrative != "" {
+			clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
+			clean = strings.ReplaceAll(clean, "</b>", "**")
+			fmt.Printf("  %s\n", clean)
+		}
+		fmt.Println()
+	}
 }

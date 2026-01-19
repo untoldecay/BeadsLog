@@ -14,6 +14,12 @@ type ResolvedEntity struct {
 	Name string
 }
 
+type Suggestion struct {
+	Name     string
+	Distance int    // -1 if not applicable
+	Type     string // "exact", "typo", "fuzzy"
+}
+
 // ResolveEntities finds entities matching the term using Hybrid FTS + LIKE logic.
 // This ensures consistent behavior between "Search" and "Graph/Impact" commands.
 func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([]ResolvedEntity, error) {
@@ -89,18 +95,18 @@ func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([
 
 // SuggestEntities finds potential entity matches for a term that yielded no results.
 // It uses fuzzy matching and Levenshtein distance for typo correction.
-func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, error) {
+func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]Suggestion, error) {
 	// First, try FTS/LIKE to get direct matches or close prefixes
 	entities, err := ResolveEntities(ctx, db, term, 5) // Limit initial suggestions
 	if err != nil {
 		return nil, err
 	}
 	if len(entities) > 0 {
-		var names []string
+		var suggestions []Suggestion
 		for _, e := range entities {
-			names = append(names, e.Name)
+			suggestions = append(suggestions, Suggestion{Name: e.Name, Distance: 0, Type: "exact"})
 		}
-		return names, nil // Return direct matches if any
+		return suggestions, nil // Return direct matches if any
 	}
 
 	// No direct matches, try typo correction (Levenshtein) and fuzzy matching
@@ -112,24 +118,26 @@ func SuggestEntities(ctx context.Context, db *sql.DB, term string) ([]string, er
 	// Max Levenshtein distance of 2 for a suggestion (configurable)
 	closestName, dist := findClosestEntity(term, allEntityNames, 2)
 	if closestName != "" {
-		return []string{fmt.Sprintf("%s (distance: %d) ⭐", closestName, dist)}, nil
+		return []Suggestion{{Name: closestName, Distance: dist, Type: "typo"}}, nil
 	}
 
 	// No Levenshtein match, try fuzzy matching (e.g., "mod" -> "managecolumnsmodal")
-	var fuzzySuggestions []string
+	var suggestions []Suggestion
 	for _, candidate := range allEntityNames {
 		if utils.FuzzyMatch(term, candidate) {
-			fuzzySuggestions = append(fuzzySuggestions, candidate)
+			suggestions = append(suggestions, Suggestion{Name: candidate, Distance: -1, Type: "fuzzy"})
 		}
 	}
 	// Sort fuzzy suggestions alphabetically
-	sort.Strings(fuzzySuggestions)
-	if len(fuzzySuggestions) > 0 {
+	sort.Slice(suggestions, func(i, j int) bool {
+		return suggestions[i].Name < suggestions[j].Name
+	})
+	if len(suggestions) > 0 {
 		// Limit to top 5 fuzzy suggestions
-		if len(fuzzySuggestions) > 5 {
-			fuzzySuggestions = fuzzySuggestions[:5]
+		if len(suggestions) > 5 {
+			suggestions = suggestions[:5]
 		}
-		return fuzzySuggestions, nil
+		return suggestions, nil
 	}
 
 	return nil, nil // No suggestions found
