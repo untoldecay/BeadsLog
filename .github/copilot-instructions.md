@@ -1,14 +1,7 @@
 <!-- BD_PROTOCOL_START -->
 # Agent Instructions
 
-This project uses **Beads (`bd`)** for issue tracking and **Beads Devlog** for session memory and architectural context.  
-BEFORE ANYTHING ELSE, you MUST run:
-
-```bash
-bd onboard
-```
-
-That command will verify your setup and ensure the local Beads/Devlog database is ready.
+This project uses **Beads (`bd`)** for issue tracking and **Beads Devlog** for session memory and architectural context.
 
 ---
 
@@ -39,7 +32,7 @@ bd devlog verify --fix           # Auto-fix missing/invalid metadata when possib
 
 At the beginning of EVERY work session:
 
-1. **Sync and load ready work**  
+1. **Sync and load ready work**
    ```bash
    git pull --rebase
    bd sync
@@ -52,7 +45,7 @@ At the beginning of EVERY work session:
      ```
      to understand what happened in the previous session and avoid repeating mistakes.
 
-2. **Choose a focal issue**  
+2. **Choose a focal issue**
    - Pick one issue from `bd ready` or from the devlog resume context.
    - Mark it as in progress:
      ```bash
@@ -65,7 +58,31 @@ At the beginning of EVERY work session:
 
 While working on an issue:
 
-1. **Use Devlog for context and reuse**
+1. **Codebase Inquiry & Exploration (MANDATORY FIRST STEP)**
+
+   **IF** the user asks a question related to the codebase, architecture, or history (direct or indirect):
+   **YOU MUST** use `bd` tools **FIRST** to gather context before reading code or using generic search tools.
+
+   - **General Questions / Errors / "Why?":**
+     ```bash
+     bd devlog search "query"
+     ```
+     *(Retrieves decision history, previous debugging sessions, and related entities)*
+
+   - **Dependencies / Impact / "What uses this?":**
+     ```bash
+     bd devlog impact "component_name"
+     bd devlog graph "component_name"
+     ```
+     *(Visualizes architectural relationships and "blast radius")*
+
+   - **Status / "Is there a ticket?":**
+     ```bash
+     bd search "query"
+     ```
+     *(Checks the active issue tracker to avoid duplicate work)*
+
+2. **Use Devlog for context and reuse**
 
    - If you hit a bug:
      ```bash
@@ -85,7 +102,7 @@ While working on an issue:
      ```
      to visualize related components and avoid breaking hidden dependencies.
 
-2. **Track discovered work**
+3. **Track discovered work**
 
    - When you discover new bugs or follow‑up tasks:
      ```bash
@@ -93,13 +110,13 @@ While working on an issue:
      ```
      This automatically maintains the dependency graph and keeps future ready‑work accurate.
 
-3. **Follow AI DIRECTIVES (if present)**
+4. **Follow AI DIRECTIVES (if present)**
 
    - Certain commands may output lines starting with:
      ```text
      🚀 **AI DEVLOG DIRECTIVE**
      ```
-   - These indicate **critical Devlog or metadata issues** you MUST fix immediately.  
+   - These indicate **critical Devlog or metadata issues** you MUST fix immediately.
      After applying the fix, re-run the command that produced the directive to confirm resolution.
 
 ---
@@ -184,15 +201,15 @@ git status  # MUST show "up to date with origin"
 
 ## Summary of Responsibilities
 
-- **Beads (`bd`)**  
+- **Beads (`bd`)**
   - Source of truth for issues, priorities, and dependencies.
   - Controls ready work, status transitions, and git-synced task state.
 
-- **Beads Devlog (`bd devlog`)**  
+- **Beads Devlog (`bd devlog`)**
   - Source of truth for session history, debugging narratives, and entity-level graphs.
   - Controls context retrieval, impact analysis, and architectural understanding.
 
-Your job as an agent is to **keep both layers healthy**:  
+Your job as an agent is to **keep both layers healthy**:
 Issues must be accurate, and Devlog must reflect what actually happened, so future sessions can land on their feet instantly.
 
 <!-- BD_PROTOCOL_END -->
