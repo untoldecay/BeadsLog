@@ -23,8 +23,14 @@ type SearchOptions struct {
 	TextOnly bool // If true, only BM25, no entity lookup
 }
 
-func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]SearchResult, error) {
+type SearchResponse struct {
+	Results         []SearchResult
+	RelatedEntities []string
+}
+
+func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchResponse, error) {
 	results := make(map[string]SearchResult)
+	var response SearchResponse
 
 	// Prepare the match query
 	// If not strict, we might want to make it friendlier
@@ -40,7 +46,7 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]Search
 
 	// 1. BM25 Text Search
 	textQuery := "" +
-	             `
+		`
         SELECT s.id, s.title, snippet(sessions_fts, 1, '<b>', '</b>', '...', 64), bm25(sessions_fts) 
         FROM sessions_fts 
         JOIN sessions s ON sessions_fts.rowid = s.rowid
@@ -64,7 +70,8 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]Search
 	// or returning what we have. But a syntax error likely fails everything.
 
 	if opts.Strict || opts.TextOnly {
-		return mapToSlice(results), nil
+		response.Results = mapToSlice(results)
+		return response, nil
 	}
 
 	// 2. Entity Search & Expansion
@@ -72,20 +79,19 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]Search
         SELECT rowid, name FROM entities_fts WHERE entities_fts MATCH ? LIMIT 5
     `
 	eRows, err := db.QueryContext(ctx, entityQuery, matchQuery)
-	var matchedEntities []string
 	if err == nil {
 		defer eRows.Close()
 		for eRows.Next() {
 			var id int64
 			var name string
 			if err := eRows.Scan(&id, &name); err == nil {
-				matchedEntities = append(matchedEntities, name)
+				response.RelatedEntities = append(response.RelatedEntities, name)
 			}
 		}
 	}
 
 	// For each matched entity, find related sessions
-	for _, entityName := range matchedEntities {
+	for _, entityName := range response.RelatedEntities {
 		relatedQuery := `
             SELECT s.id, s.title, s.narrative
             FROM sessions s
@@ -102,12 +108,12 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]Search
 				// Placeholder score for entity matches (since we don't have BM25 for them in this query)
 				// We start with a base score.
 				var baseScore float64 = -5.0 // Stronger than a weak text match?
-				
+
 				if err := rRows.Scan(&r.ID, &r.Title, &r.Narrative); err == nil {
 					if existing, ok := results[r.ID]; ok {
 						// Boost existing result
 						// Lower score is better in FTS5 BM25
-						existing.Score -= 2.0 
+						existing.Score -= 2.0
 						if !strings.Contains(existing.Reason, "entity:") {
 							existing.Reason += fmt.Sprintf(", entity:%s", entityName)
 						}
@@ -123,9 +129,9 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) ([]Search
 		}
 	}
 
-	return mapToSlice(results), nil
+	response.Results = mapToSlice(results)
+	return response, nil
 }
-
 func mapToSlice(m map[string]SearchResult) []SearchResult {
 	s := make([]SearchResult, 0, len(m))
 	for _, v := range m {

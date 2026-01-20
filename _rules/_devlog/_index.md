@@ -57,3 +57,5 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Update Search CLI Output | Refined search output with contextual box and suggestions | 2026-01-19 | [2026-01-19_update-search-cli.md](2026-01-19_update-search-cli.md) |
 | [feature] Lipgloss Search Render | Migrated devlog search output to Lipgloss tables | 2026-01-20 | [2026-01-20_test_lipgloss.md](2026-01-20_test_lipgloss.md) |
 | [enhance] Agent Protocol | Enforced Beads-first workflow for codebase inquiries | 2026-01-20 | [2026-01-20_optimize-instructions.md](2026-01-20_optimize-instructions.md) |
+| [fix] Advanced Search Graph | Restored graph neighbors and related entities in search results | 2026-01-20 | [2026-01-20_restore-advanced-search-and-timestamps.md](2026-01-20_restore-advanced-search-and-timestamps.md) |
+| [enhance] Devlog List Timestamp | Added time precision to devlog list command output | 2026-01-20 | [2026-01-20_restore-advanced-search-and-timestamps.md](2026-01-20_restore-advanced-search-and-timestamps.md) |

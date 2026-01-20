@@ -647,7 +647,7 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		query := "SELECT title, date(timestamp), type FROM sessions"
+		query := "SELECT title, timestamp, type FROM sessions"
 		var queryArgs []interface{}
 		if sessionType != "" {
 			query += " WHERE type = ?"
@@ -663,12 +663,22 @@ var devlogListCmd = &cobra.Command{
 		defer rows.Close()
 
 		for rows.Next() {
-			var title, date, typ string
-			if err := rows.Scan(&title, &date, &typ); err != nil {
+			var title, timestampStr, typ string
+			if err := rows.Scan(&title, &timestampStr, &typ); err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
-			fmt.Printf("[%s] %s - %s\n", date, typ, title)
+			
+			// Parse and format timestamp
+			displayTime := timestampStr
+			if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
+				displayTime = t.Local().Format("2006-01-02 15:04")
+			} else if len(timestampStr) > 16 {
+				// Fallback if not RFC3339 but likely ISO-ish
+				displayTime = timestampStr[:16] 
+			}
+
+			fmt.Printf("[%s] %s - %s\n", displayTime, typ, title)
 		}
 	},
 }
@@ -775,7 +785,7 @@ var devlogSearchCmd = &cobra.Command{
 			Strict:   strict,
 			TextOnly: textOnly,
 		}
-		results, err := queries.HybridSearch(rootCtx, db, opts)
+		response, err := queries.HybridSearch(rootCtx, db, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error executing search: %v\n", err)
 			os.Exit(1)
@@ -784,13 +794,32 @@ var devlogSearchCmd = &cobra.Command{
 		if jsonOutput {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			enc.Encode(results)
+			enc.Encode(response)
 			return
 		}
 
-		if len(results) > 0 {
+		if len(response.Results) > 0 {
+			// Fetch graph neighbors for the first matched entity if available
+			var graphNeighbors []string
+			if len(response.RelatedEntities) > 0 {
+				primaryEntity := response.RelatedEntities[0]
+				graph, err := queries.GetEntityGraphExact(rootCtx, db, primaryEntity, 1) // Depth 1 for neighbors
+				if err == nil && graph != nil {
+					for _, node := range graph.Nodes {
+						// Only show direct neighbors (depth 1), not the root or deeper
+						if node.Depth == 1 {
+							rel := "related"
+							if node.Relationship != "" {
+								rel = node.Relationship
+							}
+							graphNeighbors = append(graphNeighbors, fmt.Sprintf("%s (%s)", node.Name, rel))
+						}
+					}
+				}
+			}
+
 			// Found direct results
-			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(results), nil, nil, ui.GetWidth()))
+			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth()))
 			return
 		}
 
@@ -807,10 +836,10 @@ var devlogSearchCmd = &cobra.Command{
 			if first.Type == "typo" {
 				// Perform auto-search
 				correctedOpts := queries.SearchOptions{Query: first.Name, Limit: limit, Strict: strict, TextOnly: textOnly}
-				correctedResults, err := queries.HybridSearch(rootCtx, db, correctedOpts)
+				correctedResponse, err := queries.HybridSearch(rootCtx, db, correctedOpts)
 
-				if err == nil && len(correctedResults) > 0 {
-					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResults), ui.GetWidth()))
+				if err == nil && len(correctedResponse.Results) > 0 {
+					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
