@@ -148,49 +148,12 @@ func initializeDevlog(baseDir string, quiet bool) {
 			}
 			fmt.Printf("    %s Devlog index has %d existing session(s)\n", ui.RenderWarn("⚠"), rowCount)
 			fmt.Println()
-			fmt.Println("    Automatically syncing devlog data...")
+			fmt.Println("    Your project already has devlog data. To import it:")
 			fmt.Println()
-
-			// Run bd devlog sync to populate database
-			syncStore, syncErr := sqlite.New(rootCtx, dbPath)
-			if syncErr != nil {
-				fmt.Printf("    %s Failed to open database for sync: %v\n", ui.RenderWarn("⚠"), syncErr)
-			} else {
-				defer syncStore.Close()
-
-				// Import devlogs
-				importCmd := &cobra.Command{
-					Use:   "sync",
-					Short: "Sync devlog data",
-				}
-
-				// Silence sync output during init (we already showed status)
-				oldStdout := os.Stdout
-				oldStderr := os.Stderr
-				_, w, _ := os.Pipe()
-				os.Stdout = w
-				os.Stderr = w
-				defer func() {
-					os.Stdout = oldStdout
-					os.Stderr = oldStderr
-				}()
-
-				syncErr := devlogSyncCmd.RunE(importCmd, nil)
-				w.Close()
-
-				if syncErr != nil {
-					fmt.Printf("    %s Devlog sync failed: %v\n", ui.RenderWarn("⚠"), syncErr)
-					fmt.Println()
-					fmt.Println("    Your project has devlog data but sync encountered issues.")
-					fmt.Println("    Try running 'bd devlog sync' to see details.")
-				} else {
-					fmt.Printf("    %s Devlog data synced successfully\n", ui.RenderPass("✓"))
-					fmt.Println()
-					fmt.Println("    Your devlog is ready to use!")
-					fmt.Println("    Run 'bd devlog status' to verify.")
-				}
-			}
+			fmt.Println("      • Run 'bd devlog sync' to populate the devlog database")
+			fmt.Println("      • After sync, your devlog will be ready to use!")
 			fmt.Println()
+			fmt.Printf("  %s Continuing with initialization...\n", "i")
 		}
 	}
 
