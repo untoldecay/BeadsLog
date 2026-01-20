@@ -180,11 +180,11 @@ To verify the complete Agent Trap system functionality, including bootstrap trig
         1. Removed automatic sync execution (was causing panic)
         2. Changed to guidance-only approach
         3. When existing devlog detected: Show clear next steps
-    *   **Result:** 
+    *   **Result:**
         - Build successful
         - No more panic/segfault
-        - Simpler, more maintainable code
         - User stays in control
+        - Simpler, more maintainable code
     *   **Analysis/Correction:** Simpler is better:
         - No complex programmatic command invocation
         - No risk of nil pointer dereference
@@ -204,6 +204,12 @@ To verify the complete Agent Trap system functionality, including bootstrap trig
 
   i Continuing with initialization...
 ```
+
+**Test Results:**
+- ✅ Fresh init: Shows "ready for import"
+- ✅ Existing devlogs: Shows warning with clear guidance
+- ✅ No panic/segfault
+- ✅ Init completes successfully
 
 ---
 
