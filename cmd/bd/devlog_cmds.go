@@ -116,40 +116,81 @@ func initializeDevlog(baseDir string, quiet bool) {
 		}
 		fmt.Println() // Added for spacing
 
-		// Devlog Database Status Check
-		fmt.Printf("  %s Checking devlog database...\n", ui.RenderPass("✓"))
-		store, err := sqlite.New(rootCtx, dbPath)
-		if err != nil {
-			// Database not available yet (this is ok for fresh init)
-			fmt.Printf("    Devlog database not ready (this is normal for new setup)\n")
+		// Devlog Index Status Check
+		indexPath = filepath.Join(baseDir, "_index.md")
+		fmt.Printf("  %s Checking devlog index...\n", ui.RenderPass("✓"))
+
+		// Check if index has actual data (beyond template row)
+		indexRows, indexErr := parseIndexMD(indexPath)
+		hasData := false
+
+		if indexErr == nil && len(indexRows) > 0 {
+			// Check if all rows are just the template row
+			for _, row := range indexRows {
+				if row.Subject != "[init] Setup" {
+					hasData = true
+					break
+				}
+			}
+		}
+
+		if !hasData {
+			// Index is empty or only has template row
+			fmt.Printf("    %s Devlog index is empty (ready for import)\n", ui.RenderPass("✓"))
 			fmt.Println()
 		} else {
-			defer store.Close()
-
-			// Check if there are existing sessions in the database
-			var sessionCount int
-			err := store.UnderlyingDB().QueryRowContext(rootCtx, "SELECT COUNT(*) FROM sessions").Scan(&sessionCount)
-
-			if err != nil || sessionCount == 0 {
-				// No sessions or error checking - this is ok for fresh init
-				if err != nil {
-					fmt.Printf("    Unable to check existing sessions (this is normal for new setup)\n")
-				} else {
-					fmt.Printf("    %s Devlog database is empty (ready for import)\n", ui.RenderPass("✓"))
+			// Index has user data
+			rowCount := 0
+			for _, row := range indexRows {
+				if row.Subject != "[init] Setup" {
+					rowCount++
 				}
-				fmt.Println()
-			} else {
-				// Sessions exist - user may think they're in base project
-				fmt.Printf("    %s Devlog database has %d existing session(s)\n", ui.RenderWarn("⚠"), sessionCount)
-				fmt.Println()
-				fmt.Println("    Your project already has devlog data. To continue:")
-				fmt.Println()
-				fmt.Println("      • To update: Run 'bd devlog sync' to import new devlogs")
-				fmt.Println("      • To view: Run 'bd devlog status' to check your devlog system")
-				fmt.Println("      • To reset: Run 'bd devlog reset' to clear all devlog data")
-				fmt.Println()
-				fmt.Println("    Continuing with initialization...")
 			}
+			fmt.Printf("    %s Devlog index has %d existing session(s)\n", ui.RenderWarn("⚠"), rowCount)
+			fmt.Println()
+			fmt.Println("    Automatically syncing devlog data...")
+			fmt.Println()
+
+			// Run bd devlog sync to populate database
+			syncStore, syncErr := sqlite.New(rootCtx, dbPath)
+			if syncErr != nil {
+				fmt.Printf("    %s Failed to open database for sync: %v\n", ui.RenderWarn("⚠"), syncErr)
+			} else {
+				defer syncStore.Close()
+
+				// Import devlogs
+				importCmd := &cobra.Command{
+					Use:   "sync",
+					Short: "Sync devlog data",
+				}
+
+				// Silence sync output during init (we already showed status)
+				oldStdout := os.Stdout
+				oldStderr := os.Stderr
+				_, w, _ := os.Pipe()
+				os.Stdout = w
+				os.Stderr = w
+				defer func() {
+					os.Stdout = oldStdout
+					os.Stderr = oldStderr
+				}()
+
+				syncErr := devlogSyncCmd.RunE(importCmd, nil)
+				w.Close()
+
+				if syncErr != nil {
+					fmt.Printf("    %s Devlog sync failed: %v\n", ui.RenderWarn("⚠"), syncErr)
+					fmt.Println()
+					fmt.Println("    Your project has devlog data but sync encountered issues.")
+					fmt.Println("    Try running 'bd devlog sync' to see details.")
+				} else {
+					fmt.Printf("    %s Devlog data synced successfully\n", ui.RenderPass("✓"))
+					fmt.Println()
+					fmt.Println("    Your devlog is ready to use!")
+					fmt.Println("    Run 'bd devlog status' to verify.")
+				}
+			}
+			fmt.Println()
 		}
 	}
 

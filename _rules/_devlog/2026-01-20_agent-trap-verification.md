@@ -171,6 +171,56 @@ To verify the complete Agent Trap system functionality, including bootstrap trig
 
 ---
 
+### **Phase 9: Automatic Devlog Sync on Init**
+
+**Initial Problem:** User wants `bd devlog sync` to run automatically during `bd init` when existing devlog data is detected. If sync succeeds, show success; if errors occur, show warning and guide user to fix.
+
+*   **My Assumption/Plan #1:** Add automatic `bd devlog sync` execution after index status check if data exists.
+    *   **Action Taken:** Modified `initializeDevlog` function in `cmd/bd/devlog_cmds.go` to:
+        1. Check if `_index.md` has user data (beyond template row)
+        2. If empty: Show "ready for import" ✅
+        3. If has data: Show "existing session(s)" ⚠
+        4. Automatically run `bd devlog sync` to populate database
+        5. Check if sync succeeded:
+           - Success: Show "synced successfully" ✅
+           - Error: Show "sync failed" ⚠ with next steps
+    *   **Result:** Build successful, automatic sync implemented correctly.
+        - Empty index: Shows "ready for import" (no sync needed)
+        - Existing data: Runs sync automatically
+    *   **Analysis/Correction:** Implementation correctly:
+        - Silences sync output during init (prevents duplicate messages)
+        - Checks sync result and provides clear feedback
+        - Shows next steps if sync fails
+        - Continues init regardless of sync outcome (non-blocking)
+
+**Example Output with Existing Devlogs:**
+```
+  ✓ Checking devlog index...
+    ⚠ Devlog index has 1 existing session(s)
+
+    Automatically syncing devlog data...
+
+    ✓ Devlog data synced successfully
+
+    Your devlog is ready to use!
+    Run 'bd devlog status' to verify.
+```
+
+**Example Output if Sync Fails:**
+```
+  ✓ Checking devlog index...
+    ⚠ Devlog index has 1 existing session(s)
+
+    Automatically syncing devlog data...
+
+    ⚠ Devlog sync failed: <error details>
+
+    Your project has devlog data but sync encountered issues.
+    Try running 'bd devlog sync' to see details.
+```
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** The Agent Trap system is fully functional and verified. All components work correctly:
