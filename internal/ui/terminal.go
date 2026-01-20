@@ -50,3 +50,12 @@ func ShouldUseEmoji() bool {
 	// Default: use emoji only if stdout is a TTY
 	return IsTerminal()
 }
+
+// GetWidth returns the width of the terminal or a default value.
+func GetWidth() int {
+	w, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || w <= 0 {
+		return 80
+	}
+	return w
+}

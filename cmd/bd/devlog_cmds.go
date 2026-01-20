@@ -789,20 +789,13 @@ var devlogSearchCmd = &cobra.Command{
 			return
 		}
 
-		vm := ui.SearchViewModel{
-			Query:        query,
-			ResultsCount: len(results),
-		}
-
 		if len(results) > 0 {
 			// Found direct results
-			fmt.Println(ui.RenderSearchBox(vm))
-			printSearchResults(results, strict, textOnly)
+			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(results), nil, nil, ui.GetWidth()))
 			return
 		}
 
 		// Tier 2, 3, 4: Suggestions
-		vm.NoResults = true
 		suggestions, err := queries.SuggestEntities(rootCtx, db, query)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting suggestions: %v\n", err)
@@ -813,18 +806,12 @@ var devlogSearchCmd = &cobra.Command{
 			// Check if first suggestion is a typo correction
 			first := suggestions[0]
 			if first.Type == "typo" {
-				vm.TypoCorrection = first.Name
-				vm.TypoDistance = first.Distance
-				vm.AutoSearching = true
-
-				// Render box immediately to show "Auto-searching..."
-				fmt.Println(ui.RenderSearchBox(vm))
-
 				// Perform auto-search
 				correctedOpts := queries.SearchOptions{Query: first.Name, Limit: limit, Strict: strict, TextOnly: textOnly}
 				correctedResults, err := queries.HybridSearch(rootCtx, db, correctedOpts)
+
 				if err == nil && len(correctedResults) > 0 {
-					printSearchResults(correctedResults, strict, textOnly)
+					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResults), ui.GetWidth()))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
@@ -832,12 +819,15 @@ var devlogSearchCmd = &cobra.Command{
 			}
 
 			// Just suggestions
-			for _, s := range suggestions {
-				vm.Suggestions = append(vm.Suggestions, s.Name)
+			suggestionNames := make([]string, len(suggestions))
+			for i, s := range suggestions {
+				suggestionNames[i] = s.Name
 			}
+			fmt.Println(ui.RenderNoResults(query, suggestionNames, ui.GetWidth()))
+			return
 		}
 
-		fmt.Println(ui.RenderSearchBox(vm))
+		fmt.Println(ui.RenderNoResults(query, nil, ui.GetWidth()))
 	},
 }
 
@@ -1238,18 +1228,17 @@ func init() {
 	rootCmd.AddCommand(devlogCmd)
 }
 
-func printSearchResults(results []queries.SearchResult, strict, textOnly bool) {
-	for _, r := range results {
-		reason := ""
-		if !strict && !textOnly && r.Reason != "text match" {
-			reason = fmt.Sprintf(" (%s)", r.Reason)
+
+
+func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultItem {
+	items := make([]ui.SearchResultItem, len(results))
+	for i, r := range results {
+		items[i] = ui.SearchResultItem{
+			ID:        r.ID,
+			Title:     r.Title,
+			Narrative: r.Narrative,
+			Reason:    r.Reason,
 		}
-		fmt.Printf("- [%s] %s%s\n", r.ID, r.Title, reason)
-		if r.Narrative != "" {
-			clean := strings.ReplaceAll(r.Narrative, "<b>", "**")
-			clean = strings.ReplaceAll(clean, "</b>", "**")
-			fmt.Printf("  %s\n", clean)
-		}
-		fmt.Println()
 	}
+	return items
 }

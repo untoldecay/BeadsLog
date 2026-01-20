@@ -7,9 +7,9 @@ toolchain go1.24.11
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/anthropics/anthropic-sdk-go v1.19.0
-	github.com/charmbracelet/glamour v0.10.0
+	github.com/charmbracelet/glamour v0.9.1
 	github.com/charmbracelet/huh v0.8.0
-	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
+	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gofrs/flock v0.13.0
 	github.com/muesli/termenv v0.16.0
@@ -19,8 +19,8 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/tetratelabs/wazero v1.11.0
 	golang.org/x/mod v0.31.0
-	golang.org/x/sys v0.39.0
-	golang.org/x/term v0.38.0
+	golang.org/x/sys v0.40.0
+	golang.org/x/term v0.39.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/script v0.0.2
