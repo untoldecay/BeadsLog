@@ -56,3 +56,4 @@ This index provides a concise record of all development work for easy scanning a
 | [feature] Implement Typo & Fuzzy Search | Integrated Levenshtein and fuzzy matching into search | 2026-01-19 | [2026-01-19_implement-typo-fuzzy-search.md](2026-01-19_implement-typo-fuzzy-search.md) |
 | [enhance] Update Search CLI Output | Refined search output with contextual box and suggestions | 2026-01-19 | [2026-01-19_update-search-cli.md](2026-01-19_update-search-cli.md) |
 | [feature] Lipgloss Search Render | Migrated devlog search output to Lipgloss tables | 2026-01-20 | [2026-01-20_test_lipgloss.md](2026-01-20_test_lipgloss.md) |
+| [enhance] Agent Protocol | Enforced Beads-first workflow for codebase inquiries | 2026-01-20 | [2026-01-20_optimize-instructions.md](2026-01-20_optimize-instructions.md) |
