@@ -591,15 +591,14 @@ var devlogGraphCmd = &cobra.Command{
 			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
 			if len(suggestions) > 0 {
 				fmt.Println("\nDid you mean?")
-				for _, s := range suggestions {
-					fmt.Printf("- %s\n", s)
-				}
-			}
-			return
-		}
-
-		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
-
+				                for _, s := range suggestions {
+				                    fmt.Printf("- %s\n", s.Name)
+				                }
+				            }
+				            return
+				        }
+				
+				        fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 
 		for _, t := range targets {
@@ -873,7 +872,7 @@ var devlogImpactCmd = &cobra.Command{
 			if len(suggestions) > 0 {
 				fmt.Println("\nDid you mean?")
 				for _, s := range suggestions {
-					fmt.Printf("- %s\n", s)
+					fmt.Printf("- %s\n", s.Name)
 				}
 			}
 			return
