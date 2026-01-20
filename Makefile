@@ -11,8 +11,13 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 # Build string: dev.<commit-count>.<short-hash>
 BUILD=dev.$(shell git rev-list --count HEAD).$(shell git rev-parse --short HEAD)
 
+# Generate code (protocol embedding)
+generate:
+	@echo "Generating code..."
+	go generate ./cmd/bd
+
 # Build the bd binary
-build:
+build: generate
 	@echo "Building bd..."
 	@echo "Build: $(BUILD)"
 	@echo "Commit: $(COMMIT)"
@@ -20,14 +25,14 @@ build:
 	go build -ldflags="-X main.Build=$(BUILD) -X main.Commit=$(COMMIT) -X main.Branch=$(BRANCH)" -o bd ./cmd/bd
 
 # Run all tests (skips known broken tests listed in .test-skip)
-test:
+test: generate
 	@echo "Running tests..."
 	@TEST_COVER=1 ./scripts/test.sh
 
 # Run performance benchmarks (10K and 20K issue databases with automatic CPU profiling)
 # Generates CPU profile: internal/storage/sqlite/bench-cpu-<timestamp>.prof
 # View flamegraph: go tool pprof -http=:8080 <profile-file>
-bench:
+bench: generate
 	@echo "Running performance benchmarks..."
 	@echo "This will generate 10K and 20K issue databases and profile all operations."
 	@echo "CPU profiles will be saved to internal/storage/sqlite/"
@@ -38,12 +43,12 @@ bench:
 	@echo "View flamegraph: cd internal/storage/sqlite && go tool pprof -http=:8080 bench-cpu-*.prof"
 
 # Run quick benchmarks (shorter benchtime for faster feedback)
-bench-quick:
+bench-quick: generate
 	@echo "Running quick performance benchmarks..."
 	go test -bench=. -benchtime=100ms -tags=bench -run=^$$ ./internal/storage/sqlite/ -timeout=15m
 
 # Install bd to GOPATH/bin
-install:
+install: generate
 	@echo "Installing bd to $$(go env GOPATH)/bin..."
 	@bash -c 'commit=$$(git rev-parse HEAD 2>/dev/null || echo ""); \
 		branch=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""); \

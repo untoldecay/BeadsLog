@@ -52,13 +52,25 @@ Manual synchronization of `cmd/bd/protocol.go` with `_rules/AGENTS.md.protocol` 
 
 ---
 
+### **Phase 4: Makefile Integration**
+
+**Initial Problem:**
+While `go generate` automates the code generation, it requires a manual step. `go build` does not run `go generate` by default. If a developer edits the protocol markdown and runs `make build`, the binary will still have the old protocol.
+
+*   **My Assumption/Plan #1:** Add `generate` as a prerequisite target in `Makefile`.
+    *   **Action Taken:** Modified `Makefile` to define a `generate` target (`go generate ./cmd/bd`) and made `build`, `install`, `test`, and `bench` depend on it.
+    *   **Result:** The build process is now fully automated and fail-safe. Editing the markdown file and running `make` guarantees the binary is up-to-date.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** The agent protocol is optimized, the redundant "onboard" instruction is removed, and the binary embedding process is fully automated via `go generate`.
+**Final Status:** The agent protocol is optimized, the redundant "onboard" instruction is removed, and the binary embedding process is fully automated via `go generate` and `Makefile`.
 **Key Learnings:**
 *   Explicit "IF/THEN" rules in agent instructions are more effective than general guidelines.
 *   `bd onboard` effectively syncs the central protocol to agent-specific files.
 *   `go generate` is a powerful tool for embedding content that defies standard `go:embed` path restrictions, effectively eliminating manual synchronization technical debt.
+*   `Makefile` integration is essential to ensure code generation happens automatically in the build loop.
 
 ---
 
@@ -69,3 +81,4 @@ Manual synchronization of `cmd/bd/protocol.go` with `_rules/AGENTS.md.protocol` 
 - cmd/bd/protocol.go -> bd onboard (embeds content)
 - cmd/bd/gen_protocol.go -> _rules/AGENTS.md.protocol (reads)
 - cmd/bd/gen_protocol.go -> cmd/bd/protocol_content.go (generates)
+- Makefile -> cmd/bd/gen_protocol.go (executes)
