@@ -128,3 +128,9 @@ output
 
 # Sandbox generated tests
 _sandbox/Test-*/
+
+# Gemini agent temporary files
+.gemini/
+
+# Test repository in sandbox
+_sandbox/new_test_repo/
