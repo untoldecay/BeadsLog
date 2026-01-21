@@ -51,30 +51,28 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 4: UX Enhancements**
+### **Phase 6: Fix Initialization Order**
 
-**Initial Problem:** Agents needed clearer follow-up guidance after onboarding, and devlog search needed better error recovery hints.
+**Initial Problem:** `bd init --quiet` was skipping orchestration and devlog initialization because the calls were placed after an early return for quiet mode.
 
-*   **My Assumption/Plan #1:** Add follow-up prompts and refine workflow order.
-    *   **Action Taken:**
-        1. Updated `bd onboard` to explicitly prompt reading `PROTOCOL.md`.
-        2. Updated `PROTOCOL.md` template to recommend `verify` before `sync`.
-        3. Updated `bd devlog search` to provide a `bd devlog sync` tip on empty results.
-    *   **Result:** Success. Tested in sandbox, follow-up guidance is now clear and search is more helpful.
+*   **My Assumption/Plan #1:** Move critical initialization logic before the UI-only quiet check.
+    *   **Action Taken:** Moved `initializeOrchestration` and `initializeDevlog` before the `if quiet { return }` block in `cmd/bd/init.go`.
+    *   **Result:** Success. Verified that `devlog_dir` is correctly saved to the database in both verbose and quiet modes.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is now fully automated and refined with clear follow-up UX.
+**Final Status:** Progressive Disclosure Protocol is fully automated, refined, and verified across all initialization modes.
 **Key Learnings:**
-*   Workflow order matters: verifying devlog health before syncing prevents ingestion of corrupted or incomplete files.
-*   "Next Step" prompts are essential for guiding AI agents through multi-step onboarding processes.
+*   Side-effects that affect permanent state (like updating a database) must be decoupled from UI-related early returns.
+*   "Quiet mode" should only suppress output, not essential configuration logic.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
+- bd init -> initializeOrchestration (ensured in all modes)
+- bd init -> initializeDevlog (ensured in all modes)
 - bd onboard -> PROTOCOL.md (prompts to read)
 - devlog search -> bd devlog sync (suggests on empty results)
-- PROTOCOL.md -> bd devlog verify (prioritizes)

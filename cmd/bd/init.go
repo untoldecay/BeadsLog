@@ -477,20 +477,25 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
-		        // Check if we're in a git repo and merge driver isn't configured
-				// Install by default unless --skip-merge-driver is passed
-				if !skipMergeDriver && isGitRepo() && !mergeDriverInstalled() {
-					if err := installMergeDriver(); err != nil && !quiet {
-						fmt.Fprintf(os.Stderr, "\n%s Failed to install merge driver: %v\n", ui.RenderWarn("⚠"), err)
-						fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
-					}
-				}
-		
-				// Skip output if quiet mode
-				if quiet {
-					return
-				}
-				fmt.Println("[Tasks]")
+		// Check if we're in a git repo and merge driver isn't configured
+		// Install by default unless --skip-merge-driver is passed
+		if !skipMergeDriver && isGitRepo() && !mergeDriverInstalled() {
+			if err := installMergeDriver(); err != nil && !quiet {
+				fmt.Fprintf(os.Stderr, "\n%s Failed to install merge driver: %v\n", ui.RenderWarn("⚠"), err)
+				fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
+			}
+		}
+
+		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
+		// Must run even in quiet mode to ensure database state is updated.
+		initializeOrchestration(!quiet)
+		initializeDevlog("_rules/_devlog", quiet)
+
+		// Skip output if quiet mode
+		if quiet {
+			return
+		}
+		fmt.Println("[Tasks]")
 		fmt.Printf("  Database: %s\n", ui.RenderAccent(initDBPath))
 		fmt.Printf("  Issue prefix: %s\n", ui.RenderAccent(prefix))
 		fmt.Printf("  Issues will be named: %s\n\n", ui.RenderAccent(prefix+"-<hash> (e.g., "+prefix+"-a3f2dd)"))
@@ -520,17 +525,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			fmt.Println("------------------------------------------------------------")
 		}
 
-		// BeadsLog: Initialize orchestration (Progressive Disclosure)
-		if !quiet {
-			fmt.Println("\n[Log Memory]")
-		}
-		initializeOrchestration(!quiet)
-		initializeDevlog("_rules/_devlog", quiet)
-
-		if !quiet {
-			fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart --tasks"))
-			fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd quickstart --devlog"))
-		}
+		fmt.Println("\n[Log Memory]")
+		fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart --tasks"))
+		fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd quickstart --devlog"))
 	},
 }
 

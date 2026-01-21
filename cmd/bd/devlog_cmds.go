@@ -95,12 +95,18 @@ func initializeDevlog(baseDir string, quiet bool) {
 
 	// Store config
 	store, err := sqlite.New(rootCtx, dbPath)
-	if err == nil {
+	if err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "  %s Warning: could not open database to save devlog configuration: %v\n", ui.RenderWarn("⚠"), err)
+		}
+	} else {
 		defer store.Close()
 		// Always set or update if empty
 		current, _ := store.GetConfig(rootCtx, "devlog_dir")
 		if current == "" || current != baseDir {
-			_ = store.SetConfig(rootCtx, "devlog_dir", baseDir)
+			if err := store.SetConfig(rootCtx, "devlog_dir", baseDir); err != nil && !quiet {
+				fmt.Fprintf(os.Stderr, "  %s Warning: failed to save devlog_dir to database: %v\n", ui.RenderWarn("⚠"), err)
+			}
 		}
 	}
 
