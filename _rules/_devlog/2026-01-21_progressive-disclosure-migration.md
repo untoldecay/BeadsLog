@@ -51,28 +51,32 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 6: Fix Initialization Order**
+### **Phase 7: Onboarding Gate**
 
-**Initial Problem:** `bd init --quiet` was skipping orchestration and devlog initialization because the calls were placed after an early return for quiet mode.
+**Initial Problem:** Agents often ignore the session start protocol in `PROTOCOL.md` even when prompted, leading to uninitialized local state.
 
-*   **My Assumption/Plan #1:** Move critical initialization logic before the UI-only quiet check.
-    *   **Action Taken:** Moved `initializeOrchestration` and `initializeDevlog` before the `if quiet { return }` block in `cmd/bd/init.go`.
-    *   **Result:** Success. Verified that `devlog_dir` is correctly saved to the database in both verbose and quiet modes.
+*   **My Assumption/Plan #1:** Implementation of a "Gatekeeper" that hides project context until the protocol is run.
+    *   **Action Taken:**
+        1. Created `RestrictedBootloader` (no context links) and `FullBootloader` (all links) templates.
+        2. Updated `bd onboard` to install the Restricted version and set `onboarding_finalized = false`.
+        3. Updated `bd ready` to trigger `finalizeOnboarding()`, which unlocks the Full Bootloader.
+        4. Added `TestOnboardingGateFlow` to `onboard_test.go`.
+    *   **Result:** Success. The agent is now physically unable to see project context until they execute `bd ready`.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is fully automated, refined, and verified across all initialization modes.
+**Final Status:** Progressive Disclosure Protocol is now fully automated, refined, and enforced via an Onboarding Gate.
 **Key Learnings:**
-*   Side-effects that affect permanent state (like updating a database) must be decoupled from UI-related early returns.
-*   "Quiet mode" should only suppress output, not essential configuration logic.
+*   "Enforcement by Hiding" is a powerful pattern for guiding LLM behavior. If they don't have the context, they can't skip ahead.
+*   `bd ready` is the perfect trigger for finalization as it signifies the agent has checked the task list and is ready to work.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd init -> initializeOrchestration (ensured in all modes)
-- bd init -> initializeDevlog (ensured in all modes)
-- bd onboard -> PROTOCOL.md (prompts to read)
-- devlog search -> bd devlog sync (suggests on empty results)
+- bd ready -> finalizeOnboarding (triggers)
+- finalizeOnboarding -> FullBootloader (installs)
+- bd onboard -> RestrictedBootloader (installs)
+- onboarding_finalized (DB flag) -> finalizeOnboarding (controls)

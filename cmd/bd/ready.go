@@ -28,6 +28,9 @@ Use --gated to find molecules ready for gate-resume dispatch:
 
 This is useful for agents executing molecules to see which steps can run next.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Finalize onboarding if needed
+		finalizeOnboarding(rootCtx, store)
+
 		// Handle --gated flag (gate-resume discovery)
 		gated, _ := cmd.Flags().GetBool("gated")
 		if gated {

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/untoldecay/BeadsLog/internal/storage/memory"
 )
 
-func TestMigrateAndInjectProtocol(t *testing.T) {
+func TestOnboardingGateFlow(t *testing.T) {
 	tempDir := t.TempDir()
 	
 	// Change CWD to tempDir so _rules/_orchestration is created there
@@ -14,40 +17,53 @@ func TestMigrateAndInjectProtocol(t *testing.T) {
 	os.Chdir(tempDir)
 	defer os.Chdir(oldCwd)
 
-	t.Run("Migration of legacy content", func(t *testing.T) {
+	ctx := context.Background()
+	store := memory.New("")
+
+	t.Run("Stage 1: Restricted Onboarding", func(t *testing.T) {
 		f := "GEMINI.md"
 		legacyContent := "# Legacy Context\nSpecial rules."
 		os.WriteFile(f, []byte(legacyContent), 0644)
 
-		migrateAndInjectProtocol(f)
+		executeOnboard(ctx, store)
 
-		// Check GEMINI.md has bootloader
+		// Check GEMINI.md has RESTRICTED bootloader
 		content, _ := os.ReadFile(f)
-		if !strings.Contains(string(content), "BeadsLog Agent Protocol") {
-			t.Error("Bootloader not installed in GEMINI.md")
+		strContent := string(content)
+		if !strings.Contains(strContent, "SETUP IN PROGRESS") {
+			t.Error("Restricted bootloader not installed")
+		}
+		if strings.Contains(strContent, "PROJECT_CONTEXT.md") {
+			t.Error("Restricted bootloader should not link to PROJECT_CONTEXT.md")
 		}
 
-		// Check legacy content moved to PROJECT_CONTEXT.md
-		contextPath := "_rules/_orchestration/PROJECT_CONTEXT.md"
-		contextContent, err := os.ReadFile(contextPath)
-		if err != nil {
-			t.Fatalf("PROJECT_CONTEXT.md not created: %v", err)
-		}
-		if !strings.Contains(string(contextContent), legacyContent) {
-			t.Error("Legacy content not found in PROJECT_CONTEXT.md")
+		// Check flag in DB
+		finalized, _ := store.GetConfig(ctx, "onboarding_finalized")
+		if finalized != "false" {
+			t.Errorf("Expected onboarding_finalized=false, got %s", finalized)
 		}
 	})
 
-	t.Run("Idempotency", func(t *testing.T) {
-		f := "CLAUDE.md"
-		migrateAndInjectProtocol(f) // First run
+	t.Run("Stage 2: Finalization via ready trigger", func(t *testing.T) {
+		f := "GEMINI.md"
 		
-		content1, _ := os.ReadFile(f)
-		migrateAndInjectProtocol(f) // Second run
-		
-		content2, _ := os.ReadFile(f)
-		if string(content1) != string(content2) {
-			t.Error("Onboarding not idempotent")
+		// Simulate running bd ready
+		finalizeOnboarding(ctx, store)
+
+		// Check GEMINI.md has FULL bootloader
+		content, _ := os.ReadFile(f)
+		strContent := string(content)
+		if strings.Contains(strContent, "SETUP IN PROGRESS") {
+			t.Error("Full bootloader should not contain setup-in-progress warning")
+		}
+		if !strings.Contains(strContent, "PROJECT_CONTEXT.md") {
+			t.Error("Full bootloader should link to PROJECT_CONTEXT.md")
+		}
+
+		// Check flag in DB
+		finalized, _ := store.GetConfig(ctx, "onboarding_finalized")
+		if finalized != "true" {
+			t.Errorf("Expected onboarding_finalized=true, got %s", finalized)
 		}
 	})
 }

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
@@ -21,11 +23,12 @@ var Candidates = []string{
 	".github/COPILOT-INSTRUCTIONS.md",
 }
 
-// migrateAndInjectProtocol handles the Progressive Disclosure migration.
+// migrateAndInjectRestrictedProtocol handles the Progressive Disclosure migration.
 // 1. Extracts legacy content (anything outside BD_PROTOCOL tags).
 // 2. Moves legacy content to _rules/_orchestration/PROJECT_CONTEXT.md.
-// 3. Replaces agent file content with the Bootloader Protocol.
-func migrateAndInjectProtocol(file string) {
+// 3. Replaces agent file content with the RESTRICTED Bootloader Protocol.
+// 4. Sets onboarding_finalized = false in the database.
+func migrateAndInjectRestrictedProtocol(ctx context.Context, store storage.Storage, file string) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
@@ -85,12 +88,8 @@ func migrateAndInjectProtocol(file string) {
 			}
 		} else {
 			// Create new (should have been created by initializeOrchestration, but safety first)
-			// If initializeOrchestration created the default template, we append to it.
 			header := fmt.Sprintf("\n\n## Legacy Content from %s\n", file)
-			
-			// Use restoreCodeBlocks on the template just in case
 			baseContent := restoreCodeBlocks(ProjectContextMdTemplate)
-			
 			newContext := baseContent + header + legacyContent
 			if err := os.WriteFile(contextPath, []byte(newContext), 0644); err != nil {
 				fmt.Fprintf(os.Stderr, "Error writing context file: %v\n", err)
@@ -100,53 +99,92 @@ func migrateAndInjectProtocol(file string) {
 		}
 	}
 
-	// Inject Bootloader (Overwrite agent file)
-	// The bootloader is purely the protocol block.
-	// Restore blocks just in case AgentProtocol uses them in future
-	finalBootloader := restoreCodeBlocks(AgentProtocol)
+	// Inject Restricted Bootloader (Overwrite agent file)
+	// This forces the agent to run the protocol to unlock the context.
+	finalBootloader := restoreCodeBlocks(RestrictedBootloader)
 	fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
 	
-	// Idempotency check
-	if strings.TrimSpace(string(content)) == strings.TrimSpace(fullBlock) {
-		fmt.Printf("  %s %s (Already up to date)\n", ui.RenderPass("✓"), file)
-		return
-	}
-
 	if err := os.WriteFile(file, []byte(fullBlock), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", file, err)
 		return
 	}
-	fmt.Printf("  %s Updated %s (Bootloader installed)\n", ui.RenderPass("✓"), file)
+	fmt.Printf("  %s Updated %s (Restricted Bootloader installed)\n", ui.RenderPass("✓"), file)
+
+	// Set flag in database
+	if store != nil {
+		_ = store.SetConfig(ctx, "onboarding_finalized", "false")
+	}
+}
+
+// finalizeOnboarding unlocks the environment by installing the Full Bootloader
+func finalizeOnboarding(ctx context.Context, store storage.Storage) {
+	if store == nil {
+		return
+	}
+
+	finalized, _ := store.GetConfig(ctx, "onboarding_finalized")
+	if finalized == "true" {
+		return
+	}
+
+	// Find and update all agent files
+	found := false
+	for _, file := range Candidates {
+		if _, err := os.Stat(file); err == nil {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+
+			// Check if it's our bootloader (has protocol tags)
+			if strings.Contains(string(content), ProtocolStartTag) {
+				finalBootloader := restoreCodeBlocks(FullBootloader)
+				fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
+				
+				if err := os.WriteFile(file, []byte(fullBlock), 0644); err == nil {
+					found = true
+				}
+			}
+		}
+	}
+
+	if found {
+		_ = store.SetConfig(ctx, "onboarding_finalized", "true")
+		fmt.Printf("\n%s Session Initialized. Project context is now unlocked in your agent instructions.\n", ui.RenderPass("✅"))
+	}
 }
 
 // executeOnboard actively modifies agent instruction files.
-func executeOnboard() error {
+func executeOnboard(ctx context.Context, store storage.Storage) error {
 	// Ensure orchestration structure exists
 	initializeOrchestration(false)
 
 	found := false
 	for _, file := range Candidates {
 		if _, err := os.Stat(file); err == nil {
-			migrateAndInjectProtocol(file)
+			migrateAndInjectRestrictedProtocol(ctx, store, file)
 			found = true
 		}
 	}
 
 	if !found {
 		// If no specific agent file, suggest creating AGENTS.md
-		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with the unified protocol...")
+		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with restricted protocol...")
 		
-		finalBootloader := restoreCodeBlocks(AgentProtocol)
+		finalBootloader := restoreCodeBlocks(RestrictedBootloader)
 		fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
 		
 		if err := os.WriteFile("AGENTS.md", []byte(fullBlock), 0644); err != nil {
 			return fmt.Errorf("error creating AGENTS.md: %w", err)
 		}
+		if store != nil {
+			_ = store.SetConfig(ctx, "onboarding_finalized", "false")
+		}
 		fmt.Printf("  %s Created AGENTS.md\n", ui.RenderPass("✓"))
 	}
 
-	fmt.Printf("\n%s Onboarding complete. Agents are now using Progressive Disclosure.\n", ui.RenderPass("✓"))
-	fmt.Printf("👉 **NEXT STEP:** Read %s to initialize your session.\n", ui.RenderAccent("_rules/_orchestration/PROTOCOL.md"))
+	fmt.Printf("\n%s Phase 1 complete. Your environment is partially configured.\n", ui.RenderPass("✓"))
+	fmt.Printf("👉 **MANDATORY NEXT STEP:** Follow the sequence in %s to unlock project context.\n", ui.RenderAccent("_rules/_orchestration/PROTOCOL.md"))
 
 	return nil
 }
@@ -156,14 +194,12 @@ var onboardCmd = &cobra.Command{
 	GroupID: "setup",
 	Short:   "Set up agent instruction files for Beads and Devlog integration",
 	Long: `This command actively modifies agent instruction files (e.g., AGENTS.md)
-	to integrate Beads and Beads Devlog workflows. It injects a unified
-	protocol that guides agents on issue tracking, session memory, and proper
-	workflow.
+	to integrate Beads and Beads Devlog workflows. It injects a restricted
+	protocol that guides agents to initialize their session.
 
-	This approach replaces the old method of printing instructions for manual
-	copy-pasting, ensuring consistency and correctness across agent setups.`,
+	Once the initialization protocol is complete, the full project context will be unlocked.`,
 	Run: func(cmd *cobra.Command, args []string) {
-			if err := executeOnboard(); err != nil {
+			if err := executeOnboard(rootCtx, store); err != nil {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 			}
 		},
