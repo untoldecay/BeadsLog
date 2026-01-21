@@ -59,3 +59,5 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Agent Protocol | Enforced Beads-first workflow for codebase inquiries | 2026-01-20 | [2026-01-20_optimize-instructions.md](2026-01-20_optimize-instructions.md) |
 | [fix] Advanced Search Graph | Restored graph neighbors and related entities in search results | 2026-01-20 | [2026-01-20_restore-advanced-search-and-timestamps.md](2026-01-20_restore-advanced-search-and-timestamps.md) |
 | [enhance] Devlog List Timestamp | Added time precision to devlog list command output | 2026-01-20 | [2026-01-20_restore-advanced-search-and-timestamps.md](2026-01-20_restore-advanced-search-and-timestamps.md) |
+| [enhance] Standardize Search Tables | Unified search lists into centered-header, left-aligned tables | 2026-01-20 | [2026-01-20_standardize-search-ui-tables.md](2026-01-20_standardize-search-ui-tables.md) |
+| [enhance] Progressive Disclosure Protocol | Split agent instructions into on-demand modules | 2026-01-21 | [2026-01-21_progressive-disclosure-migration.md](2026-01-21_progressive-disclosure-migration.md) |
