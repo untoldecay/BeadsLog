@@ -143,9 +143,10 @@ func executeOnboard() error {
 			return fmt.Errorf("error creating AGENTS.md: %w", err)
 		}
 		fmt.Printf("  %s Created AGENTS.md\n", ui.RenderPass("✓"))
-	} else {
-		fmt.Printf("\n%s Onboarding complete. Agents are now using Progressive Disclosure.\n", ui.RenderPass("✓"))
 	}
+
+	fmt.Printf("\n%s Onboarding complete. Agents are now using Progressive Disclosure.\n", ui.RenderPass("✓"))
+	fmt.Printf("👉 **NEXT STEP:** Read %s to initialize your session.\n", ui.RenderAccent("_rules/_orchestration/PROTOCOL.md"))
 
 	return nil
 }

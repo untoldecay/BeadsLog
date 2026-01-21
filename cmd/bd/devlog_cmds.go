@@ -852,10 +852,12 @@ var devlogSearchCmd = &cobra.Command{
 				suggestionNames[i] = s.Name
 			}
 			fmt.Println(ui.RenderNoResults(query, suggestionNames, ui.GetWidth()))
+			fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 			return
 		}
 
 		fmt.Println(ui.RenderNoResults(query, nil, ui.GetWidth()))
+		fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 	},
 }
 

@@ -51,18 +51,30 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
+### **Phase 4: UX Enhancements**
+
+**Initial Problem:** Agents needed clearer follow-up guidance after onboarding, and devlog search needed better error recovery hints.
+
+*   **My Assumption/Plan #1:** Add follow-up prompts and refine workflow order.
+    *   **Action Taken:**
+        1. Updated `bd onboard` to explicitly prompt reading `PROTOCOL.md`.
+        2. Updated `PROTOCOL.md` template to recommend `verify` before `sync`.
+        3. Updated `bd devlog search` to provide a `bd devlog sync` tip on empty results.
+    *   **Result:** Success. Tested in sandbox, follow-up guidance is now clear and search is more helpful.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is now fully automated in the CLI.
+**Final Status:** Progressive Disclosure Protocol is now fully automated and refined with clear follow-up UX.
 **Key Learnings:**
-*   Large markdown strings in Go constants are prone to shell parsing errors; using placeholders for backticks (` ``` `) and helper functions for file writing improves reliability.
-*   Separating boilerplate templates from logic (`init_helpers.go`) keeps the codebase maintainable.
+*   Workflow order matters: verifying devlog health before syncing prevents ingestion of corrupted or incomplete files.
+*   "Next Step" prompts are essential for guiding AI agents through multi-step onboarding processes.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd init -> initializeOrchestration (calls)
-- bd onboard -> migrateAndInjectProtocol (calls)
-- onboard_test -> migrateAndInjectProtocol (verifies)
-- init_templates -> ProtocolMdTemplate (contains)
+- bd onboard -> PROTOCOL.md (prompts to read)
+- devlog search -> bd devlog sync (suggests on empty results)
+- PROTOCOL.md -> bd devlog verify (prioritizes)

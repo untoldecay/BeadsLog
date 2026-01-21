@@ -13,9 +13,10 @@ bd ready         # Find prioritized work
 
 ## 2. Devlog Starting Workflow
 [codeblock=bash]
-bd devlog sync   # Get latest team knowledge
+bd devlog verify --fix # Health check (Fix if needed)
+bd devlog sync         # Get latest team knowledge
 bd devlog resume --last 1  # Load your last session
-bd devlog status # Devlog health
+bd devlog status       # Verify database state
 [/codeblock]
 
 ## 3. Pick Task
