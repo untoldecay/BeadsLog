@@ -184,7 +184,14 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	}
 
 	fmt.Printf("\n%s Phase 1 complete. Your environment is partially configured.\n", ui.RenderPass("✓"))
-	fmt.Printf("👉 **MANDATORY NEXT STEP:** Follow the sequence in %s to unlock project context.\n", ui.RenderAccent("_rules/_orchestration/PROTOCOL.md"))
+	fmt.Printf("\n👉 **MANDATORY ACTIVATION:**\n")
+	fmt.Printf("Execute the following command block now to initialize your session and unlock project context:\n\n")
+	fmt.Printf("```bash\n")
+	fmt.Printf("bd sync\n")
+	fmt.Printf("bd devlog verify --fix\n")
+	fmt.Printf("bd devlog sync\n")
+	fmt.Printf("bd ready\n")
+	fmt.Printf("```\n")
 
 	return nil
 }

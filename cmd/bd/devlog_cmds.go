@@ -235,9 +235,9 @@ func configureAgentRules(quiet bool) {
 	if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
 		for _, file := range foundFiles {
 			if injectBootstrapTrigger(file, bootstrapTrigger) {
-				fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), file)
+				fmt.Printf("    %s Agent instruction: %s (Migrated & Updated)\n", ui.RenderPass("✓"), file)
 			} else {
-				fmt.Printf("    %s Agent instruction: %s (Configured)\n", ui.RenderPass("✓"), file)
+				fmt.Printf("    %s Agent instruction: %s (Already configured)\n", ui.RenderPass("✓"), file)
 			}
 		}
 	} else {
@@ -252,13 +252,56 @@ func injectBootstrapTrigger(file, trigger string) bool {
 	}
 
 	sContent := string(content)
-	if strings.Contains(sContent, trigger) || strings.Contains(sContent, "Devlog Protocol") {
-		return false // Already configured
+	
+	// If it already only contains the trigger or our protocol, skip
+	if strings.Contains(sContent, trigger) || strings.Contains(sContent, ProtocolStartTag) {
+		return false
 	}
 
-	// Prepend
-	newContent := trigger + "\n\n" + sContent
-	_ = os.WriteFile(file, []byte(newContent), 0644)
+	// Identify Legacy Content (Anything outside current protocol tags if they exist)
+	startIndex := strings.Index(sContent, ProtocolStartTag)
+	endIndex := strings.Index(sContent, ProtocolEndTag)
+
+	var legacyContent string
+	if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
+		preBlock := sContent[:startIndex]
+		postBlock := sContent[endIndex+len(ProtocolEndTag):]
+		legacyContent = strings.TrimSpace(preBlock + "\n" + postBlock)
+	} else {
+		legacyContent = strings.TrimSpace(sContent)
+	}
+
+	// If there's content to migrate, move it
+	if legacyContent != "" {
+		contextPath := "_rules/_orchestration/PROJECT_CONTEXT.md"
+		
+		// Ensure directory exists (idempotent)
+		initializeOrchestration(false)
+
+		// Read existing context
+		existingContext, err := os.ReadFile(contextPath)
+		if err == nil {
+			// Check if we already migrated this content
+			if !strings.Contains(string(existingContext), legacyContent) {
+				header := fmt.Sprintf("\n\n## Legacy Content from %s (at init)\n", file)
+				newContext := string(existingContext) + header + legacyContent
+				_ = os.WriteFile(contextPath, []byte(newContext), 0644)
+			}
+		} else {
+			// Create new
+			header := fmt.Sprintf("\n\n## Legacy Content from %s (at init)\n", file)
+			baseContent := restoreCodeBlocks(ProjectContextMdTemplate)
+			newContext := baseContent + header + legacyContent
+			_ = os.WriteFile(contextPath, []byte(newContext), 0644)
+		}
+	}
+
+	// Overwrite agent file with ONLY the trigger
+	newContent := trigger + "\n"
+	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+		return false
+	}
+	
 	return true
 }
 

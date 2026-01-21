@@ -51,33 +51,31 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 8: Gate Hardening**
+### **Phase 9: Immediate Migration on Init**
 
-**Initial Problem:** `bd onboard` was skipping database flag setting because it was marked as a "no-DB" command, and `bd ready` was skipping finalization when using the daemon.
+**Initial Problem:** Even with the trap, the agent file still contained legacy clutter after `bd init` until `bd onboard` was run.
 
-*   **My Assumption/Plan #1:** Enable database access for onboarding and harden the ready trigger.
+*   **My Assumption/Plan #1:** Move legacy content immediately during the `init` phase.
     *   **Action Taken:**
-        1. Removed `onboard` from `noDbCommands` in `cmd/bd/main.go`.
-        2. Removed `ready` from `readOnlyCommands` to allow read-write access for finalization.
-        3. Updated `cmd/bd/ready.go` to ensure a direct store is available for local file updates even if the daemon is running.
-        4. Verified the entire flow via a new sandbox integration test (`_sandbox/Test-18-Gate-Enforcement`).
-    *   **Result:** Success. The gate is now robust across all modes (daemon and direct) and enforces initialization before unlocking project context.
+        1. Updated `configureAgentRules` in `cmd/bd/devlog_cmds.go` to perform content migration immediately.
+        2. Overwrote agent files with **only** the bootstrap trigger after moving their content to `PROJECT_CONTEXT.md`.
+        3. Verified the three-stage flow (Init -> Onboard -> Ready) in a new integration test (`_sandbox/Test-20-Full-Flow`).
+    *   **Result:** Success. The agent file is now "content-free" immediately after `bd init`, showing only the mandatory trap message.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is fully automated, refined, and enforced via a hardened Onboarding Gate.
+**Final Status:** Progressive Disclosure Protocol is now fully automated, enforced, and optimized for maximum cleanliness from the first step.
 **Key Learnings:**
-*   Commands that modify local metadata files based on shared database state must be carefully classified to ensure they have the necessary storage access.
-*   Enforcement mechanisms that rely on "unlocking" content are highly effective at guiding AI agents through mandatory setup steps.
+*   Moving content early reduces "cognitive noise" for coding agents who might otherwise try to act on legacy instructions before they are properly modularized.
+*   The `init` command is the best place for structural reorganization, while `onboard` is the best place for logical activation.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd ready -> finalizeOnboarding (triggers)
-- finalizeOnboarding -> FullBootloader (installs)
-- bd onboard -> RestrictedBootloader (installs)
-- onboarding_finalized (DB flag) -> finalizeOnboarding (controls)
-- cmd/bd/main.go -> Storage (provides access to onboard/ready)
+- bd init -> PROJECT_CONTEXT.md (moves legacy content)
+- bd init -> GEMINI.md (trap only)
+- bd onboard -> RestrictedBootloader (trap replacement)
+- bd ready -> FullBootloader (final unlocking)
