@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
@@ -68,7 +69,7 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 			}
 
 			if modified {
-				if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+				if err := os.WriteFile(file, []byte(newContent), 0644); err == nil {
 					found = true
 				}
 			}
@@ -98,6 +99,15 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("with links to all project modules and conventions.\n")
 
 	// Set state to uninitialized
+	// Config operations require direct database access (GH#536)
+	if daemonClient != nil && store == nil && dbPath != "" {
+		var err error
+		store, err = sqlite.New(ctx, dbPath)
+		if err == nil {
+			defer store.Close()
+		}
+	}
+
 	if store != nil {
 		_ = store.SetConfig(ctx, "onboarding_finalized", "false")
 	}

@@ -98,6 +98,7 @@ var readOnlyCommands = map[string]bool{
 	"duplicates": true,
 	"comments":   true, // list comments (not add)
 	"export":     true, // export only reads
+	"prime":      true, // prime only reads
 }
 
 // isReadOnlyCommand returns true if the command only reads from the database.
@@ -371,7 +372,6 @@ var rootCmd = &cobra.Command{
 			"init",
 			"merge",
 			"powershell",
-			"prime",
 			"quickstart",
 			"repair",
 			"resolve-conflicts",

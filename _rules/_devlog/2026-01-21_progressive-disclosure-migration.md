@@ -65,17 +65,59 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
+### **Phase 12: Adapt `bd prime` to Progressive Disclosure**
+
+**Initial Problem:** `bd prime` was still outputting the legacy monolithic context, which duplicated content now managed by `WORKING_PROTOCOL.md`.
+
+*   **My Assumption/Plan #1:** Refactor `prime.go` to inject the new Progressive Disclosure components.
+    *   **Action Taken:** 
+        1. Modified `cmd/bd/prime.go` to read and include `WORKING_PROTOCOL.md` in the output.
+        2. Integrated the `RestrictedBootloader` vs `FullBootloader` logic into the `prime` command.
+        3. Standardized the "Session Close Protocol" across MCP and CLI modes.
+    *   **Result:** Success. `bd prime` now acts as the dynamic "Prime" for the Progressive Disclosure system, providing the bootloader and current working loop in a single command.
+
+---
+
+### **Phase 13: Hardening Onboarding State Persistence**
+
+**Initial Problem:** Testing revealed that `bd ready` was updating agent files but not consistently persisting the `onboarding_finalized` flag to the database, causing `bd prime` to stay in restricted mode.
+
+*   **My Assumption/Plan #1:** There was a logic error in the success path of `finalizeOnboarding`.
+    *   **Action Taken:** 
+        1. Fixed a bug in `cmd/bd/onboard.go` where the `found` flag was set only if file writing *failed*.
+        2. Added `strings.TrimSpace` to the config check in `prime.go` to handle newline-terminated values from the CLI.
+        3. Made `executeOnboard` daemon-aware by establishing a direct SQLite connection for config writes (RPC for config set was missing).
+    *   **Result:** Success. Onboarding now persists the "true" state to the database correctly.
+
+---
+
+### **Phase 14: Restoring Context Awareness to `bd prime`**
+
+**Initial Problem:** `bd prime` was unable to read the `onboarding_finalized` flag from the database, causing it to default to the restricted bootloader even after onboarding was complete.
+
+*   **My Assumption/Plan #1:** `bd prime` was in the `noDbCommands` list in `main.go`.
+    *   **Action Taken:** 
+        1. Identified that `prime` was indeed skipping database initialization.
+        2. Removed `prime` from `noDbCommands` and added it to `readOnlyCommands` in `cmd/bd/main.go`.
+        3. Verified that `prime` now correctly initializes the `store` variable and reads project configuration.
+    *   **Result:** Success. `bd prime` correctly transitions from restricted mode to full progressive disclosure mode once `bd ready` finalizes onboarding.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is fully automated, instructional, and verified.
+**Final Status:** Progressive Disclosure Protocol is fully automated, integrated with `bd prime`, and state-aware. Onboarding flow is hardened and verified.
 **Key Learnings:**
-*   Instructional CLI output is the most "native" way to guide AI agents.
-*   The "Goal-Action-Reward" loop (explicit trap -> guided commands -> unlocked context) creates a highly robust onboarding experience.
+*   `noDbCommands` in `main.go` can lead to "silent" state-reading failures if a command needs metadata/config but is listed as not needing a database.
+*   Direct SQLite connections are necessary for config updates if the RPC layer doesn't support them yet.
+*   Using `/tmp` for integration tests involving daemons is dangerous due to PID file collision and recursive autostart logic; always use dedicated subdirectories.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd onboard -> Activation Guide (outputs)
-- bd ready -> finalizeOnboarding (unlocks automatically)
-- bootstrapTrigger -> finalizeOnboarding (matched for replacement)
+- bd prime -> WORKING_PROTOCOL.md (includes)
+- bd onboard -> onboarding_finalized (sets)
+- bd ready -> finalizeOnboarding (calls)
+- finalizeOnboarding -> onboarding_finalized (sets)
+- bd prime -> onboarding_finalized (reads)
