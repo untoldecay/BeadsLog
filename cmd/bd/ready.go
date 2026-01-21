@@ -29,6 +29,15 @@ Use --gated to find molecules ready for gate-resume dispatch:
 This is useful for agents executing molecules to see which steps can run next.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Finalize onboarding if needed
+		// If daemon is running, we need a direct connection to the DB to check/set config
+		// because daemon doesn't handle local file overwrites.
+		if daemonClient != nil && store == nil && dbPath != "" {
+			var err error
+			store, err = sqlite.New(rootCtx, dbPath)
+			if err == nil {
+				defer store.Close()
+			}
+		}
 		finalizeOnboarding(rootCtx, store)
 
 		// Handle --gated flag (gate-resume discovery)

@@ -89,7 +89,6 @@ var (
 // database file (which breaks file watchers). See GH#804.
 var readOnlyCommands = map[string]bool{
 	"list":       true,
-	"ready":      true,
 	"show":       true,
 	"stats":      true,
 	"blocked":    true,
@@ -371,7 +370,6 @@ var rootCmd = &cobra.Command{
 			"human",
 			"init",
 			"merge",
-			"onboard",
 			"powershell",
 			"prime",
 			"quickstart",

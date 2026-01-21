@@ -51,26 +51,26 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 7: Onboarding Gate**
+### **Phase 8: Gate Hardening**
 
-**Initial Problem:** Agents often ignore the session start protocol in `PROTOCOL.md` even when prompted, leading to uninitialized local state.
+**Initial Problem:** `bd onboard` was skipping database flag setting because it was marked as a "no-DB" command, and `bd ready` was skipping finalization when using the daemon.
 
-*   **My Assumption/Plan #1:** Implementation of a "Gatekeeper" that hides project context until the protocol is run.
+*   **My Assumption/Plan #1:** Enable database access for onboarding and harden the ready trigger.
     *   **Action Taken:**
-        1. Created `RestrictedBootloader` (no context links) and `FullBootloader` (all links) templates.
-        2. Updated `bd onboard` to install the Restricted version and set `onboarding_finalized = false`.
-        3. Updated `bd ready` to trigger `finalizeOnboarding()`, which unlocks the Full Bootloader.
-        4. Added `TestOnboardingGateFlow` to `onboard_test.go`.
-    *   **Result:** Success. The agent is now physically unable to see project context until they execute `bd ready`.
+        1. Removed `onboard` from `noDbCommands` in `cmd/bd/main.go`.
+        2. Removed `ready` from `readOnlyCommands` to allow read-write access for finalization.
+        3. Updated `cmd/bd/ready.go` to ensure a direct store is available for local file updates even if the daemon is running.
+        4. Verified the entire flow via a new sandbox integration test (`_sandbox/Test-18-Gate-Enforcement`).
+    *   **Result:** Success. The gate is now robust across all modes (daemon and direct) and enforces initialization before unlocking project context.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is now fully automated, refined, and enforced via an Onboarding Gate.
+**Final Status:** Progressive Disclosure Protocol is fully automated, refined, and enforced via a hardened Onboarding Gate.
 **Key Learnings:**
-*   "Enforcement by Hiding" is a powerful pattern for guiding LLM behavior. If they don't have the context, they can't skip ahead.
-*   `bd ready` is the perfect trigger for finalization as it signifies the agent has checked the task list and is ready to work.
+*   Commands that modify local metadata files based on shared database state must be carefully classified to ensure they have the necessary storage access.
+*   Enforcement mechanisms that rely on "unlocking" content are highly effective at guiding AI agents through mandatory setup steps.
 
 ---
 
@@ -80,3 +80,4 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 - finalizeOnboarding -> FullBootloader (installs)
 - bd onboard -> RestrictedBootloader (installs)
 - onboarding_finalized (DB flag) -> finalizeOnboarding (controls)
+- cmd/bd/main.go -> Storage (provides access to onboard/ready)
