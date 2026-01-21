@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // Candidates lists potential agent instruction files
@@ -20,9 +21,11 @@ var Candidates = []string{
 	".github/COPILOT-INSTRUCTIONS.md",
 }
 
-// injectProtocol reads a file, removes old bootstrap triggers, and injects the new protocol.
-// It uses tags for safe replacement.
-func injectProtocol(file, protocol string) {
+// migrateAndInjectProtocol handles the Progressive Disclosure migration.
+// 1. Extracts legacy content (anything outside BD_PROTOCOL tags).
+// 2. Moves legacy content to _rules/_orchestration/PROJECT_CONTEXT.md.
+// 3. Replaces agent file content with the Bootloader Protocol.
+func migrateAndInjectProtocol(file string) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
@@ -35,80 +38,96 @@ func injectProtocol(file, protocol string) {
 	triggers := []string{
 		"BEFORE ANYTHING ELSE: run 'bd devlog onboard'",
 		"BEFORE ANYTHING ELSE: run 'bd onboard'",
+		"> **IMPORTANT:** Run `bd onboard` to configure this agent.",
 	}
 
-	modifiedTrigger := false
 	for _, t := range triggers {
 		if strings.Contains(strContent, t) {
 			strContent = strings.ReplaceAll(strContent, t, "")
-			modifiedTrigger = true
 		}
 	}
 
-	// Prepare the full protocol block with tags
-	fullProtocolBlock := ProtocolStartTag + "\n" + protocol + "\n" + ProtocolEndTag
-
-	// Tag-based replacement logic
+	// Identify Legacy Content
 	startIndex := strings.Index(strContent, ProtocolStartTag)
 	endIndex := strings.Index(strContent, ProtocolEndTag)
 
-	var newContent string
-	var action string
-
+	var legacyContent string
 	if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
-		// Tags found: Replace content between them
+		// Content BEFORE the tag + Content AFTER the tag
 		preBlock := strContent[:startIndex]
 		postBlock := strContent[endIndex+len(ProtocolEndTag):]
-		
-		// Normalize whitespace around blocks
-		preBlock = strings.TrimRight(preBlock, "\n")
-		postBlock = strings.TrimLeft(postBlock, "\n")
-		
-		if preBlock != "" {
-			newContent = preBlock + "\n\n" + fullProtocolBlock
-		} else {
-			newContent = fullProtocolBlock
-		}
-		
-		if postBlock != "" {
-			newContent += "\n\n" + postBlock
-		}
-		action = "refreshed existing protocol"
-
+		legacyContent = strings.TrimSpace(preBlock + "\n" + postBlock)
 	} else {
-		// Tags not found or broken: Prepend to top
-		strContent = strings.TrimSpace(strContent)
-		if strContent == "" {
-			newContent = fullProtocolBlock
-		} else {
-			newContent = fullProtocolBlock + "\n\n" + strContent
-		}
-		action = "prepended new protocol"
+		// No tags? The whole file is legacy content (unless it's empty)
+		legacyContent = strings.TrimSpace(strContent)
 	}
 
+	// Move Legacy Content to PROJECT_CONTEXT.md
+	if legacyContent != "" {
+		contextPath := "_rules/_orchestration/PROJECT_CONTEXT.md"
+		
+		// Ensure directory exists (idempotent)
+		initializeOrchestration(false)
+
+		// Read existing context
+		existingContext, err := os.ReadFile(contextPath)
+		if err == nil {
+			// Check if we already migrated this content (simple string check)
+			if !strings.Contains(string(existingContext), legacyContent) {
+				// Append with a header
+				header := fmt.Sprintf("\n\n## Legacy Content from %s\n", file)
+				newContext := string(existingContext) + header + legacyContent
+				if err := os.WriteFile(contextPath, []byte(newContext), 0644); err != nil {
+					fmt.Fprintf(os.Stderr, "Error updating context file: %v\n", err)
+				} else {
+					fmt.Printf("  %s Migrated legacy content from %s to %s\n", ui.RenderPass("✓"), file, contextPath)
+				}
+			}
+		} else {
+			// Create new (should have been created by initializeOrchestration, but safety first)
+			// If initializeOrchestration created the default template, we append to it.
+			header := fmt.Sprintf("\n\n## Legacy Content from %s\n", file)
+			
+			// Use restoreCodeBlocks on the template just in case
+			baseContent := restoreCodeBlocks(ProjectContextMdTemplate)
+			
+			newContext := baseContent + header + legacyContent
+			if err := os.WriteFile(contextPath, []byte(newContext), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing context file: %v\n", err)
+			} else {
+				fmt.Printf("  %s Migrated legacy content from %s to %s\n", ui.RenderPass("✓"), file, contextPath)
+			}
+		}
+	}
+
+	// Inject Bootloader (Overwrite agent file)
+	// The bootloader is purely the protocol block.
+	// Restore blocks just in case AgentProtocol uses them in future
+	finalBootloader := restoreCodeBlocks(AgentProtocol)
+	fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
+	
 	// Idempotency check
-	// Note: We compare trimmed versions to avoid noise from trailing newlines
-	if strings.TrimSpace(newContent) == strings.TrimSpace(string(content)) && !modifiedTrigger {
-		fmt.Printf("Skipping %s (protocol up to date)\n", file)
+	if strings.TrimSpace(string(content)) == strings.TrimSpace(fullBlock) {
+		fmt.Printf("  %s %s (Already up to date)\n", ui.RenderPass("✓"), file)
 		return
 	}
 
-	if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(file, []byte(fullBlock), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", file, err)
 		return
 	}
-	fmt.Printf("Updated %s (%s)\n", file, action)
+	fmt.Printf("  %s Updated %s (Bootloader installed)\n", ui.RenderPass("✓"), file)
 }
 
 // executeOnboard actively modifies agent instruction files.
 func executeOnboard() error {
-	// Use the embedded AgentProtocol directly
-	unifiedProtocol := AgentProtocol
+	// Ensure orchestration structure exists
+	initializeOrchestration(false)
 
 	found := false
 	for _, file := range Candidates {
 		if _, err := os.Stat(file); err == nil {
-			injectProtocol(file, unifiedProtocol)
+			migrateAndInjectProtocol(file)
 			found = true
 		}
 	}
@@ -116,13 +135,16 @@ func executeOnboard() error {
 	if !found {
 		// If no specific agent file, suggest creating AGENTS.md
 		fmt.Println("No standard agent instruction file found. Creating AGENTS.md with the unified protocol...")
-		fullBlock := ProtocolStartTag + "\n" + unifiedProtocol + "\n" + ProtocolEndTag
+		
+		finalBootloader := restoreCodeBlocks(AgentProtocol)
+		fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
+		
 		if err := os.WriteFile("AGENTS.md", []byte(fullBlock), 0644); err != nil {
 			return fmt.Errorf("error creating AGENTS.md: %w", err)
 		}
-		fmt.Println("✓ Created AGENTS.md")
+		fmt.Printf("  %s Created AGENTS.md\n", ui.RenderPass("✓"))
 	} else {
-		fmt.Println("✓ Onboarding process completed for existing agent files.")
+		fmt.Printf("\n%s Onboarding complete. Agents are now using Progressive Disclosure.\n", ui.RenderPass("✓"))
 	}
 
 	return nil

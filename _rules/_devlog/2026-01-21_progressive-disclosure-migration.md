@@ -35,17 +35,34 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
+### **Phase 3: CLI Automation**
+
+**Initial Problem:** Need to automate the scaffolding and migration for all new projects.
+
+*   **My Assumption/Plan #1:** Integrate logic into `bd init` and `bd onboard`.
+    *   **Action Taken:**
+        1. Created `cmd/bd/init_orchestration.go` for scaffolding.
+        2. Created `cmd/bd/init_templates.go` for markdown context templates (using `[codeblock=bash]` placeholders to avoid Go syntax issues).
+        3. Created `cmd/bd/init_helpers.go` to keep templates clean.
+        4. Updated `cmd/bd/init.go` to call `initializeOrchestration`.
+        5. Updated `cmd/bd/onboard.go` to handle the content migration to `PROJECT_CONTEXT.md`.
+        6. Updated `_rules/AGENTS.md.protocol` as the source of truth for the bootloader.
+    *   **Result:** Success. Build passed, sandbox tests verified migration of legacy content and bootloader installation.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** Migration complete. The repo uses the new split-file protocol.
+**Final Status:** Progressive Disclosure Protocol is now fully automated in the CLI.
 **Key Learnings:**
-*   Separating "Protocol" (immutable rules) from "Context" (project specifics) allows for cleaner, reusable agent instructions.
-*   The "Bootloader" pattern (loading only what's needed) is a viable strategy for reducing context window usage.
+*   Large markdown strings in Go constants are prone to shell parsing errors; using placeholders for backticks (` ``` `) and helper functions for file writing improves reliability.
+*   Separating boilerplate templates from logic (`init_helpers.go`) keeps the codebase maintainable.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- GEMINI.md -> _rules/_orchestration/PROTOCOL.md (loads)
-- GEMINI.md -> _rules/_orchestration/WORKING_PROTOCOL.md (loads)
-- _rules/_orchestration/PROJECT_CONTEXT.md -> GEMINI.md (migrated from)
+- bd init -> initializeOrchestration (calls)
+- bd onboard -> migrateAndInjectProtocol (calls)
+- onboard_test -> migrateAndInjectProtocol (verifies)
+- init_templates -> ProtocolMdTemplate (contains)

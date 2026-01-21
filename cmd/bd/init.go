@@ -520,10 +520,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			fmt.Println("------------------------------------------------------------")
 		}
 
-		// BeadsLog: Automatically initialize devlog space
+		// BeadsLog: Initialize orchestration (Progressive Disclosure)
 		if !quiet {
 			fmt.Println("\n[Log Memory]")
 		}
+		initializeOrchestration(!quiet)
 		initializeDevlog("_rules/_devlog", quiet)
 
 		if !quiet {

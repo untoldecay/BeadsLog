@@ -1,193 +1,141 @@
 package main
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-)
+const ProtocolMdTemplate = `# Protocol: First Execution
 
-// createConfigYaml creates the config.yaml template in the specified directory
-func createConfigYaml(beadsDir string, noDbMode bool) error {
-	configYamlPath := filepath.Join(beadsDir, "config.yaml")
+⚠️ **Load ONLY on first message per session**
 
-	// Skip if already exists
-	if _, err := os.Stat(configYamlPath); err == nil {
-		return nil
-	}
+## 1. Beads Starting Workflow
+[codeblock=bash]
+bd sync          # Get latest issues
+bd status        # Health check
+bd ready         # Find prioritized work
+[/codeblock]
 
-	noDbLine := "# no-db: false"
-	if noDbMode {
-		noDbLine = "no-db: true  # JSONL-only mode, no SQLite database"
-	}
+## 2. Devlog Starting Workflow
+[codeblock=bash]
+bd devlog sync   # Get latest team knowledge
+bd devlog resume --last 1  # Load your last session
+bd devlog status # Devlog health
+[/codeblock]
 
-	configYamlTemplate := fmt.Sprintf(`# Beads Configuration File
-# This file configures default behavior for all bd commands in this repository
-# All settings can also be set via environment variables (BD_* prefix)
-# or overridden with command-line flags
+## 3. Pick Task
+- Choose from ` + "`bd ready`" + `
+- ` + "`bd update <id>`" + ` to claim
+- Check: ` + "`bd devlog search \"<issue keywords>\"`" + `
 
-# Issue prefix for this repository (used by bd init)
-# If not set, bd init will auto-detect from directory name
-# Example: issue-prefix: "myproject" creates issues like "myproject-1", "myproject-2", etc.
-# issue-prefix: ""
+## ✅ Now Ready
+Load WORKING_PROTOCOL.md for task loop.
+`
+const WorkingProtocolMdTemplate = `# Working Protocol
 
-# Use no-db mode: load from JSONL, no SQLite, write back after each command
-# When true, bd will use .beads/issues.jsonl as the source of truth
-# instead of SQLite database
-%s
+⚠️ **Load for every task during active work**
 
-# Disable daemon for RPC communication (forces direct database access)
-# no-daemon: false
+## 🔄 The Loop (Repeat)
 
-# Disable auto-flush of database to JSONL after mutations
-# no-auto-flush: false
+### Before Coding
+[codeblock=bash]
+bd devlog graph "ComponentName"  # Dependencies
+bd devlog impact "ComponentName" # What breaks if changed?
+bd devlog search "error/feature" # Past solutions?
+[/codeblock]
 
-# Disable auto-import from JSONL when it's newer than database
-# no-auto-import: false
+### Code + Commit (Auto-Devlog)
+[codeblock=bash]
+git add .
+git commit -m "fix: descriptive message"
+[/codeblock]
+*Pre-commit automatically generates devlog*
 
-# Enable JSON output by default
-# json: false
+### Update Issue
+[codeblock=bash]
+bd update <id> --status "in-progress" | closed
+[/codeblock]
 
-# Default actor for audit trails (overridden by BD_ACTOR or --actor)
-# actor: ""
+## 🆘 Common Scenarios
+**Split work?** ` + "`bd split <id> \"sub-task\"`" + `
+**Blocked?** ` + "`bd block <current> <blocking>`" + `
+**New bug?** ` + "`bd new \"Bug title\" --priority high`" + `
 
-# Path to database (overridden by BEADS_DB or --db)
-# db: ""
+## ✅ End Session
+[codeblock=bash]
+bd status          # Verify sync
+git push           # Share with team
+[/codeblock]
 
-# Auto-start daemon if not running (can also use BEADS_AUTO_START_DAEMON)
-# auto-start-daemon: true
+## 🔍 Still Need Help?
+bd --help | bd devlog --help → Load *_REFERENCE.md
+`
+const BeadsReferenceMdTemplate = `# Beads Commands
 
-# Debounce interval for auto-flush (can also use BEADS_FLUSH_DEBOUNCE)
-# flush-debounce: "5s"
+⚠️ **Load ONLY when bd --help insufficient**
 
-# Git branch for beads commits (bd sync will commit to this branch)
-# IMPORTANT: Set this for team projects so all clones use the same sync branch.
-# This setting persists across clones (unlike database config which is gitignored).
-# Can also use BEADS_SYNC_BRANCH env var for local override.
-# If not set, bd sync will require you to run 'bd config set sync.branch <branch>'.
-# sync-branch: "beads-sync"
+## Issue Lifecycle
+[codeblock=bash]
+bd new "Title" --type bug --priority high
+bd ready                           # P0 issues
+bd update <id> --status in-progress
+bd update <id> --assign @teammate
+bd close <id>
+bd split <id> "Sub-task"
+bd block <current> <blocking>
+[/codeblock]
 
-# Multi-repo configuration (experimental - bd-307)
-# Allows hydrating from multiple repositories and routing writes to the correct JSONL
-# repos:
-#   primary: "."  # Primary repo (where this database lives)
-#   additional:   # Additional repos to hydrate from (read-only)
-#     - ~/beads-planning  # Personal planning repo
-#     - ~/work-planning   # Work planning repo
+## Query
+[codeblock=bash]
+bd list --status open
+bd show <id>
+bd search "keywords"
+[/codeblock]
 
-# Integration settings (access with 'bd config get/set')
-# These are stored in the database, not in this file:
-# - jira.url
-# - jira.project
-# - linear.url
-# - linear.api-key
-# - github.org
-# - github.repo
-`, noDbLine)
+## Sync & Versioning
+[codeblock=bash]
+bd sync               # Sync local DB <-> JSONL <-> Git
+bd deploy staging     # Deploy to staging environment
+bd deploy production  # Deploy to production environment
+[/codeblock]
+`
+const DevlogReferenceMdTemplate = `# Devlog Commands
 
-	if err := os.WriteFile(configYamlPath, []byte(configYamlTemplate), 0600); err != nil {
-		return fmt.Errorf("failed to write config.yaml: %w", err)
-	}
+⚠️ **Load ONLY when bd devlog --help insufficient**
 
-	return nil
-}
+## Search
+[codeblock=bash]
+bd devlog search "nginx timeout"
+bd devlog search "modal" --type fix
+bd devlog search "auth" --since 2026-01
+bd devlog list --last 5
+[/codeblock]
 
-// createReadme creates the README.md file in the .beads directory
-func createReadme(beadsDir string) error {
-	readmePath := filepath.Join(beadsDir, "README.md")
+## Architecture
+[codeblock=bash]
+bd devlog graph "nginx"
+bd devlog impact "AuthService"
+bd devlog status
+bd devlog verify --fix
+[/codeblock]
 
-	// Skip if already exists
-	if _, err := os.Stat(readmePath); err == nil {
-		return nil
-	}
+## Maintenance
+[codeblock=bash]
+bd devlog sync        # Ingest new markdown files
+bd devlog verify      # Check for missing metadata
+bd devlog reset       # Clear local cache (rare)
+[/codeblock]
+`
+const ProjectContextMdTemplate = `# Project Context
 
-	readmeTemplate := `# Beads - AI-Native Issue Tracking
+⚠️ **Load for tech stack, conventions, and architectural overview**
 
-Welcome to Beads! This repository uses **Beads** for issue tracking - a modern, AI-native tool designed to live directly in your codebase alongside your code.
+## Overview
+This file contains project-specific knowledge. 
+It is populated by migrating legacy agent instructions or by the user.
 
-## What is Beads?
+## Tech Stack
+- Frontend: [React/Vue/Svelte]
+- Backend: [Go/Node/Python]
+- Database: [SQLite/Postgres]
 
-Beads is issue tracking that lives in your repo, making it perfect for AI coding agents and developers who want their issues close to their code. No web UI required - everything works through the CLI and integrates seamlessly with git.
-
-**Learn more:** [github.com/untoldecay/BeadsLog](https://github.com/untoldecay/BeadsLog)
-
-## Quick Start
-
-### Essential Commands
-
-` + "```bash" + `
-# Create new issues
-bd create "Add user authentication"
-
-# View all issues
-bd list
-
-# View issue details
-bd show <issue-id>
-
-# Update issue status
-bd update <issue-id> --status in_progress
-bd update <issue-id> --status done
-
-# Sync with git remote
-bd sync
-` + "```" + `
-
-### Working with Issues
-
-Issues in Beads are:
-- **Git-native**: Stored in ` + "`.beads/issues.jsonl`" + ` and synced like code
-- **AI-friendly**: CLI-first design works perfectly with AI coding agents
-- **Branch-aware**: Issues can follow your branch workflow
-- **Always in sync**: Auto-syncs with your commits
-
-## Why Beads?
-
-✨ **AI-Native Design**
-- Built specifically for AI-assisted development workflows
-- CLI-first interface works seamlessly with AI coding agents
-- No context switching to web UIs
-
-🚀 **Developer Focused**
-- Issues live in your repo, right next to your code
-- Works offline, syncs when you push
-- Fast, lightweight, and stays out of your way
-
-🔧 **Git Integration**
-- Automatic sync with git commits
-- Branch-aware issue tracking
-- Intelligent JSONL merge resolution
-
-## Get Started with Beads
-
-Try Beads in your own projects:
-
-` + "```bash" + `
-# Install Beads
-curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
-
-# Initialize in your repo
-bd init
-
-# Create your first issue
-bd create "Try out Beads"
-` + "```" + `
-
-## Learn More
-
-- **Documentation**: [github.com/untoldecay/BeadsLog/docs](https://github.com/untoldecay/BeadsLog/tree/main/docs)
-- **Quick Start Guide**: Run ` + "`bd quickstart`" + `
-- **Examples**: [github.com/untoldecay/BeadsLog/examples](https://github.com/untoldecay/BeadsLog/tree/main/examples)
-
----
-
-*Beads: Issue tracking that moves at the speed of thought* ⚡
+## Conventions
+- Commits: Conventional Commits
+- Branching: Feature Branch Workflow
 `
 
-	// Write README.md (0644 is standard for markdown files)
-	// #nosec G306 - README needs to be readable
-	if err := os.WriteFile(readmePath, []byte(readmeTemplate), 0644); err != nil {
-		return fmt.Errorf("failed to write README.md: %w", err)
-	}
-
-	return nil
-}
