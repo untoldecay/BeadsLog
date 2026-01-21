@@ -253,8 +253,8 @@ func injectBootstrapTrigger(file, trigger string) bool {
 
 	sContent := string(content)
 	
-	// If it already only contains the trigger or our protocol, skip
-	if strings.Contains(sContent, trigger) || strings.Contains(sContent, ProtocolStartTag) {
+	// If it already only contains the trigger, skip
+	if strings.Contains(sContent, trigger) {
 		return false
 	}
 

@@ -51,31 +51,31 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 9: Immediate Migration on Init**
+### **Phase 10: Active Onboarding Protocol**
 
-**Initial Problem:** Even with the trap, the agent file still contained legacy clutter after `bd init` until `bd onboard` was run.
+**Initial Problem:** Complete automation of `bd onboard` allowed agents to bypass the mental overhead of understanding the new workflow, leading to "passive" compliance.
 
-*   **My Assumption/Plan #1:** Move legacy content immediately during the `init` phase.
+*   **My Assumption/Plan #1:** Revert `bd onboard` to a manual copy-paste protocol while keeping `bd ready` as the automatic unlock trigger.
     *   **Action Taken:**
-        1. Updated `configureAgentRules` in `cmd/bd/devlog_cmds.go` to perform content migration immediately.
-        2. Overwrote agent files with **only** the bootstrap trigger after moving their content to `PROJECT_CONTEXT.md`.
-        3. Verified the three-stage flow (Init -> Onboard -> Ready) in a new integration test (`_sandbox/Test-20-Full-Flow`).
-    *   **Result:** Success. The agent file is now "content-free" immediately after `bd init`, showing only the mandatory trap message.
+        1. Modified `bd onboard` to only output Markdown snippets and set the `onboarding_finalized = false` flag.
+        2. Maintained `bd ready` as the "Gatekeeper" that automatically upgrades the agent file to the Full Bootloader once the protocol is followed.
+        3. Verified the "Manual -> Automatic" hybrid flow in a new integration test (`_sandbox/Test-22-Manual-Onboarding`).
+    *   **Result:** Success. The system now enforces active engagement from the agent during initialization, ensuring they physically interact with the orchestration modules.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is now fully automated, enforced, and optimized for maximum cleanliness from the first step.
+**Final Status:** Progressive Disclosure Protocol is fully automated for infrastructure (`init`), manual for activation (`onboard`), and automatic for rewarding compliance (`ready`).
 **Key Learnings:**
-*   Moving content early reduces "cognitive noise" for coding agents who might otherwise try to act on legacy instructions before they are properly modularized.
-*   The `init` command is the best place for structural reorganization, while `onboard` is the best place for logical activation.
+*   Pure automation can sometimes be counter-productive for instruction enforcement. Forcing an agent to perform a "copy-paste" act ensures they have parsed the instructions.
+*   The "Handshake" pattern (Manual Step -> Verification -> Auto-Reward) creates a robust onboarding experience for both humans and AI agents.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd init -> PROJECT_CONTEXT.md (moves legacy content)
-- bd init -> GEMINI.md (trap only)
-- bd onboard -> RestrictedBootloader (trap replacement)
-- bd ready -> FullBootloader (final unlocking)
+- bd onboard -> RestrictedBootloader (outputs snippet)
+- bd ready -> FullBootloader (unlocks automatically)
+- bd init -> PROJECT_CONTEXT.md (pre-scaffolds context)
+- onboarding_finalized (DB flag) -> ready (triggers upgrade)
