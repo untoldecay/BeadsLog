@@ -23,7 +23,8 @@ var Candidates = []string{
 	".github/COPILOT-INSTRUCTIONS.md",
 }
 
-// finalizeOnboarding unlocks the environment by installing the Full Bootloader
+// finalizeOnboarding unlocks the environment by installing the Full Bootloader.
+// It searches for either the Protocol tags OR the initial bootstrap trap.
 func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 	if store == nil {
 		return
@@ -34,7 +35,10 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 		return
 	}
 
-	// Find and update all agent files
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard' and follow ALL instructions to initialize your session."
+	fullBootloader := restoreCodeBlocks(FullBootloader)
+	fullBlock := ProtocolStartTag + "\n" + fullBootloader + "\n" + ProtocolEndTag
+
 	found := false
 	for _, file := range Candidates {
 		if _, err := os.Stat(file); err == nil {
@@ -43,12 +47,28 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 				continue
 			}
 
-			// Check if it's our bootloader (has protocol tags)
-			if strings.Contains(string(content), ProtocolStartTag) {
-				finalBootloader := restoreCodeBlocks(FullBootloader)
-				fullBlock := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
-				
-				if err := os.WriteFile(file, []byte(fullBlock), 0644); err == nil {
+			sContent := string(content)
+			var newContent string
+			modified := false
+
+			if strings.Contains(sContent, ProtocolStartTag) {
+				// Case 1: Already has tags, just update between them
+				startIndex := strings.Index(sContent, ProtocolStartTag)
+				endIndex := strings.Index(sContent, ProtocolEndTag)
+				if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
+					pre := sContent[:startIndex]
+					post := sContent[endIndex+len(ProtocolEndTag):]
+					newContent = pre + fullBlock + post
+					modified = true
+				}
+			} else if strings.Contains(sContent, bootstrapTrigger) {
+				// Case 2: Fresh init, replace the trap line
+				newContent = strings.Replace(sContent, bootstrapTrigger, fullBlock, 1)
+				modified = true
+			}
+
+			if modified {
+				if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
 					found = true
 				}
 			}
@@ -57,39 +77,25 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 
 	if found {
 		_ = store.SetConfig(ctx, "onboarding_finalized", "true")
-		fmt.Printf("\n%s Session Initialized. Project context is now unlocked in your agent instructions.\n", ui.RenderPass("✅"))
+		fmt.Printf("\n%s Session Initialized. Agent instructions updated with full project context.\n", ui.RenderPass("✅"))
 	}
 }
 
-// executeOnboard generates the copy-paste protocol for the agent
+// executeOnboard acts as a guide for the agent
 func executeOnboard(ctx context.Context, store storage.Storage) error {
-	// Ensure orchestration structure exists (for manually following the instructions)
+	// Ensure orchestration structure exists
 	initializeOrchestration(false)
 
-	// Prepare the Restricted Bootloader snippet
-	finalBootloader := restoreCodeBlocks(RestrictedBootloader)
-	fullSnippet := ProtocolStartTag + "\n" + finalBootloader + "\n" + ProtocolEndTag
-
-	fmt.Printf("\n%s BeadsLog Onboarding - Copy-Paste Protocol\n", ui.RenderAccent("🏰"))
+	fmt.Printf("\n%s BeadsLog Activation Guide\n", ui.RenderAccent("🚀"))
 	fmt.Printf("------------------------------------------------------------\n")
-	fmt.Printf("To integrate with this repository, you must update your instructions.\n\n")
+	fmt.Printf("Welcome! To unlock the project context and finish your setup, follow these steps:\n\n")
 	
-	fmt.Printf("👉 **STEP 1: Copy this block to your instruction file**\n")
-	fmt.Printf("Target files (choose yours): %s\n\n", strings.Join(Candidates, ", "))
-	
-	fmt.Printf("```markdown\n%s\n```\n\n", fullSnippet)
+	fmt.Printf("1. **Verify Health**: Run %s to ensure devlog integrity.\n", ui.RenderAccent("bd devlog verify --fix"))
+	fmt.Printf("2. **Sync Knowledge**: Run %s to ingest latest issues and logs.\n", ui.RenderAccent("bd sync"))
+	fmt.Printf("3. **Unlock Environment**: Run %s to finalize your session.\n\n", ui.RenderAccent("bd ready"))
 
-	fmt.Printf("👉 **STEP 2: Delete the 'run bd onboard' note from that file.**\n\n")
-
-	fmt.Printf("👉 **STEP 3: Execute the Activation Sequence**\n")
-	fmt.Printf("Read %s and run the commands inside to unlock full context:\n\n", ui.RenderAccent("_rules/_orchestration/PROTOCOL.md"))
-	
-	fmt.Printf("```bash\n")
-	fmt.Printf("bd sync\n")
-	fmt.Printf("bd devlog verify --fix\n")
-	fmt.Printf("bd devlog sync\n")
-	fmt.Printf("bd ready\n")
-	fmt.Printf("```\n")
+	fmt.Printf("👉 **GOAL:** Once %s is run, your instruction file will be automatically updated\n", ui.RenderAccent("bd ready"))
+	fmt.Printf("with links to all project modules and conventions.\n")
 
 	// Set state to uninitialized
 	if store != nil {
@@ -102,12 +108,10 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 var onboardCmd = &cobra.Command{
 	Use:     "onboard",
 	GroupID: "setup",
-	Short:   "Generate integration instructions for the agent",
-	Long: `This command generates the necessary Markdown snippets to integrate
-	Beads and Beads Devlog into your agent instruction files.
-	
-	Copy the generated snippet to your primary rule file (e.g. AGENTS.md)
-	to begin the activation process.`,
+	Short:   "Guide the agent through session initialization",
+	Long: `This command provides a step-by-step guide for agents to activate
+	their session. Following the guide will lead to the 'bd ready' command,
+	which unlocks the full project context in the agent's instructions.`,
 	Run: func(cmd *cobra.Command, args []string) {
 			if err := executeOnboard(rootCtx, store); err != nil {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)

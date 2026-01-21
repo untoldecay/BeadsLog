@@ -51,31 +51,31 @@ To implement the Progressive Disclosure Protocol for agent instructions, separat
 
 ---
 
-### **Phase 10: Active Onboarding Protocol**
+### **Phase 11: Guided Activation Guide**
 
-**Initial Problem:** Complete automation of `bd onboard` allowed agents to bypass the mental overhead of understanding the new workflow, leading to "passive" compliance.
+**Initial Problem:** Snippets and copy-paste steps were still prone to agent error or bypass. Agents need a clear "tutorial" experience.
 
-*   **My Assumption/Plan #1:** Revert `bd onboard` to a manual copy-paste protocol while keeping `bd ready` as the automatic unlock trigger.
+*   **My Assumption/Plan #1:** Pivot `bd onboard` to act as a CLI activation guide while hardening the automatic unlock trigger.
     *   **Action Taken:**
-        1. Modified `bd onboard` to only output Markdown snippets and set the `onboarding_finalized = false` flag.
-        2. Maintained `bd ready` as the "Gatekeeper" that automatically upgrades the agent file to the Full Bootloader once the protocol is followed.
-        3. Verified the "Manual -> Automatic" hybrid flow in a new integration test (`_sandbox/Test-22-Manual-Onboarding`).
-    *   **Result:** Success. The system now enforces active engagement from the agent during initialization, ensuring they physically interact with the orchestration modules.
+        1. Updated the bootstrap trap to be explicit about the goal: `Run bd onboard and follow ALL instructions`.
+        2. Updated `bd onboard` to output a clean, 3-step numbered guide (Verify -> Sync -> Unlock).
+        3. Hardened `finalizeOnboarding` to search for and replace the new explicit trap message.
+        4. Verified the entire "Guide -> Trigger -> Unlock" flow in a new integration test (`_sandbox/Test-23-Guided-Activation`).
+    *   **Result:** Success. The agent experience is now natural, instructional, and effectively enforces the Progressive Disclosure workflow.
 
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** Progressive Disclosure Protocol is fully automated for infrastructure (`init`), manual for activation (`onboard`), and automatic for rewarding compliance (`ready`).
+**Final Status:** Progressive Disclosure Protocol is fully automated, instructional, and verified.
 **Key Learnings:**
-*   Pure automation can sometimes be counter-productive for instruction enforcement. Forcing an agent to perform a "copy-paste" act ensures they have parsed the instructions.
-*   The "Handshake" pattern (Manual Step -> Verification -> Auto-Reward) creates a robust onboarding experience for both humans and AI agents.
+*   Instructional CLI output is the most "native" way to guide AI agents.
+*   The "Goal-Action-Reward" loop (explicit trap -> guided commands -> unlocked context) creates a highly robust onboarding experience.
 
 ---
 
 ### **Architectural Relationships**
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- bd onboard -> RestrictedBootloader (outputs snippet)
-- bd ready -> FullBootloader (unlocks automatically)
-- bd init -> PROJECT_CONTEXT.md (pre-scaffolds context)
-- onboarding_finalized (DB flag) -> ready (triggers upgrade)
+- bd onboard -> Activation Guide (outputs)
+- bd ready -> finalizeOnboarding (unlocks automatically)
+- bootstrapTrigger -> finalizeOnboarding (matched for replacement)

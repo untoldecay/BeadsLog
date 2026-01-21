@@ -191,7 +191,7 @@ func configureAgentRules(quiet bool) {
 		fmt.Println("  Agent behavior:")
 	}
 
-	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard'"
+	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard' and follow ALL instructions to initialize your session."
 
 	// Find all existing agent files
 	var foundFiles []string
