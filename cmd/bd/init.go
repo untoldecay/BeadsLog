@@ -499,53 +499,57 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		var autoSync, enforceDevlog bool
 		autoSync = true // Default
 
-		// Interactive setup if not quiet and stdin is a TTY
-		if !quiet && ui.IsTerminal() {
-			form := huh.NewForm(
-				huh.NewGroup(
-					huh.NewNote().
-						Title("BeadsLog Setup Wizard").
-						Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
-
-					huh.NewConfirm().
-						Title("Enable Auto-Sync?").
-						Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
-						Value(&autoSync),
-
-					huh.NewConfirm().
-						Title("Enforce Devlogs?").
-						Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
-						Value(&enforceDevlog),
-				),
-			)
-
-			if err := form.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
-				os.Exit(1)
-			}
-		}
-
-		// Pass false/true to keep them silent as we report results at the end.
-		orchFiles := initializeOrchestration(false)
-		devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
-
-		// Skip output if quiet mode
-		if quiet {
-			return
-		}
-
-		// Collect information for the final report
-		initResult := ui.InitResult{
-			DBPath:               initDBPath,
-			Prefix:               prefix,
-			OrchestrationFiles:   orchFiles,
-			DevlogSpaceStatus:    devlogRes.SpaceStatus,
-			DevlogPromptStatus:   devlogRes.PromptStatus,
-			AgentRules:           devlogRes.AgentRules,
-			HooksInstalled:       hooksInstalledAtInit || (isGitRepo() && hooksInstalled()),
-			MergeDriverInstalled: mergeDriverInstalledAtInit || (isGitRepo() && mergeDriverInstalled()),
-		}
-
+		        // Interactive setup if not quiet and stdin is a TTY
+				if !quiet && ui.IsTerminal() {
+					form := huh.NewForm(
+						huh.NewGroup(
+							huh.NewNote().
+								Title("BeadsLog Setup Wizard").
+								Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
+		
+							huh.NewSelect[bool]().
+								Title("Enable Auto-Sync?").
+								Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+								Options(
+									huh.NewOption("Yes, keep me in sync (Recommended)", true),
+									huh.NewOption("No, I'll sync manually", false),
+								).
+								Value(&autoSync),
+		
+							huh.NewSelect[bool]().
+								Title("Enforce Devlogs?").
+								Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
+								Options(
+									huh.NewOption("Yes, enforce best practices", true),
+									huh.NewOption("No, allow loose commits", false),
+								).
+								Value(&enforceDevlog),
+						),
+					)
+		
+					if err := form.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
+				}
+		
+				orchFiles := initializeOrchestration(false)
+				devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
+		
+				// Collect information for the final report
+				initResult := ui.InitResult{
+					DBPath:               initDBPath,
+					Prefix:               prefix,
+					RepoID:               repoID,
+					CloneID:              cloneID,
+					OrchestrationFiles:   orchFiles,
+					DevlogSpaceStatus:    devlogRes.SpaceStatus,
+					DevlogPromptStatus:   devlogRes.PromptStatus,
+					AgentRules:           devlogRes.AgentRules,
+					DevlogHooks:          devlogRes.Hooks,
+					HooksInstalled:       hooksInstalledAtInit || (isGitRepo() && hooksInstalled()),
+					MergeDriverInstalled: mergeDriverInstalledAtInit || (isGitRepo() && mergeDriverInstalled()),
+				}
 		// Run bd doctor diagnostics to catch setup issues early
 		doctorResult := runDiagnostics(cwd)
 		for _, check := range doctorResult.Checks {

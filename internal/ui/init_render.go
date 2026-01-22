@@ -6,30 +6,55 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
-	"github.com/charmbracelet/lipgloss/table"
 )
 
 // InitResult aggregates all information from the initialization process
+
 type InitResult struct {
+
 	// Database info
-	DBPath string
-	Prefix string
+
+	DBPath  string
+
+	Prefix  string
+
+	RepoID  string
+
+	CloneID string
+
+
 
 	// Step results
-	OrchestrationFiles []string
-	DevlogSpaceStatus   string
-	DevlogPromptStatus  string
-	AgentRules          []string
-	DevlogHooks         []string
-	HooksInstalled      bool
+
+	OrchestrationFiles   []string
+
+	DevlogSpaceStatus    string
+
+	DevlogPromptStatus   string
+
+	AgentRules           []string
+
+	DevlogHooks          []string
+
+	HooksInstalled       bool
+
 	MergeDriverInstalled bool
 
+
+
 	// Diagnostics
+
 	DoctorIssues []string
 
+
+
 	// Next steps
+
 	QuickstartCommands []string
+
 }
+
+
 
 // RenderInitReport generates a professional Lipgloss report for the init command
 
@@ -53,63 +78,7 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 2. Component Table (Summary)
-
-	detailsRows := [][]string{
-
-		{"Database", res.DBPath},
-
-		{"Issue Prefix", res.Prefix},
-
-		{"Next IDs", res.Prefix + "-<hash>"},
-
-	}
-
-
-
-	summaryTable := table.New().
-
-		Headers("Component", "Configuration").
-
-		Rows(detailsRows...).
-
-		Border(lipgloss.RoundedBorder()).
-
-		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
-
-		Width(width).
-
-		StyleFunc(func(row, col int) lipgloss.Style {
-
-			if row == table.HeaderRow {
-
-				if col == 0 {
-
-					return TableHeaderStyle.Width(20)
-
-				}
-
-				return TableHeaderStyle.Width(width - 20 - 3)
-
-			}
-
-			style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
-
-			if col == 0 {
-
-				style = style.Bold(true).Foreground(ColorAccent)
-
-			}
-
-			return style
-
-		})
-
-	sections = append(sections, summaryTable.String(), "")
-
-
-
-	// 3. Hierarchical Progress List
+	// 2. Hierarchical Progress List
 
 	// Helper for checkmark list
 
@@ -129,7 +98,39 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 3a. Orchestration
+	// 2a. Configuration List (Replacing Table)
+
+	lConfig := checkList()
+
+	lConfig.Item("Configuration:")
+
+	configSubList := list.New().Enumerator(func(_ list.Items, i int) string { return RenderPass("✓") }).EnumeratorStyle(lipgloss.NewStyle().MarginRight(1))
+
+	configSubList.Item(fmt.Sprintf("Database: %s", res.DBPath))
+
+	configSubList.Item(fmt.Sprintf("Issue Prefix: %s", res.Prefix))
+
+	configSubList.Item(fmt.Sprintf("Next IDs: %s-<hash>", res.Prefix))
+
+	if res.RepoID != "" {
+
+		configSubList.Item(fmt.Sprintf("Repository ID: %s", res.RepoID[:8]))
+
+	}
+
+	if res.CloneID != "" {
+
+		configSubList.Item(fmt.Sprintf("Clone ID: %s", res.CloneID))
+
+	}
+
+	lConfig.Item(configSubList)
+
+	sections = append(sections, lConfig.String())
+
+
+
+	// 2b. Orchestration
 
 	lOrch := checkList()
 
@@ -149,7 +150,7 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 3b. Agent Rules
+	// 2c. Agent Rules
 
 	if len(res.AgentRules) > 0 {
 
@@ -163,7 +164,7 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 3c. Devlog
+	// 2d. Devlog
 
 	lDev := checkList()
 
@@ -179,7 +180,7 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 3d. Git Hooks
+	// 2e. Git Hooks
 
 	allHooks := []string{}
 
@@ -207,75 +208,77 @@ func RenderInitReport(res InitResult, width int) string {
 
 
 
-	// 4. Setup Completion Table (Diagnostics)
+	// 3. Setup Completion / Warnings (Background Color)
 
 	if len(res.DoctorIssues) > 0 {
 
-		warnRows := [][]string{}
+		// Use a high-visibility background for diagnostics
+
+		warnStyle := lipgloss.NewStyle().
+
+			Background(lipgloss.Color("#2a2a2a")).
+
+			Padding(1, 2).
+
+			Width(width)
+
+
+
+		var warnLines []string
+
+		warnLines = append(warnLines, lipgloss.NewStyle().Bold(true).Foreground(ColorWarn).Render("⚠ SETUP INCOMPLETE / WARNINGS"))
+
+		
+
+		// Use a list inside the warning area
+
+		diagList := list.New().Enumerator(func(_ list.Items, i int) string {
+
+			return lipgloss.NewStyle().Foreground(ColorWarn).Render("•")
+
+		}).EnumeratorStyle(lipgloss.NewStyle().MarginRight(1))
+
+		
 
 		for _, issue := range res.DoctorIssues {
 
-			warnRows = append(warnRows, []string{"⚠", issue})
+			diagList.Item(issue)
 
 		}
 
+		warnLines = append(warnLines, diagList.String())
+
+		
+
+		// Embed doctor command at the end
+
+		doctorCmd := lipgloss.NewStyle().Foreground(ColorAccent).Bold(true).Render("bd doctor --fix")
+
+		warnLines = append(warnLines, "", "Run "+doctorCmd+" to resolve these issues.")
 
 
-		diagTable := table.New().
 
-			Headers("!", "Setup Completion / Warnings").
-
-			Rows(warnRows...).
-
-			Border(lipgloss.RoundedBorder()).
-
-			BorderStyle(lipgloss.NewStyle().Foreground(ColorWarn)).
-
-			Width(width).
-
-			StyleFunc(func(row, col int) lipgloss.Style {
-
-				if row == table.HeaderRow {
-
-					if col == 0 {
-
-						return TableHeaderStyle.Width(3).Foreground(ColorWarn)
-
-					}
-
-					return TableHeaderStyle.Width(width - 3 - 3).Foreground(ColorWarn)
-
-				}
-
-				style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
-
-				if col == 0 {
-
-					style = style.Foreground(ColorWarn).Bold(true)
-
-				}
-
-				return style
-
-			})
-
-		sections = append(sections, diagTable.String(), "")
+		sections = append(sections, warnStyle.Render(strings.Join(warnLines, "\n")), "")
 
 	}
 
 
 
-	// 5. Help (Quickfix)
+	// 4. Help (Quickfix) - Only if no warnings (to avoid redundancy)
 
-	sections = append(sections, lipgloss.NewStyle().Bold(true).Render("Help & Diagnostics:"))
+	if len(res.DoctorIssues) == 0 {
 
-	sections = append(sections, "  • Run "+lipgloss.NewStyle().Foreground(ColorAccent).Render("bd doctor --fix")+" to resolve setup warnings.")
+		sections = append(sections, lipgloss.NewStyle().Bold(true).Render("Help & Diagnostics:"))
 
-	sections = append(sections, "")
+		sections = append(sections, "  • Run "+lipgloss.NewStyle().Foreground(ColorAccent).Render("bd doctor")+" for system health check.")
+
+		sections = append(sections, "")
+
+	}
 
 
 
-	// 6. Final Message
+	// 5. Final Message
 
 	nextStep := lipgloss.NewStyle().Foreground(ColorAccent).Bold(true).Render("bd onboard")
 
@@ -288,3 +291,5 @@ func RenderInitReport(res InitResult, width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 
 }
+
+
