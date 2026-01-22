@@ -207,12 +207,17 @@ func configureAgentRules(quiet bool) {
 			var response string
 			fmt.Scanln(&response)
 			if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-				// Create AGENTS.md
-				f, err := os.OpenFile("AGENTS.md", os.O_CREATE|os.O_WRONLY, 0644)
+				// Use the first candidate as the default file to create (usually AGENTS.md)
+				defaultFile := "AGENTS.md"
+				if len(Candidates) > 0 {
+					defaultFile = Candidates[0]
+				}
+
+				f, err := os.OpenFile(defaultFile, os.O_CREATE|os.O_WRONLY, 0644)
 				if err == nil {
 					f.WriteString(bootstrapTrigger + "\n")
 					f.Close()
-					fmt.Printf("    %s Agent instruction: AGENTS.md (Created)\n", ui.RenderPass("✓"))
+					fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), defaultFile)
 				}
 			}
 		}

@@ -8,18 +8,21 @@
 # the actual hook logic. This pattern ensures hook behavior is always
 # in sync with the installed bd version - no manual updates needed.
 
-# Check if bd is available
-if ! command -v bd >/dev/null 2>&1; then
-    echo "Warning: bd command not found in PATH, skipping pre-commit hook" >&2
+# Check if bd is available (prefer local ./bd if present)
+if [ -f "./bd" ]; then
+    BD_CMD="./bd"
+elif command -v bd >/dev/null 2>&1; then
+    BD_CMD="bd"
+else
+    echo "Warning: bd command not found, skipping pre-commit hook" >&2
     echo "  Install bd: brew install steveyegge/tap/bd" >&2
-    echo "  Or add bd to your PATH" >&2
     exit 0
 fi
 
 # Run bd devlog compliance check
 # This command exits with 1 if devlog is not compliant, blocking the commit.
-if ! bd check --hook pre-commit; then
+if ! $BD_CMD check --hook pre-commit; then
     exit 1
 fi
 
-exec bd hooks run pre-commit "$@"
+exec $BD_CMD hooks run pre-commit "$@"

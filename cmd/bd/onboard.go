@@ -15,11 +15,13 @@ import (
 // Candidates lists potential agent instruction files
 var Candidates = []string{
 	"AGENTS.md",
+	"AGENT.md",
 	".windsufrules",
 	".cursorrules",
 	"CLAUDE.md",
 	".claude/rules",
 	"GEMINI.md",
+	"CODEBASE.md",
 	".github/copilot-instructions.md",
 	".github/COPILOT-INSTRUCTIONS.md",
 }
@@ -65,6 +67,11 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 			} else if strings.Contains(sContent, bootstrapTrigger) {
 				// Case 2: Fresh init, replace the trap line
 				newContent = strings.Replace(sContent, bootstrapTrigger, fullBlock, 1)
+				modified = true
+			} else {
+				// Case 3: File exists but missing trigger/protocol - PREPEND full protocol
+				// This handles cases where onboarding was somehow missed but we are finalizing
+				newContent = fullBlock + "\n" + sContent
 				modified = true
 			}
 

@@ -261,8 +261,12 @@ fi
 
 // preCommitHookBody returns the common pre-commit hook logic
 func preCommitHookBody() string {
-	return `# Check if bd is available
-if ! command -v bd >/dev/null 2>&1; then
+	return `# Check if bd is available (prefer local ./bd if present)
+if [ -f "./bd" ]; then
+    BD_CMD="./bd"
+elif command -v bd >/dev/null 2>&1; then
+    BD_CMD="bd"
+else
     echo "Warning: bd command not found, skipping pre-commit flush" >&2
     exit 0
 fi
@@ -293,14 +297,14 @@ fi
 
 # Run bd devlog compliance check
 # This command exits with 1 if devlog is not compliant, blocking the commit.
-if ! bd check --hook pre-commit; then
+if ! $BD_CMD check --hook pre-commit; then
     exit 1
 fi
 
 # Flush pending changes to JSONL
-if ! bd sync --flush-only >/dev/null 2>&1; then
+if ! $BD_CMD sync --flush-only >/dev/null 2>&1; then
     echo "Error: Failed to flush bd changes to JSONL" >&2
-    echo "Run 'bd sync --flush-only' manually to diagnose" >&2
+    echo "Run '$BD_CMD sync --flush-only' manually to diagnose" >&2
     exit 1
 fi
 
