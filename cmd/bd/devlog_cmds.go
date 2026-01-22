@@ -71,9 +71,6 @@ func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
 		return result
 	}
 	result.SpaceStatus = statusDir
-	if !quiet {
-		fmt.Printf("  %s Devlog space: %s %s\n", ui.RenderPass("✓"), baseDir, statusDir)
-	}
 
 	// Create _index.md
 	indexPath := filepath.Join(baseDir, "_index.md")
@@ -98,9 +95,6 @@ func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
 		statusPrompt = "(Already exists)"
 	}
 	result.PromptStatus = statusPrompt
-	if !quiet {
-		fmt.Printf("  %s Devlog prompt: %s %s\n", ui.RenderPass("✓"), promptPath, statusPrompt)
-	}
 
 	// Store config
 	store, err := sqlite.New(rootCtx, dbPath)
@@ -119,7 +113,11 @@ func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
 		}
 	}
 
+	// Logic remains the same, but we only print if NOT quiet
 	if !quiet {
+		fmt.Printf("  %s Devlog space: %s %s\n", ui.RenderPass("✓"), baseDir, statusDir)
+		fmt.Printf("  %s Devlog prompt: %s %s\n", ui.RenderPass("✓"), promptPath, statusPrompt)
+
 		// Integrity Check
 		indexPath := filepath.Join(baseDir, "_index.md")
 		if _, err := parseIndexMD(indexPath); err != nil {
@@ -135,7 +133,7 @@ func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
 	// Agent Rules Integration
 	result.AgentRules = configureAgentRules(quiet)
 
-	// Automation Setup
+	// Automation Setup (Must print if not quiet)
 	if !quiet {
 		fmt.Println("\n[Automation Setup]")
 		fmt.Println()
@@ -199,9 +197,6 @@ func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
 
 func configureAgentRules(quiet bool) []string {
 	var results []string
-	if !quiet {
-		fmt.Println("  Agent behavior:")
-	}
 
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard' and follow ALL instructions to initialize your session."
 
@@ -215,6 +210,7 @@ func configureAgentRules(quiet bool) []string {
 
 	if len(foundFiles) == 0 {
 		if !quiet {
+			fmt.Println("  Agent behavior:")
 			fmt.Print("    Let agent automate devlog maintenance? [Y/n] ")
 			var response string
 			fmt.Scanln(&response)
@@ -242,11 +238,14 @@ func configureAgentRules(quiet bool) []string {
 		for _, file := range foundFiles {
 			if injectBootstrapTrigger(file, bootstrapTrigger) {
 				results = append(results, fmt.Sprintf("%s (Updated)", file))
+			} else {
+				results = append(results, fmt.Sprintf("%s (Active)", file))
 			}
 		}
 		return results
 	}
 
+	fmt.Println("  Agent behavior:")
 	fmt.Printf("    Found agent rules: %s\n", strings.Join(foundFiles, ", "))
 	fmt.Print("    Enable auto-maintenance for these agents? [Y/n] ")
 

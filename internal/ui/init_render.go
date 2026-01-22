@@ -41,6 +41,7 @@ func RenderInitReport(res InitResult, width int) string {
 	sections = append(sections, header, "")
 
 	// 2. Hierarchical Progress List (using lipgloss/list)
+	// Outer list uses checkmarks
 	l := list.New().
 		Enumerator(func(_ list.Items, i int) string {
 			return RenderPass("✓")
@@ -48,7 +49,10 @@ func RenderInitReport(res InitResult, width int) string {
 		EnumeratorStyle(lipgloss.NewStyle().MarginRight(1))
 
 	// Orchestration
-	orchList := list.New().Enumerator(list.Bullet)
+	orchList := list.New().Enumerator(func(_ list.Items, i int) string {
+		return RenderPass("✓")
+	}).EnumeratorStyle(lipgloss.NewStyle().MarginRight(1))
+	
 	for _, f := range res.OrchestrationFiles {
 		orchList.Item(f)
 	}

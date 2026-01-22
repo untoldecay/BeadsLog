@@ -494,8 +494,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
 		// Must run even in quiet mode to ensure database state is updated.
-		orchFiles := initializeOrchestration(!quiet)
-		devlogRes := initializeDevlog("_rules/_devlog", quiet)
+		// Pass false/true to keep them silent as we report results at the end.
+		orchFiles := initializeOrchestration(false)
+		devlogRes := initializeDevlog("_rules/_devlog", true)
 
 		// Skip output if quiet mode
 		if quiet {

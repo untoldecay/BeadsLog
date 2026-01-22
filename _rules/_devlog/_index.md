@@ -66,3 +66,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Lipgloss UI Uniformization | Refactored graph, impact, and entities with Tables and Trees | 2026-01-22 | [2026-01-22_lipgloss-ui-uniformization.md](2026-01-22_lipgloss-ui-uniformization.md) |
 | [enhance] Lipgloss Init Refactor | Modernized 'bd init' output with a structured setup report | 2026-01-22 | [2026-01-22_lipgloss-init-refactor.md](2026-01-22_lipgloss-init-refactor.md) |
 | [enhance] Finalize Lipgloss UI for 'bd init' | Implemented hierarchical lists and minimalist aesthetic for init report | 2026-01-22 | [2026-01-22_finalize-lipgloss-init.md](2026-01-22_finalize-lipgloss-init.md) |
+| [rationalize] Rationalize 'bd init' output | Eliminated redundant status messages and added checkmark lists | 2026-01-22 | [2026-01-22_rationalize-init-output.md](2026-01-22_rationalize-init-output.md) |
