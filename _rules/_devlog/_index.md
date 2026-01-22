@@ -67,3 +67,6 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Lipgloss Init Refactor | Modernized 'bd init' output with a structured setup report | 2026-01-22 | [2026-01-22_lipgloss-init-refactor.md](2026-01-22_lipgloss-init-refactor.md) |
 | [enhance] Finalize Lipgloss UI for 'bd init' | Implemented hierarchical lists and minimalist aesthetic for init report | 2026-01-22 | [2026-01-22_finalize-lipgloss-init.md](2026-01-22_finalize-lipgloss-init.md) |
 | [rationalize] Rationalize 'bd init' output | Eliminated redundant status messages and added checkmark lists | 2026-01-22 | [2026-01-22_rationalize-init-output.md](2026-01-22_rationalize-init-output.md) |
+| [enhance] Interactive Init Wizard | Implemented huh interactive form and checkmark progress lists for init | 2026-01-22 | [2026-01-22_interactive-wizard-and-enhanced-ui.md](2026-01-22_interactive-wizard-and-enhanced-ui.md) |
+| [enhance] Interactive Devlog Reset | Upgraded devlog reset to use huh for styled confirmation | 2026-01-22 | [2026-01-22_interactive-wizard-and-enhanced-ui.md](2026-01-22_interactive-wizard-and-enhanced-ui.md) |
+| [fix] RenderInitReport imports | Restored missing fmt import for init report | 2026-01-22 | [2026-01-22_interactive-wizard-and-enhanced-ui.md](2026-01-22_interactive-wizard-and-enhanced-ui.md) |

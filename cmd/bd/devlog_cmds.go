@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/huh"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
@@ -49,223 +50,361 @@ var devlogInitCmd = &cobra.Command{
 		if len(args) > 0 {
 			baseDir = args[0]
 		}
-		initializeDevlog(baseDir, false)
+		initializeDevlog(baseDir, false, true, false)
 	},
 }
 
 type DevlogInitResult struct {
+
 	SpaceStatus  string
+
 	PromptStatus string
+
 	AgentRules   []string
+
+	Hooks        []string
+
 }
 
-func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
+
+
+func initializeDevlog(baseDir string, quiet bool, autoSync, enforce bool) DevlogInitResult {
+
 	var result DevlogInitResult
+
 	statusDir := "(Created)"
+
 	if _, err := os.Stat(baseDir); err == nil {
+
 		statusDir = "(Already exists)"
+
 	} else if err := os.MkdirAll(baseDir, 0755); err != nil {
+
 		if !quiet {
+
 			fmt.Fprintf(os.Stderr, "Error creating devlog dir: %v\n", err)
+
 		}
+
 		return result
+
 	}
+
 	result.SpaceStatus = statusDir
 
+
+
 	// Create _index.md
+
 	indexPath := filepath.Join(baseDir, "_index.md")
+
 	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+
 		if err := os.WriteFile(indexPath, []byte(indexTemplate), 0644); err != nil {
+
 			if !quiet {
+
 				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
+
 			}
+
 		}
+
 	}
+
+
 
 	// Create _generate-devlog.md in the baseDir
+
 	promptPath := filepath.Join(baseDir, "_generate-devlog.md")
+
 	statusPrompt := "(Created)"
+
 	if _, err := os.Stat(promptPath); os.IsNotExist(err) {
+
 		if err := os.WriteFile(promptPath, []byte(promptTemplate), 0644); err != nil {
+
 			if !quiet {
+
 				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
+
 			}
+
 		}
+
 	} else {
+
 		statusPrompt = "(Already exists)"
+
 	}
+
 	result.PromptStatus = statusPrompt
 
+
+
 	// Store config
+
 	store, err := sqlite.New(rootCtx, dbPath)
+
 	if err != nil {
+
 		if !quiet {
+
 			fmt.Fprintf(os.Stderr, "  %s Warning: could not open database to save devlog configuration: %v\n", ui.RenderWarn("⚠"), err)
+
 		}
+
 	} else {
+
 		defer store.Close()
+
 		// Always set or update if empty
+
 		current, _ := store.GetConfig(rootCtx, "devlog_dir")
+
 		if current == "" || current != baseDir {
+
 			if err := store.SetConfig(rootCtx, "devlog_dir", baseDir); err != nil && !quiet {
+
 				fmt.Fprintf(os.Stderr, "  %s Warning: failed to save devlog_dir to database: %v\n", ui.RenderWarn("⚠"), err)
+
 			}
+
 		}
+
 	}
+
+
 
 	// Logic remains the same, but we only print if NOT quiet
+
 	if !quiet {
+
 		fmt.Printf("  %s Devlog space: %s %s\n", ui.RenderPass("✓"), baseDir, statusDir)
+
 		fmt.Printf("  %s Devlog prompt: %s %s\n", ui.RenderPass("✓"), promptPath, statusPrompt)
 
+
+
 		// Integrity Check
+
 		indexPath := filepath.Join(baseDir, "_index.md")
+
 		if _, err := parseIndexMD(indexPath); err != nil {
+
 			fmt.Printf("  %s Devlog index corrupted: %s\n", ui.RenderWarn("⚠"), indexPath)
+
 			fmt.Println("    Run 'bd devlog sync' to see error and get AI repair directive.")
+
 		} else {
+
 			fmt.Printf("  %s Devlog scaffolding initialized successfully\n", ui.RenderPass("✓"))
+
 			fmt.Println("  Run 'bd devlog sync' to ingest all devlogs in the system.")
+
 		}
+
 		fmt.Println() // Added for spacing
+
 	}
 
-	// Agent Rules Integration
-	result.AgentRules = configureAgentRules(quiet)
 
-	// Automation Setup (Must print if not quiet)
-	if !quiet {
-		fmt.Println("\n[Automation Setup]")
-		fmt.Println()
 
-		// 1. Auto-Sync
-		fmt.Println("  1. Enable Auto-Sync? [Y/n]")
-		fmt.Print("     (Keeps your issue tracker up-to-date in the background) ")
-		var response string
-		fmt.Scanln(&response)
-		if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-			installDevlogHooks(true)
-		} else {
-			fmt.Println("     Skipped auto-sync setup.")
-		}
-		fmt.Println()
+	// Agent Rules Integration (force enabled if called from init)
 
-		// 2. Enforcement
-		enforceSource := config.GetValueSource("devlog.enforce-on-commit")
-		enforceConfigured := enforceSource != config.SourceDefault
+	result.AgentRules = configureAgentRules(quiet, true)
 
-		// If configured via file, ensure it's the LOCAL config file, not a parent one
-		if enforceSource == config.SourceConfigFile {
-			usedConfig := config.GetConfigFileUsed()
-			// Assume config is next to DB
-			dbDir := filepath.Dir(dbPath)
-			expectedConfig := filepath.Join(dbDir, "config.yaml")
 
-			usedAbs, _ := filepath.Abs(usedConfig)
-			expectedAbs, _ := filepath.Abs(expectedConfig)
 
-			if usedAbs != expectedAbs {
-				enforceConfigured = false
-			}
-		}
+	// Automation Setup (handled via parameters)
 
-		if !enforceConfigured {
-			fmt.Println("  2. Enforce Devlogs? [y/N]")
-			fmt.Print("     (Prevents commits until you update the devlog—ensures AI has perfect memory) ")
+	if autoSync {
 
-			var response string
-			fmt.Scanln(&response)
-			response = strings.ToLower(strings.TrimSpace(response))
+		installDevlogHooks(false)
 
-			if response == "y" || response == "yes" {
-				if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil {
-					fmt.Fprintf(os.Stderr, "     Warning: failed to set devlog enforcement: %v\n", err)
-				} else {
-					fmt.Printf("     %s Devlog enforcement enabled (in config.yaml)\n", ui.RenderPass("✓"))
-				}
-			} else {
-				if err := config.SetYamlConfig("devlog.enforce-on-commit", "false"); err != nil {
-					fmt.Fprintf(os.Stderr, "     Warning: failed to set devlog enforcement: %v\n", err)
-				}
-				fmt.Printf("     %s Devlog enforcement disabled\n", ui.RenderPass("✓"))
-			}
-		}
+		result.Hooks = append(result.Hooks, "post-commit", "post-merge")
+
 	}
+
+
+
+	if enforce {
+
+		if err := config.SetYamlConfig("devlog.enforce-on-commit", "true"); err != nil && !quiet {
+
+			fmt.Fprintf(os.Stderr, "     Warning: failed to set devlog enforcement: %v\n", err)
+
+		}
+
+	} else {
+
+		_ = config.SetYamlConfig("devlog.enforce-on-commit", "false")
+
+	}
+
+
 
 	return result
+
 }
 
-func configureAgentRules(quiet bool) []string {
+
+
+func configureAgentRules(quiet bool, forceEnable bool) []string {
+
 	var results []string
+
+
 
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard' and follow ALL instructions to initialize your session."
 
+
+
 	// Find all existing agent files
+
 	var foundFiles []string
+
 	for _, f := range Candidates {
+
 		if _, err := os.Stat(f); err == nil {
+
 			foundFiles = append(foundFiles, f)
+
 		}
+
 	}
+
+
 
 	if len(foundFiles) == 0 {
+
 		if !quiet {
+
 			fmt.Println("  Agent behavior:")
+
 			fmt.Print("    Let agent automate devlog maintenance? [Y/n] ")
+
 			var response string
+
 			fmt.Scanln(&response)
+
 			if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-				// Use the first candidate as the default file to create (usually AGENTS.md)
-				defaultFile := "AGENTS.md"
-				if len(Candidates) > 0 {
-					defaultFile = Candidates[0]
-				}
 
-				f, err := os.OpenFile(defaultFile, os.O_CREATE|os.O_WRONLY, 0644)
-				if err == nil {
-					f.WriteString(bootstrapTrigger + "\n")
-					f.Close()
+				forceEnable = true
+
+			}
+
+		}
+
+		
+
+		if forceEnable {
+
+			// Use the first candidate as the default file to create (usually AGENTS.md)
+
+			defaultFile := "AGENTS.md"
+
+			if len(Candidates) > 0 {
+
+				defaultFile = Candidates[0]
+
+			}
+
+
+
+			f, err := os.OpenFile(defaultFile, os.O_CREATE|os.O_WRONLY, 0644)
+
+			if err == nil {
+
+				f.WriteString(bootstrapTrigger + "\n")
+
+				f.Close()
+
+				if !quiet {
+
 					fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), defaultFile)
-					results = append(results, fmt.Sprintf("%s (Created)", defaultFile))
+
 				}
+
+				results = append(results, fmt.Sprintf("%s (Created)", defaultFile))
+
 			}
+
 		}
+
 		return results
+
 	}
 
-	if quiet {
-		// Quietly update all
+
+
+	if quiet || forceEnable {
+
+		// Update all found
+
 		for _, file := range foundFiles {
+
 			if injectBootstrapTrigger(file, bootstrapTrigger) {
+
 				results = append(results, fmt.Sprintf("%s (Updated)", file))
+
 			} else {
+
 				results = append(results, fmt.Sprintf("%s (Active)", file))
+
 			}
+
 		}
+
 		return results
+
 	}
+
+
 
 	fmt.Println("  Agent behavior:")
+
 	fmt.Printf("    Found agent rules: %s\n", strings.Join(foundFiles, ", "))
+
 	fmt.Print("    Enable auto-maintenance for these agents? [Y/n] ")
 
+
+
 	var response string
+
 	fmt.Scanln(&response)
+
 	if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
+
 		for _, file := range foundFiles {
+
 			if injectBootstrapTrigger(file, bootstrapTrigger) {
+
 				fmt.Printf("    %s Agent instruction: %s (Migrated & Updated)\n", ui.RenderPass("✓"), file)
+
 				results = append(results, fmt.Sprintf("%s (Updated)", file))
+
 			} else {
+
 				fmt.Printf("    %s Agent instruction: %s (Already configured)\n", ui.RenderPass("✓"), file)
+
 				results = append(results, fmt.Sprintf("%s (Active)", file))
+
 			}
+
 		}
+
 	} else {
+
 		fmt.Println("    Skipped agent configuration.")
+
 	}
+
 	return results
+
 }
+
+
 
 func injectBootstrapTrigger(file, trigger string) bool {
 	content, err := os.ReadFile(file)
@@ -1176,12 +1315,25 @@ var devlogResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Clear all devlog data (sessions, entities, relationships)",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print("⚠️  This will delete ALL devlog data (sessions, entities, relationships) from the local database.\n")
-		fmt.Print("Are you sure? [y/N] ")
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" && strings.ToLower(confirm) != "yes" {
-			fmt.Println("Aborted.")
+		confirm := false
+		if !ui.IsTerminal() {
+			fmt.Println("Error: interactive confirmation required for reset. Use --force if needed (not implemented yet).")
+			os.Exit(1)
+		}
+
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Reset Devlog Database?").
+					Description("This will delete ALL sessions, entities, and architectural relationships from the local database. Files on disk will NOT be touched.").
+					Affirmative("Yes, Reset").
+					Negative("No, Cancel").
+					Value(&confirm),
+			),
+		)
+
+		if err := form.Run(); err != nil || !confirm {
+			fmt.Println("Reset cancelled.")
 			return
 		}
 

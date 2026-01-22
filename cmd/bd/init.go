@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/huh"
 	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
@@ -494,9 +495,39 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
 		// Must run even in quiet mode to ensure database state is updated.
+		
+		var autoSync, enforceDevlog bool
+		autoSync = true // Default
+
+		// Interactive setup if not quiet and stdin is a TTY
+		if !quiet && ui.IsTerminal() {
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewNote().
+						Title("BeadsLog Setup Wizard").
+						Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
+
+					huh.NewConfirm().
+						Title("Enable Auto-Sync?").
+						Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+						Value(&autoSync),
+
+					huh.NewConfirm().
+						Title("Enforce Devlogs?").
+						Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
+						Value(&enforceDevlog),
+				),
+			)
+
+			if err := form.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
 		// Pass false/true to keep them silent as we report results at the end.
 		orchFiles := initializeOrchestration(false)
-		devlogRes := initializeDevlog("_rules/_devlog", true)
+		devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
 
 		// Skip output if quiet mode
 		if quiet {
