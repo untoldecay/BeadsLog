@@ -63,3 +63,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Progressive Disclosure Protocol | Split agent instructions into on-demand modules | 2026-01-21 | [2026-01-21_progressive-disclosure-migration.md](2026-01-21_progressive-disclosure-migration.md) |
 | [feature] Real Agent Trap Synergy | Integrated prime command with onboarding state-awareness | 2026-01-21 | [2026-01-21_real-agent-trap-synergy.md](2026-01-21_real-agent-trap-synergy.md) |
 | [feature] AGENT.md support & hook fallback | Added singular AGENT.md support and local hook fallbacks | 2026-01-22 | [2026-01-22_agent-md-support-and-hook-hardening.md](2026-01-22_agent-md-support-and-hook-hardening.md) |
+| [enhance] Lipgloss UI Uniformization | Refactored graph, impact, and entities with Tables and Trees | 2026-01-22 | [2026-01-22_lipgloss-ui-uniformization.md](2026-01-22_lipgloss-ui-uniformization.md) |

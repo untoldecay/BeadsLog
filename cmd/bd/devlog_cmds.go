@@ -655,37 +655,36 @@ var devlogGraphCmd = &cobra.Command{
 				        fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
 
+		type graphMatch struct {
+			Name  string
+			Graph *queries.EntityGraph
+		}
+		var matches []graphMatch
+
 		for _, t := range targets {
-			fmt.Printf("=== %s ===\n", t.Name)
 			graph, err := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
-			if err != nil {
-				fmt.Printf("Error querying graph: %v\n", err)
-			} else {
-				printGraph(graph)
+			if err == nil && len(graph.Nodes) > 0 {
+				matches = append(matches, graphMatch{Name: t.Name, Graph: graph})
 			}
-			fmt.Println()
+		}
+
+		if len(matches) > 0 {
+			// Convert to anonymous struct slice for the UI helper
+			uiMatches := make([]struct {
+				Name  string
+				Graph *queries.EntityGraph
+			}, len(matches))
+			for i, m := range matches {
+				uiMatches[i] = struct {
+					Name  string
+					Graph *queries.EntityGraph
+				}{Name: m.Name, Graph: m.Graph}
+			}
+			fmt.Println(ui.RenderGraphTable(term, uiMatches, ui.GetWidth()))
+		} else {
+			fmt.Println("No graphs found.")
 		}
 	},
-}
-
-func printGraph(graph *queries.EntityGraph) {
-	if len(graph.Nodes) == 0 {
-		fmt.Println("No entities found.")
-		fmt.Println("Tip: Run 'bd devlog verify --fix' to audit sessions for missing metadata.")
-		return
-	}
-
-	for _, node := range graph.Nodes {
-		indent := strings.Repeat("  ", node.Depth)
-		marker := "└──"
-		if node.Depth == 0 {
-			marker = ""
-		} else {
-			indent = strings.Repeat("  ", node.Depth-1)
-		}
-		
-		fmt.Printf("%s%s %s (%d)\n", indent, marker, node.Name, node.Depth)
-	}
 }
 
 var devlogListCmd = &cobra.Command{
@@ -755,7 +754,7 @@ var entitiesCmd = &cobra.Command{
 		}
 		defer rows.Close()
 
-		fmt.Println("Top Entities:")
+		var entities [][]string
 		for rows.Next() {
 			var name string
 			var count int
@@ -763,7 +762,13 @@ var entitiesCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
-			fmt.Printf("%s (%d)\n", name, count)
+			entities = append(entities, []string{name, fmt.Sprintf("%d", count)})
+		}
+
+		if len(entities) > 0 {
+			fmt.Println(ui.RenderEntitiesTable(entities, ui.GetWidth()))
+		} else {
+			fmt.Println("No entities found.")
 		}
 	},
 }
@@ -966,8 +971,6 @@ var devlogImpactCmd = &cobra.Command{
 		fmt.Printf("Impact of '%s' (%d matches):\n\n", term, len(targets))
 
 		for _, t := range targets {
-			fmt.Printf("[%s]\n", t.Name)
-
 			rows, err := db.QueryContext(rootCtx, `
 				SELECT e.name, ed.relationship 
 				FROM entity_deps ed 
@@ -976,27 +979,19 @@ var devlogImpactCmd = &cobra.Command{
 			`, t.ID)
 
 			if err != nil {
-				fmt.Printf("  Error querying deps: %v\n", err)
+				fmt.Printf("  Error querying deps for %s: %v\n", t.Name, err)
 				continue
 			}
 			
-			// Must iterate completely or close explicitly inside loop if using defer rows.Close() in loop?
-			// Better to just iterate and close manually or use a func closure.
-			// Re-using 'rows' variable in loop is risky if deferred.
-			// Let's iterate and not defer inside loop, just Close() at end of iteration.
-			
-			foundDeps := false
+			var deps []string
 			for rows.Next() {
-				foundDeps = true
 				var name, rel string
 				rows.Scan(&name, &rel)
-				fmt.Printf("- %s (%s)\n", name, rel)
+				deps = append(deps, fmt.Sprintf("- %s (%s)", name, rel))
 			}
 			rows.Close()
 			
-			if !foundDeps {
-				fmt.Println("  (No known dependencies)")
-			}
+			fmt.Println(ui.RenderImpactTable(t.Name, deps, ui.GetWidth()))
 			fmt.Println()
 		}
 	},

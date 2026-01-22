@@ -47,4 +47,5 @@ bd devlog --help          # All devlog commands
 2. Load PROTOCOL.md only once per session
 3. Load WORKING_PROTOCOL.md at task start
 4. Reference files only when commands fail
+
 <!-- BD_PROTOCOL_END -->

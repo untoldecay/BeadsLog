@@ -21,35 +21,24 @@ func renderSingleTable(title string, items []string, width int) string {
 		return ""
 	}
 
-	// 1. Header Box (Centered, with bottom border)
-	// For lipgloss.Style, we use BorderForeground to set color
-	headerBox := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(ColorAccent).
-		Align(lipgloss.Center).
-		Border(lipgloss.RoundedBorder(), true, true, false, true).
-		BorderForeground(ColorMuted).
-		Width(width - 2). // Account for borders
-		Render(title)
-
-	// 2. Body Table (Left aligned, no top border)
 	rows := [][]string{}
 	for i, item := range items {
 		rows = append(rows, []string{fmt.Sprintf("%d. %s", i+1, item)})
 	}
 
-	// For table.Table, we use BorderStyle to set style (which includes color)
-	t := table.New().
+	return table.New().
+		Headers(title).
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
-		BorderTop(false).
 		Width(width).
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return TableHeaderStyle.Width(width - 2)
+			}
 			return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
-		})
-
-	return lipgloss.JoinVertical(lipgloss.Left, headerBox, t.String())
+		}).
+		String()
 }
 
 // RenderResultsWithContext renders the search results with headers and tables
@@ -74,15 +63,6 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 
 	// 3. Results Table
 	if len(results) > 0 {
-		headerBox := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorAccent).
-			Align(lipgloss.Center).
-			Border(lipgloss.RoundedBorder(), true, true, false, true).
-			BorderForeground(ColorMuted).
-			Width(width - 2).
-			Render(fmt.Sprintf("📄 Found %d sessions", len(results)))
-
 		rows := [][]string{}
 		for i, r := range results {
 			// Truncate title
@@ -100,12 +80,15 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 		}
 
 		t := table.New().
+			Headers(fmt.Sprintf("📄 Found %d sessions", len(results))).
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
-			BorderTop(false).
 			Width(width).
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
+				if row == table.HeaderRow {
+					return TableHeaderStyle.Width(width - 2)
+				}
 				// Column 0 (ID) gets fixed width, Column 1 (Title) takes rest
 				style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
 				if col == 0 {
@@ -114,7 +97,7 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 				return style
 			})
 
-		sections = append(sections, lipgloss.JoinVertical(lipgloss.Left, headerBox, t.String()))
+		sections = append(sections, t.String())
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
@@ -136,15 +119,6 @@ func RenderTypoCorrection(query, corrected string, results []SearchResultItem, w
 
 	// 3. Results Table
 	if len(results) > 0 {
-		headerBox := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorAccent).
-			Align(lipgloss.Center).
-			Border(lipgloss.RoundedBorder(), true, true, false, true).
-			BorderForeground(ColorMuted).
-			Width(width - 2).
-			Render(fmt.Sprintf("📄 Found %d sessions", len(results)))
-
 		rows := [][]string{}
 		for i, r := range results {
 			if i >= 5 {
@@ -165,12 +139,15 @@ func RenderTypoCorrection(query, corrected string, results []SearchResultItem, w
 		}
 
 		t := table.New().
+			Headers(fmt.Sprintf("📄 Found %d sessions", len(results))).
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
-			BorderTop(false).
 			Width(width).
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
+				if row == table.HeaderRow {
+					return TableHeaderStyle.Width(width - 2)
+				}
 				style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
 				if col == 0 {
 					style = style.Width(20)
@@ -178,10 +155,74 @@ func RenderTypoCorrection(query, corrected string, results []SearchResultItem, w
 				return style
 			})
 
-		sections = append(sections, lipgloss.JoinVertical(lipgloss.Left, headerBox, t.String()))
+		sections = append(sections, t.String())
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// RenderImpactTable renders the impact of an entity using a Lipgloss table
+func RenderImpactTable(target string, deps []string, width int) string {
+	title := fmt.Sprintf("💥 Impact Analysis: [%s]", target)
+	
+	if len(deps) == 0 {
+		return table.New().
+			Headers(title).
+			Rows([]string{"(No known dependencies)"}).
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
+			Width(width).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				if row == table.HeaderRow {
+					return TableHeaderStyle.Width(width - 2)
+				}
+				return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left).Foreground(ColorMuted)
+			}).
+			String()
+	}
+
+	rows := [][]string{}
+	for _, dep := range deps {
+		rows = append(rows, []string{dep})
+	}
+
+	return table.New().
+		Headers(title).
+		Rows(rows...).
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
+		Width(width).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return TableHeaderStyle.Width(width - 2)
+			}
+			return lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
+		}).
+		String()
+}
+
+// RenderEntitiesTable renders a list of entities and their mention counts
+func RenderEntitiesTable(entities [][]string, width int) string {
+	return table.New().
+		Headers("Top Entities", "Mentions").
+		Rows(entities...).
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
+		Width(width).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				// Each header cell needs to be half width - 1 for border
+				return TableHeaderStyle.Width(width/2 - 1)
+			}
+			style := lipgloss.NewStyle().Padding(0, 1)
+			if col == 1 {
+				style = style.Align(lipgloss.Right)
+			} else {
+				style = style.Align(lipgloss.Left)
+			}
+			return style
+		}).
+		String()
 }
 
 // RenderNoResults renders the no results view
