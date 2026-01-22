@@ -64,3 +64,5 @@ This index provides a concise record of all development work for easy scanning a
 | [feature] Real Agent Trap Synergy | Integrated prime command with onboarding state-awareness | 2026-01-21 | [2026-01-21_real-agent-trap-synergy.md](2026-01-21_real-agent-trap-synergy.md) |
 | [feature] AGENT.md support & hook fallback | Added singular AGENT.md support and local hook fallbacks | 2026-01-22 | [2026-01-22_agent-md-support-and-hook-hardening.md](2026-01-22_agent-md-support-and-hook-hardening.md) |
 | [enhance] Lipgloss UI Uniformization | Refactored graph, impact, and entities with Tables and Trees | 2026-01-22 | [2026-01-22_lipgloss-ui-uniformization.md](2026-01-22_lipgloss-ui-uniformization.md) |
+| [enhance] Lipgloss Init Refactor | Modernized 'bd init' output with a structured setup report | 2026-01-22 | [2026-01-22_lipgloss-init-refactor.md](2026-01-22_lipgloss-init-refactor.md) |
+| [enhance] Finalize Lipgloss UI for 'bd init' | Implemented hierarchical lists and minimalist aesthetic for init report | 2026-01-22 | [2026-01-22_finalize-lipgloss-init.md](2026-01-22_finalize-lipgloss-init.md) |

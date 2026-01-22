@@ -53,7 +53,14 @@ var devlogInitCmd = &cobra.Command{
 	},
 }
 
-func initializeDevlog(baseDir string, quiet bool) {
+type DevlogInitResult struct {
+	SpaceStatus  string
+	PromptStatus string
+	AgentRules   []string
+}
+
+func initializeDevlog(baseDir string, quiet bool) DevlogInitResult {
+	var result DevlogInitResult
 	statusDir := "(Created)"
 	if _, err := os.Stat(baseDir); err == nil {
 		statusDir = "(Already exists)"
@@ -61,8 +68,9 @@ func initializeDevlog(baseDir string, quiet bool) {
 		if !quiet {
 			fmt.Fprintf(os.Stderr, "Error creating devlog dir: %v\n", err)
 		}
-		return
+		return result
 	}
+	result.SpaceStatus = statusDir
 	if !quiet {
 		fmt.Printf("  %s Devlog space: %s %s\n", ui.RenderPass("✓"), baseDir, statusDir)
 	}
@@ -89,6 +97,7 @@ func initializeDevlog(baseDir string, quiet bool) {
 	} else {
 		statusPrompt = "(Already exists)"
 	}
+	result.PromptStatus = statusPrompt
 	if !quiet {
 		fmt.Printf("  %s Devlog prompt: %s %s\n", ui.RenderPass("✓"), promptPath, statusPrompt)
 	}
@@ -124,7 +133,7 @@ func initializeDevlog(baseDir string, quiet bool) {
 	}
 
 	// Agent Rules Integration
-	configureAgentRules(quiet)
+	result.AgentRules = configureAgentRules(quiet)
 
 	// Automation Setup
 	if !quiet {
@@ -184,9 +193,12 @@ func initializeDevlog(baseDir string, quiet bool) {
 			}
 		}
 	}
+
+	return result
 }
 
-func configureAgentRules(quiet bool) {
+func configureAgentRules(quiet bool) []string {
+	var results []string
 	if !quiet {
 		fmt.Println("  Agent behavior:")
 	}
@@ -218,18 +230,21 @@ func configureAgentRules(quiet bool) {
 					f.WriteString(bootstrapTrigger + "\n")
 					f.Close()
 					fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), defaultFile)
+					results = append(results, fmt.Sprintf("%s (Created)", defaultFile))
 				}
 			}
 		}
-		return
+		return results
 	}
 
 	if quiet {
 		// Quietly update all
 		for _, file := range foundFiles {
-			injectBootstrapTrigger(file, bootstrapTrigger)
+			if injectBootstrapTrigger(file, bootstrapTrigger) {
+				results = append(results, fmt.Sprintf("%s (Updated)", file))
+			}
 		}
-		return
+		return results
 	}
 
 	fmt.Printf("    Found agent rules: %s\n", strings.Join(foundFiles, ", "))
@@ -241,13 +256,16 @@ func configureAgentRules(quiet bool) {
 		for _, file := range foundFiles {
 			if injectBootstrapTrigger(file, bootstrapTrigger) {
 				fmt.Printf("    %s Agent instruction: %s (Migrated & Updated)\n", ui.RenderPass("✓"), file)
+				results = append(results, fmt.Sprintf("%s (Updated)", file))
 			} else {
 				fmt.Printf("    %s Agent instruction: %s (Already configured)\n", ui.RenderPass("✓"), file)
+				results = append(results, fmt.Sprintf("%s (Active)", file))
 			}
 		}
 	} else {
 		fmt.Println("    Skipped agent configuration.")
 	}
+	return results
 }
 
 func injectBootstrapTrigger(file, trigger string) bool {

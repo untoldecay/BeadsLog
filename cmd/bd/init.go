@@ -470,8 +470,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// Check if we're in a git repo and hooks aren't installed
 		// Install by default unless --skip-hooks is passed
+		hooksInstalledAtInit := false
 		if !skipHooks && isGitRepo() && !hooksInstalled() {
-			if err := installGitHooks(); err != nil && !quiet {
+			if err := installGitHooks(); err == nil {
+				hooksInstalledAtInit = true
+			} else if !quiet {
 				fmt.Fprintf(os.Stderr, "\n%s Failed to install git hooks: %v\n", ui.RenderWarn("⚠"), err)
 				fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
 			}
@@ -479,8 +482,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// Check if we're in a git repo and merge driver isn't configured
 		// Install by default unless --skip-merge-driver is passed
+		mergeDriverInstalledAtInit := false
 		if !skipMergeDriver && isGitRepo() && !mergeDriverInstalled() {
-			if err := installMergeDriver(); err != nil && !quiet {
+			if err := installMergeDriver(); err == nil {
+				mergeDriverInstalledAtInit = true
+			} else if !quiet {
 				fmt.Fprintf(os.Stderr, "\n%s Failed to install merge driver: %v\n", ui.RenderWarn("⚠"), err)
 				fmt.Fprintf(os.Stderr, "You can try again with: %s\n\n", ui.RenderAccent("bd doctor --fix"))
 			}
@@ -488,46 +494,44 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
 		// Must run even in quiet mode to ensure database state is updated.
-		initializeOrchestration(!quiet)
-		initializeDevlog("_rules/_devlog", quiet)
+		orchFiles := initializeOrchestration(!quiet)
+		devlogRes := initializeDevlog("_rules/_devlog", quiet)
 
 		// Skip output if quiet mode
 		if quiet {
 			return
 		}
-		fmt.Println("[Tasks]")
-		fmt.Printf("  Database: %s\n", ui.RenderAccent(initDBPath))
-		fmt.Printf("  Issue prefix: %s\n", ui.RenderAccent(prefix))
-		fmt.Printf("  Issues will be named: %s\n\n", ui.RenderAccent(prefix+"-<hash> (e.g., "+prefix+"-a3f2dd)"))
+
+		// Collect information for the final report
+		initResult := ui.InitResult{
+			DBPath:               initDBPath,
+			Prefix:               prefix,
+			OrchestrationFiles:   orchFiles,
+			DevlogSpaceStatus:    devlogRes.SpaceStatus,
+			DevlogPromptStatus:   devlogRes.PromptStatus,
+			AgentRules:           devlogRes.AgentRules,
+			HooksInstalled:       hooksInstalledAtInit || (isGitRepo() && hooksInstalled()),
+			MergeDriverInstalled: mergeDriverInstalledAtInit || (isGitRepo() && mergeDriverInstalled()),
+		}
 
 		// Run bd doctor diagnostics to catch setup issues early
 		doctorResult := runDiagnostics(cwd)
-		// Check if there are any warnings or errors (not just critical failures)
-		hasIssues := false
 		for _, check := range doctorResult.Checks {
 			if check.Status != statusOK {
-				hasIssues = true
-				break
+				initResult.DoctorIssues = append(initResult.DoctorIssues, fmt.Sprintf("%s: %s", check.Name, check.Message))
 			}
-		}
-		if hasIssues {
-			fmt.Println("------------------------------------------------------------")
-			fmt.Printf("⚠ Setup incomplete. Some issues were detected:\n")
-			fmt.Println("(Note: These are optional enhancements. Beads is fully functional without them.)")
-			fmt.Println()
-			// Show just the warnings or errors, not all checks
-			for _, check := range doctorResult.Checks {
-				if check.Status != statusOK {
-					fmt.Printf("  • %s: %s\n", check.Name, check.Message)
-				}
-			}
-			fmt.Printf("\nRun %s to see details and fix these issues.\n", ui.RenderAccent("bd doctor --fix"))
-			fmt.Println("------------------------------------------------------------")
 		}
 
-		fmt.Println("\n[Log Memory]")
-		fmt.Printf("\nRun %s to get started with tasks.\n", ui.RenderAccent("bd quickstart --tasks"))
-		fmt.Printf("Run %s to get started with logs.\n", ui.RenderAccent("bd quickstart --devlog"))
+		// Next steps
+		initResult.QuickstartCommands = []string{
+			"bd quickstart --tasks",
+			"bd quickstart --devlog",
+		}
+
+		// Render the final unified report
+		fmt.Println()
+		fmt.Println(ui.RenderInitReport(initResult, ui.GetWidth()))
+		fmt.Println()
 	},
 }
 
