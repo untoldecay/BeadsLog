@@ -78,3 +78,4 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] RenderInitReport code hygiene | Fixed excessive newlines and undefined Padding in init_render.go | 2026-01-22 | [2026-01-22_branded-init-and-high-contrast-ui.md](2026-01-22_branded-init-and-high-contrast-ui.md) |
 | [fix] Restore Native Select Behavior | Fixed scrolling issues in Select components by removing explicit heights | 2026-01-22 | [2026-01-22_restore-native-select-behavior.md](2026-01-22_restore-native-select-behavior.md) |
 | [enhance] Branded Logo Spacing | Added line breaks before logo for shell clarity | 2026-01-22 | [2026-01-22_restore-native-select-behavior.md](2026-01-22_restore-native-select-behavior.md) |
+| [fix] Definitively fix huh.Select interaction | Consolidated wizard into a single group and removed all height constraints | 2026-01-22 | [2026-01-22_definitively-fix-select-interaction.md](2026-01-22_definitively-fix-select-interaction.md) |

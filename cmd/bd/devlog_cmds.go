@@ -1315,26 +1315,26 @@ var devlogResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Clear all devlog data (sessions, entities, relationships)",
 	Run: func(cmd *cobra.Command, args []string) {
-		confirm := false
 		if !ui.IsTerminal() {
 			fmt.Println("Error: interactive confirmation required for reset. Use --force if needed (not implemented yet).")
 			os.Exit(1)
 		}
 
+		confirmStr := "false"
 		form := huh.NewForm(
 			huh.NewGroup(
-				huh.NewSelect[bool]().
+				huh.NewSelect[string]().
 					Title("Reset Devlog Database?").
 					Description("This will delete ALL sessions, entities, and architectural relationships from the local database. Files on disk will NOT be touched.").
 					Options(
-						huh.NewOption("Yes, Reset Database", true),
-						huh.NewOption("No, Cancel", false),
+						huh.NewOption("Yes, Reset Database", "true"),
+						huh.NewOption("No, Cancel", "false"),
 					).
-					Value(&confirm),
+					Value(&confirmStr),
 			),
 		)
 
-		if err := form.Run(); err != nil || !confirm {
+		if err := form.Run(); err != nil || confirmStr != "true" {
 			fmt.Println("Reset cancelled.")
 			return
 		}

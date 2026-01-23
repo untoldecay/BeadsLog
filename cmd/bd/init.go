@@ -502,67 +502,49 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
 		// Must run even in quiet mode to ensure database state is updated.
 		
-		var autoSync, enforceDevlog bool
-		autoSync = true // Default
+		var autoSyncStr, enforceDevlogStr string
+		autoSyncStr = "true"
+		enforceDevlogStr = "true"
 
-		        // Interactive setup if not quiet and stdin is a TTY
-				if !quiet && ui.IsTerminal() {
-					form := huh.NewForm(
-						huh.NewGroup(
-							huh.NewNote().
-								Title("BeadsLog Setup Wizard").
-								Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
-		
-																						huh.NewSelect[bool]().
-		
-																							Title("Enable Auto-Sync?").
-		
-																							Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
-		
-																							Options(
-		
-																								huh.NewOption("Yes, keep me in sync (Recommended)", true),
-		
-																								huh.NewOption("No, I'll sync manually", false),
-		
-																							).
-		
-																							Value(&autoSync),
-		
-																	
-		
-																						huh.NewSelect[bool]().
-		
-																							Title("Enforce Devlogs?").
-		
-																							Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
-		
-																							Options(
-		
-																								huh.NewOption("Yes, enforce best practices", true),
-		
-																								huh.NewOption("No, allow loose commits", false),
-		
-																							).
-		
-																							Value(&enforceDevlog),
-		
-																	
-		
-												
-		
-							
-						),
-					)
-		
-					if err := form.Run(); err != nil {
-						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
-						os.Exit(1)
-					}
-				}
-		
-				orchFiles := initializeOrchestration(false)
-				devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
+		// Interactive setup if not quiet and stdin is a TTY
+		if !quiet && ui.IsTerminal() {
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewNote().
+						Title("BeadsLog Setup Wizard").
+						Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
+
+					huh.NewSelect[string]().
+						Title("Enable Auto-Sync?").
+						Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+						Options(
+							huh.NewOption("Yes, keep me in sync (Recommended)", "true"),
+							huh.NewOption("No, I'll sync manually", "false"),
+						).
+						Value(&autoSyncStr),
+
+					huh.NewSelect[string]().
+						Title("Enforce Devlogs?").
+						Description("Prevents commits unless a devlog entry is provided. Highly recommended for AI agents.").
+						Options(
+							huh.NewOption("Yes, enforce best practices", "true"),
+							huh.NewOption("No, allow loose commits", "false"),
+						).
+						Value(&enforceDevlogStr),
+				),
+			)
+
+			if err := form.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
+		autoSync := autoSyncStr == "true"
+		enforceDevlog := enforceDevlogStr == "true"
+
+		orchFiles := initializeOrchestration(false)
+		devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
 		
 				// Collect information for the final report
 				initResult := ui.InitResult{
