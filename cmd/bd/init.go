@@ -507,23 +507,45 @@ With --stealth: configures per-repository git settings for invisible beads usage
 								Title("BeadsLog Setup Wizard").
 								Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
 		
-							huh.NewSelect[bool]().
-								Title("Enable Auto-Sync?").
-								Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
-								Options(
-									huh.NewOption("Yes, keep me in sync (Recommended)", true),
-									huh.NewOption("No, I'll sync manually", false),
-								).
-								Value(&autoSync),
+												huh.NewSelect[bool]().
 		
-							huh.NewSelect[bool]().
-								Title("Enforce Devlogs?").
-								Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
-								Options(
-									huh.NewOption("Yes, enforce best practices", true),
-									huh.NewOption("No, allow loose commits", false),
-								).
-								Value(&enforceDevlog),
+													Title("Enable Auto-Sync?").
+		
+													Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+		
+													Options(
+		
+														huh.NewOption("Yes, keep me in sync (Recommended)", true),
+		
+														huh.NewOption("No, I'll sync manually", false),
+		
+													).
+		
+													Height(4).
+		
+													Value(&autoSync),
+		
+							
+		
+												huh.NewSelect[bool]().
+		
+													Title("Enforce Devlogs?").
+		
+													Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
+		
+													Options(
+		
+														huh.NewOption("Yes, enforce best practices", true),
+		
+														huh.NewOption("No, allow loose commits", false),
+		
+													).
+		
+													Height(4).
+		
+													Value(&enforceDevlog),
+		
+							
 						),
 					)
 		

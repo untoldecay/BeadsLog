@@ -99,8 +99,9 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("Welcome! To unlock the project context and finish your setup, follow these steps:\n\n")
 	
 	fmt.Printf("1. **Verify Health**: Run %s to ensure devlog integrity.\n", ui.RenderAccent("bd devlog verify --fix"))
-	fmt.Printf("2. **Sync Knowledge**: Run %s to ingest latest issues and logs.\n", ui.RenderAccent("bd sync"))
-	fmt.Printf("3. **Unlock Environment**: Run %s to finalize your session.\n\n", ui.RenderAccent("bd ready"))
+	fmt.Printf("2. **Sync Tasks**: Run %s to get latest issues.\n", ui.RenderAccent("bd sync"))
+	fmt.Printf("3. **Sync Memory**: Run %s to ingest all devlog history.\n", ui.RenderAccent("bd devlog sync"))
+	fmt.Printf("4. **Unlock Environment**: Run %s to finalize your session.\n\n", ui.RenderAccent("bd ready"))
 
 	fmt.Printf("👉 **GOAL:** Once %s is run, your instruction file will be automatically updated\n", ui.RenderAccent("bd ready"))
 	fmt.Printf("with links to all project modules and conventions.\n")

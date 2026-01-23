@@ -1323,11 +1323,14 @@ var devlogResetCmd = &cobra.Command{
 
 		form := huh.NewForm(
 			huh.NewGroup(
-				huh.NewConfirm().
+				huh.NewSelect[bool]().
 					Title("Reset Devlog Database?").
 					Description("This will delete ALL sessions, entities, and architectural relationships from the local database. Files on disk will NOT be touched.").
-					Affirmative("Yes, Reset").
-					Negative("No, Cancel").
+					Options(
+						huh.NewOption("Yes, Reset Database", true),
+						huh.NewOption("No, Cancel", false),
+					).
+					Height(4).
 					Value(&confirm),
 			),
 		)
