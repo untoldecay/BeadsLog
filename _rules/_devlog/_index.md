@@ -73,3 +73,8 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Refine Init UI and Protocol | Unified config lists, background diagnostics, and huh.Select for init | 2026-01-22 | [2026-01-22_refine-init-ui-and-protocol.md](2026-01-22_refine-init-ui-and-protocol.md) |
 | [fix] Fix huh.Select height and unify reset UI | Resolved clipped options in init wizard and standardized reset confirmation | 2026-01-22 | [2026-01-22_fix-select-height-and-unify-ui.md](2026-01-22_fix-select-height-and-unify-ui.md) |
 | [enhance] Branded Init and High-Contrast UI | Added ASCII logo and #141414 background for diagnostics | 2026-01-22 | [2026-01-22_branded-init-and-high-contrast-ui.md](2026-01-22_branded-init-and-high-contrast-ui.md) |
+| [enhance] Final Init UI Polish | Added logo line breaks and fixed Select height visibility | 2026-01-22 | [2026-01-22_final-init-ui-polish.md](2026-01-22_final-init-ui-polish.md) |
+| [enhance] Onboarding Complete Protocol | Added 'bd devlog sync' to agent onboarding instructions | 2026-01-22 | [2026-01-22_final-init-ui-polish.md](2026-01-22_final-init-ui-polish.md) |
+| [fix] RenderInitReport code hygiene | Fixed excessive newlines and undefined Padding in init_render.go | 2026-01-22 | [2026-01-22_branded-init-and-high-contrast-ui.md](2026-01-22_branded-init-and-high-contrast-ui.md) |
+| [fix] Restore Native Select Behavior | Fixed scrolling issues in Select components by removing explicit heights | 2026-01-22 | [2026-01-22_restore-native-select-behavior.md](2026-01-22_restore-native-select-behavior.md) |
+| [enhance] Branded Logo Spacing | Added line breaks before logo for shell clarity | 2026-01-22 | [2026-01-22_restore-native-select-behavior.md](2026-01-22_restore-native-select-behavior.md) |

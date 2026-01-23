@@ -1330,7 +1330,6 @@ var devlogResetCmd = &cobra.Command{
 						huh.NewOption("Yes, Reset Database", true),
 						huh.NewOption("No, Cancel", false),
 					).
-					Height(4).
 					Value(&confirm),
 			),
 		)

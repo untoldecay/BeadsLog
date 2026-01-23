@@ -118,6 +118,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		// Show logo at the very beginning (unless quiet)
 		if !quiet {
+			fmt.Println()
 			fmt.Println(ui.RenderInitLogo())
 		}
 
@@ -512,43 +513,43 @@ With --stealth: configures per-repository git settings for invisible beads usage
 								Title("BeadsLog Setup Wizard").
 								Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
 		
-												huh.NewSelect[bool]().
+																						huh.NewSelect[bool]().
 		
-													Title("Enable Auto-Sync?").
+																							Title("Enable Auto-Sync?").
 		
-													Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+																							Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
 		
-													Options(
+																							Options(
 		
-														huh.NewOption("Yes, keep me in sync (Recommended)", true),
+																								huh.NewOption("Yes, keep me in sync (Recommended)", true),
 		
-														huh.NewOption("No, I'll sync manually", false),
+																								huh.NewOption("No, I'll sync manually", false),
 		
-													).
+																							).
 		
-													Height(4).
+																							Value(&autoSync),
 		
-													Value(&autoSync),
+																	
 		
-							
+																						huh.NewSelect[bool]().
 		
-												huh.NewSelect[bool]().
+																							Title("Enforce Devlogs?").
 		
-													Title("Enforce Devlogs?").
+																							Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
 		
-													Description("Prevents commits unless a devlog entry is provided. Recommended for AI agents.").
+																							Options(
 		
-													Options(
+																								huh.NewOption("Yes, enforce best practices", true),
 		
-														huh.NewOption("Yes, enforce best practices", true),
+																								huh.NewOption("No, allow loose commits", false),
 		
-														huh.NewOption("No, allow loose commits", false),
+																							).
 		
-													).
+																							Value(&enforceDevlog),
 		
-													Height(4).
+																	
 		
-													Value(&enforceDevlog),
+												
 		
 							
 						),
