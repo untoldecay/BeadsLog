@@ -116,6 +116,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			prefix = filepath.Base(cwd)
 		}
 
+		// Show logo at the very beginning (unless quiet)
+		if !quiet {
+			fmt.Println(ui.RenderInitLogo())
+		}
+
 		// Normalize prefix: strip trailing hyphens
 		// The hyphen is added automatically during ID generation
 		prefix = strings.TrimRight(prefix, "-")
