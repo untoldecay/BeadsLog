@@ -120,6 +120,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		if !quiet {
 			fmt.Println()
 			fmt.Println(ui.RenderInitLogo())
+			fmt.Println(ui.RenderBold("BeadsLog Setup Wizard"))
+			fmt.Println("Quick setup will scaffold orchestration rules, devlog space, and git hooks.")
+			fmt.Println()
 		}
 
 		// Normalize prefix: strip trailing hyphens
@@ -246,7 +249,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 					fmt.Printf("  Mode: %s\n", ui.RenderAccent("no-db (JSONL-only)"))
 					fmt.Printf("  Issues file: %s\n", ui.RenderAccent(jsonlPath))
 					fmt.Printf("  Issue prefix: %s\n", ui.RenderAccent(prefix))
-					fmt.Printf("  Issues will be named: %s\n\n", ui.RenderAccent(prefix+"-<hash> (e.g., "+prefix+"-a3f2dd)"))
+					fmt.Printf("  Issues will be named: %s\n\n", ui.RenderAccent(prefix+"-"+"<hash> (e.g., "+prefix+"-a3f2dd)"))
 					fmt.Printf("Run %s to get started.\n\n", ui.RenderAccent("bd --no-db quickstart"))
 				}
 				return
@@ -347,17 +350,16 @@ With --stealth: configures per-repository git settings for invisible beads usage
 				// Preserve existing config
 				cfg = existingCfg
 			} else {
-				// Create new config, detecting JSONL filename from existing files
-				cfg = configfile.DefaultConfig()
-				// Check if beads.jsonl exists but issues.jsonl doesn't (legacy)
-				issuesPath := filepath.Join(beadsDir, "issues.jsonl")
-				beadsPath := filepath.Join(beadsDir, "beads.jsonl")
-				if _, err := os.Stat(beadsPath); err == nil {
-					if _, err := os.Stat(issuesPath); os.IsNotExist(err) {
-						cfg.JSONLExport = "beads.jsonl" // Legacy filename
-					}
-				}
-			}
+								// Create metadata, detecting JSONL filename from existing files
+								cfg := configfile.DefaultConfig()
+								// Check if beads.jsonl exists but issues.jsonl doesn't (legacy)
+								issuesPath := filepath.Join(beadsDir, "issues.jsonl")
+								beadsPath := filepath.Join(beadsDir, "beads.jsonl")
+								if _, err := os.Stat(beadsPath); err == nil {
+									if _, err := os.Stat(issuesPath); os.IsNotExist(err) {
+										cfg.JSONLExport = "beads.jsonl" // Legacy filename
+									}
+								}			}
 			if err := cfg.Save(beadsDir); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create metadata.json: %v\n", err)
 				// Non-fatal - continue anyway
@@ -499,68 +501,176 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
-		// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
-		// Must run even in quiet mode to ensure database state is updated.
+				// BeadsLog: Initialize orchestration (Progressive Disclosure) and devlog space
+
+				// Must run even in quiet mode to ensure database state is updated.
+
+				
+
+				var autoSyncStr, enforceDevlogStr string
+
+				autoSyncStr = "true"
+
+				enforceDevlogStr = "true"
+
+				var selectedToolNames []string
+
 		
-		var autoSyncStr, enforceDevlogStr string
-		autoSyncStr = "true"
-		enforceDevlogStr = "true"
 
-		// Interactive setup if not quiet and stdin is a TTY
-		if !quiet && ui.IsTerminal() {
-			form := huh.NewForm(
-				huh.NewGroup(
-					huh.NewNote().
-						Title("BeadsLog Setup Wizard").
-						Description("Welcome! Let's configure your AI-native workflow orchestration.\n\nQuick setup will scaffold orchestration rules, devlog space, and git hooks."),
+										// Interactive setup if not quiet and stdin is a TTY
+										if !quiet && ui.IsTerminal() {
+											fmt.Println() // Space before questions
+											// Convert AgentToolCandidates to huh options with friendly labels
+					agentOptions := make([]huh.Option[string], len(AgentToolCandidates))
 
-					huh.NewSelect[string]().
-						Title("Enable Auto-Sync?").
-						Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
-						Options(
-							huh.NewOption("Yes, keep me in sync (Recommended)", "true"),
-							huh.NewOption("No, I'll sync manually", "false"),
-						).
-						Value(&autoSyncStr),
+					for i, tool := range AgentToolCandidates {
 
-					huh.NewSelect[string]().
-						Title("Enforce Devlogs?").
-						Description("Prevents commits unless a devlog entry is provided. Highly recommended for AI agents.").
-						Options(
-							huh.NewOption("Yes, enforce best practices", "true"),
-							huh.NewOption("No, allow loose commits", "false"),
-						).
-						Value(&enforceDevlogStr),
-				),
-			)
+						agentOptions[i] = huh.NewOption(tool.Name, tool.Name).Selected(true)
 
-			if err := form.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
-				os.Exit(1)
-			}
-		}
+					}
 
-		autoSync := autoSyncStr == "true"
-		enforceDevlog := enforceDevlogStr == "true"
-
-		orchFiles := initializeOrchestration(false)
-		devlogRes := initializeDevlog("_rules/_devlog", true, autoSync, enforceDevlog)
 		
-				// Collect information for the final report
-				initResult := ui.InitResult{
-					DBPath:               initDBPath,
-					Prefix:               prefix,
-					RepoID:               repoID,
-					CloneID:              cloneID,
-					OrchestrationFiles:   orchFiles,
-					DevlogSpaceStatus:    devlogRes.SpaceStatus,
-					DevlogPromptStatus:   devlogRes.PromptStatus,
-					AgentRules:           devlogRes.AgentRules,
-					DevlogHooks:          devlogRes.Hooks,
-					HooksInstalled:       hooksInstalledAtInit || (isGitRepo() && hooksInstalled()),
-					MergeDriverInstalled: mergeDriverInstalledAtInit || (isGitRepo() && mergeDriverInstalled()),
+
+								form := huh.NewForm(
+
+		
+
+									huh.NewGroup(
+
+		
+
+										huh.NewSelect[string]().
+
+		
+
+											Title("Enable Auto-Sync?").
+
+								Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
+
+								Options(
+
+									huh.NewOption("Yes, keep me in sync (Recommended)", "true"),
+
+									huh.NewOption("No, I'll sync manually", "false"),
+
+								).
+
+								Value(&autoSyncStr),
+
+		
+
+							huh.NewSelect[string]().
+
+								Title("Enforce Devlogs?").
+
+								Description("Prevents commits unless a devlog entry is provided. Highly recommended for AI agents.").
+
+								Options(
+
+									huh.NewOption("Yes, enforce best practices", "true"),
+
+									huh.NewOption("No, allow loose commits", "false"),
+
+								).
+
+								Value(&enforceDevlogStr),
+
+		
+
+							huh.NewMultiSelect[string]().
+
+								Title("Agent Instructions").
+
+								Description("Select which agent instruction files to generate or update.\n(Space to toggle, Enter to confirm)").
+
+								Options(agentOptions...).
+
+								Limit(20).
+
+								Value(&selectedToolNames),
+
+						),
+
+					)
+
+		
+
+					if err := form.Run(); err != nil {
+
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+
+						os.Exit(1)
+
+					}
+
 				}
-		// Run bd doctor diagnostics to catch setup issues early
+
+		
+
+				// Map selected tools to file paths
+
+				var targetFiles []string
+
+				
+
+				// If nothing selected (or non-interactive default), select all tools
+
+				if len(selectedToolNames) == 0 && (!ui.IsTerminal() || quiet) {
+
+					for _, tool := range AgentToolCandidates {
+
+						targetFiles = append(targetFiles, tool.Files...)
+
+					}
+
+				} else {
+
+					// Map selected names to files
+
+					for _, name := range selectedToolNames {
+
+						for _, tool := range AgentToolCandidates {
+
+							if tool.Name == name {
+
+								targetFiles = append(targetFiles, tool.Files...)
+
+								break
+
+							}
+
+						}
+
+					}
+
+				}
+
+		
+
+				autoSync := autoSyncStr == "true"
+
+				enforceDevlog := enforceDevlogStr == "true"
+
+		
+
+				orchFiles := initializeOrchestration(false)
+
+				devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, targetFiles)
+
+		// Collect information for the final report
+		initResult := ui.InitResult{
+			DBPath:               initDBPath,
+			Prefix:               prefix,
+			RepoID:               repoID,
+			CloneID:              cloneID,
+			OrchestrationFiles:   orchFiles,
+			DevlogSpaceStatus:    devlogRes.SpaceStatus,
+			DevlogPromptStatus:   devlogRes.PromptStatus,
+			AgentRules:           devlogRes.AgentRules,
+			DevlogHooks:          devlogRes.Hooks,
+			HooksInstalled:       hooksInstalledAtInit || (isGitRepo() && hooksInstalled()),
+			MergeDriverInstalled: mergeDriverInstalledAtInit || (isGitRepo() && mergeDriverInstalled()),
+		}		// Run bd doctor diagnostics to catch setup issues early
 		doctorResult := runDiagnostics(cwd)
 		for _, check := range doctorResult.Checks {
 			if check.Status != statusOK {
@@ -575,9 +685,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		}
 
 		// Render the final unified report
-		fmt.Println()
-		fmt.Println(ui.RenderInitReport(initResult, ui.GetWidth()))
-		fmt.Println()
+		if !quiet {
+			fmt.Println()
+			fmt.Println(ui.RenderInitReport(initResult, ui.GetWidth()))
+			fmt.Println()
+		}
 	},
 }
 

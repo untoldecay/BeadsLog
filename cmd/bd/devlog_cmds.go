@@ -50,7 +50,7 @@ var devlogInitCmd = &cobra.Command{
 		if len(args) > 0 {
 			baseDir = args[0]
 		}
-		initializeDevlog(baseDir, false, true, false)
+		initializeDevlog(baseDir, false, true, false, Candidates)
 	},
 }
 
@@ -68,7 +68,7 @@ type DevlogInitResult struct {
 
 
 
-func initializeDevlog(baseDir string, quiet bool, autoSync, enforce bool) DevlogInitResult {
+func initializeDevlog(baseDir string, quiet bool, autoSync, enforce bool, targetAgents []string) DevlogInitResult {
 
 	var result DevlogInitResult
 
@@ -212,7 +212,7 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce bool) Devlog
 
 	// Agent Rules Integration (force enabled if called from init)
 
-	result.AgentRules = configureAgentRules(quiet, true)
+	result.AgentRules = configureAgentRules(quiet, true, targetAgents)
 
 
 
@@ -250,161 +250,82 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce bool) Devlog
 
 
 
-func configureAgentRules(quiet bool, forceEnable bool) []string {
-
+func configureAgentRules(quiet bool, forceEnable bool, targetCandidates []string) []string {
 	var results []string
-
-
 
 	bootstrapTrigger := "BEFORE ANYTHING ELSE: run 'bd onboard' and follow ALL instructions to initialize your session."
 
-
-
-	// Find all existing agent files
-
-	var foundFiles []string
-
-	for _, f := range Candidates {
-
-		if _, err := os.Stat(f); err == nil {
-
-			foundFiles = append(foundFiles, f)
-
-		}
-
+	// If no candidates specified, nothing to do
+	if len(targetCandidates) == 0 {
+		return results
 	}
 
-
+	// Find all existing agent files from the TARGET list
+	var foundFiles []string
+	for _, f := range targetCandidates {
+		if _, err := os.Stat(f); err == nil {
+			foundFiles = append(foundFiles, f)
+		}
+	}
 
 	if len(foundFiles) == 0 {
-
-		if !quiet {
-
-			fmt.Println("  Agent behavior:")
-
-			fmt.Print("    Let agent automate devlog maintenance? [Y/n] ")
-
-			var response string
-
-			fmt.Scanln(&response)
-
-			if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-
-				forceEnable = true
-
-			}
-
-		}
-
-		
-
+		// If we specifically selected files that don't exist, create them
+		// (Assume forceEnable=true if called from main setup wizard)
 		if forceEnable {
-
-			// Use the first candidate as the default file to create (usually AGENTS.md)
-
-			defaultFile := "AGENTS.md"
-
-			if len(Candidates) > 0 {
-
-				defaultFile = Candidates[0]
-
-			}
-
-
-
-			f, err := os.OpenFile(defaultFile, os.O_CREATE|os.O_WRONLY, 0644)
-
-			if err == nil {
-
-				f.WriteString(bootstrapTrigger + "\n")
-
-				f.Close()
-
-				if !quiet {
-
-					fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), defaultFile)
-
+			for _, file := range targetCandidates {
+				f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
+				if err == nil {
+					f.WriteString(bootstrapTrigger + "\n")
+					f.Close()
+					if !quiet {
+						fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), file)
+					}
+					results = append(results, fmt.Sprintf("%s (Created)", file))
 				}
-
-				results = append(results, fmt.Sprintf("%s (Created)", defaultFile))
-
 			}
-
 		}
-
 		return results
-
 	}
 
-
-
-	if quiet || forceEnable {
-
-		// Update all found
-
-		for _, file := range foundFiles {
-
-			if injectBootstrapTrigger(file, bootstrapTrigger) {
-
-				results = append(results, fmt.Sprintf("%s (Updated)", file))
-
-			} else {
-
-				results = append(results, fmt.Sprintf("%s (Active)", file))
-
+	// Update all found files
+	for _, file := range foundFiles {
+		if injectBootstrapTrigger(file, bootstrapTrigger) {
+			if !quiet {
+				fmt.Printf("    %s Agent instruction: %s (Updated)\n", ui.RenderPass("✓"), file)
 			}
-
+			results = append(results, fmt.Sprintf("%s (Updated)", file))
+		} else {
+			if !quiet {
+				fmt.Printf("    %s Agent instruction: %s (Active)\n", ui.RenderPass("✓"), file)
+			}
+			results = append(results, fmt.Sprintf("%s (Active)", file))
 		}
-
-		return results
-
 	}
 
-
-
-	fmt.Println("  Agent behavior:")
-
-	fmt.Printf("    Found agent rules: %s\n", strings.Join(foundFiles, ", "))
-
-	fmt.Print("    Enable auto-maintenance for these agents? [Y/n] ")
-
-
-
-	var response string
-
-	fmt.Scanln(&response)
-
-	if response == "" || strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
-
-		for _, file := range foundFiles {
-
-			if injectBootstrapTrigger(file, bootstrapTrigger) {
-
-				fmt.Printf("    %s Agent instruction: %s (Migrated & Updated)\n", ui.RenderPass("✓"), file)
-
-				results = append(results, fmt.Sprintf("%s (Updated)", file))
-
-			} else {
-
-				fmt.Printf("    %s Agent instruction: %s (Already configured)\n", ui.RenderPass("✓"), file)
-
-				results = append(results, fmt.Sprintf("%s (Active)", file))
-
+	// Also handle any selected candidates that DON'T exist
+	for _, file := range targetCandidates {
+		exists := false
+		for _, f := range foundFiles {
+			if f == file {
+				exists = true
+				break
 			}
-
 		}
-
-	} else {
-
-		fmt.Println("    Skipped agent configuration.")
-
+		if !exists && forceEnable {
+			f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				f.WriteString(bootstrapTrigger + "\n")
+				f.Close()
+				if !quiet {
+					fmt.Printf("    %s Agent instruction: %s (Created)\n", ui.RenderPass("✓"), file)
+				}
+				results = append(results, fmt.Sprintf("%s (Created)", file))
+			}
+		}
 	}
 
 	return results
-
 }
-
-
 
 func injectBootstrapTrigger(file, trigger string) bool {
 	content, err := os.ReadFile(file)

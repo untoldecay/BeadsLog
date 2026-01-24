@@ -21,7 +21,7 @@ func TestInitCommand(t *testing.T) {
 			name:           "init with default prefix",
 			prefix:         "",
 			quiet:          false,
-			wantOutputText: "[Tasks]",
+			wantOutputText: "SETUP INCOMPLETE",
 		},
 		{
 			name:           "init with custom prefix",

@@ -26,6 +26,23 @@ var Candidates = []string{
 	".github/COPILOT-INSTRUCTIONS.md",
 }
 
+// AgentTool represents a logical AI tool that may look for multiple file paths
+type AgentTool struct {
+	Name  string
+	Files []string
+}
+
+// AgentToolCandidates groups configuration files by their respective tools
+var AgentToolCandidates = []AgentTool{
+	{Name: "Standard Agent", Files: []string{"AGENTS.md", "AGENT.md"}},
+	{Name: "Windsurf", Files: []string{".windsufrules"}},
+	{Name: "Cursor", Files: []string{".cursorrules"}},
+	{Name: "Claude", Files: []string{"CLAUDE.md", ".claude/rules"}},
+	{Name: "Gemini", Files: []string{"GEMINI.md"}},
+	{Name: "Codebase", Files: []string{"CODEBASE.md"}},
+	{Name: "GitHub Copilot", Files: []string{".github/copilot-instructions.md", ".github/COPILOT-INSTRUCTIONS.md"}},
+}
+
 // finalizeOnboarding unlocks the environment by installing the Full Bootloader.
 // It searches for either the Protocol tags OR the initial bootstrap trap.
 func finalizeOnboarding(ctx context.Context, store storage.Storage) {
@@ -93,6 +110,9 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 func executeOnboard(ctx context.Context, store storage.Storage) error {
 	// Ensure orchestration structure exists
 	initializeOrchestration(false)
+
+	// Ensure agent rules are configured (inject bootstrap trigger if missing)
+	configureAgentRules(false, true, Candidates)
 
 	fmt.Printf("\n%s BeadsLog Activation Guide\n", ui.RenderAccent("🚀"))
 	fmt.Printf("------------------------------------------------------------\n")

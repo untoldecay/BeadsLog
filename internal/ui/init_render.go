@@ -160,8 +160,8 @@ func RenderInitReport(res InitResult, width int) string {
 	}
 
 	// 5. Final Message
-	nextStep := lipgloss.NewStyle().Foreground(ColorAccent).Bold(true).Render("bd onboard")
-	finalMsg := fmt.Sprintf("Ready to roll! 🚀 Start your session by running %s to prime your agent.", nextStep)
+	nextStep := lipgloss.NewStyle().Foreground(ColorAccent).Bold(true).Render("onboard")
+	finalMsg := fmt.Sprintf("Ready✨. Start your coding agent and initiate chat by saying : %s", nextStep)
 	sections = append(sections, finalMsg)
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)

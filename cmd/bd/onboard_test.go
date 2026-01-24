@@ -30,7 +30,7 @@ func TestOnboardingGateFlow(t *testing.T) {
 		// Check GEMINI.md has RESTRICTED bootloader
 		content, _ := os.ReadFile(f)
 		strContent := string(content)
-		if !strings.Contains(strContent, "SETUP IN PROGRESS") {
+		if !strings.Contains(strContent, "BEFORE ANYTHING ELSE") {
 			t.Error("Restricted bootloader not installed")
 		}
 		if strings.Contains(strContent, "PROJECT_CONTEXT.md") {
