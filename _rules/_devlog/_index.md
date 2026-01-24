@@ -80,3 +80,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Branded Logo Spacing | Added line breaks before logo for shell clarity | 2026-01-22 | [2026-01-22_restore-native-select-behavior.md](2026-01-22_restore-native-select-behavior.md) |
 | [fix] Definitively fix huh.Select interaction | Consolidated wizard into a single group and removed all height constraints | 2026-01-22 | [2026-01-22_definitively-fix-select-interaction.md](2026-01-22_definitively-fix-select-interaction.md) |
 | [feature] Interactive init wizard | Added logical agent tool selection and polished setup wizard | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |
+| [enhance] Init UI/UX Polish | Refined layout, removed redundancy and extra line breaks in init output | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |

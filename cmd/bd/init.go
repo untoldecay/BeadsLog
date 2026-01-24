@@ -647,15 +647,11 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 		
 
-				autoSync := autoSyncStr == "true"
+		autoSync := autoSyncStr == "true"
+		enforceDevlog := enforceDevlogStr == "true"
 
-				enforceDevlog := enforceDevlogStr == "true"
-
-		
-
-				orchFiles := initializeOrchestration(false)
-
-				devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, targetFiles)
+		orchFiles := initializeOrchestration(false)
+		devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, targetFiles)
 
 		// Collect information for the final report
 		initResult := ui.InitResult{
