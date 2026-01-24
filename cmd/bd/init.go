@@ -350,9 +350,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 				// Preserve existing config
 				cfg = existingCfg
 			} else {
-								// Create metadata, detecting JSONL filename from existing files
-								cfg := configfile.DefaultConfig()
-								// Check if beads.jsonl exists but issues.jsonl doesn't (legacy)
+				// Create metadata, detecting JSONL filename from existing files
+				cfg = configfile.DefaultConfig()
+				// Check if beads.jsonl exists but issues.jsonl doesn't (legacy)
 								issuesPath := filepath.Join(beadsDir, "issues.jsonl")
 								beadsPath := filepath.Join(beadsDir, "beads.jsonl")
 								if _, err := os.Stat(beadsPath); err == nil {

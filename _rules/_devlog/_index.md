@@ -82,3 +82,4 @@ This index provides a concise record of all development work for easy scanning a
 | [feature] Interactive init wizard | Added logical agent tool selection and polished setup wizard | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |
 | [enhance] Init UI/UX Polish | Refined layout, removed redundancy and extra line breaks in init output | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |
 | [fix] Daemon Start Recursion | Fixed critical stack overflow in daemon start lock acquisition | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |
+| [fix] Metadata Corruption | Fixed variable shadowing causing null metadata and path resolution errors | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |

@@ -84,6 +84,18 @@ To refactor the `bd init` command to include an interactive, multi-select prompt
 
 ---
 
+### **Phase 7: Critical Bug Fix - Metadata Corruption & Path Resolution**
+
+**Initial Problem:** Users reported `bd onboard` failing with `is a directory` error when `BEADS_DB` env var was set to `.beads`. Additionally, `metadata.json` was being created with content `null`.
+
+*   **My Assumption/Plan #1:** Variable shadowing in `cmd/bd/init.go` caused the configuration object to remain nil during save, writing `null` to disk. This in turn caused database path resolution to fail (returning the directory instead of the file) when `BEADS_DB` was set to the directory.
+    *   **Action Taken:**
+        1.  Fixed variable shadowing (`cfg :=` -> `cfg =`) in `initCmd`.
+        2.  Enhanced `FindDatabasePath` in `internal/beads/beads.go` to robustly handle cases where `BEADS_DB` points to a directory by searching for the database inside it.
+    *   **Result:** Verified that `bd init` now produces valid `metadata.json` and `bd ready` works even with incorrect `BEADS_DB=.beads` environment variable.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** The `bd init` command now features a polished, unified interactive wizard. Users can select agent tools by logical names (e.g., "GitHub Copilot"), and the backend correctly handles the associated file sets. The final output is cleaner, and the "onboard" instruction is precise. Non-interactive execution remains safe and defaults to "all tools".
