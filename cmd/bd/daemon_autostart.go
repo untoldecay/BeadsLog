@@ -215,17 +215,26 @@ func isDaemonHealthy(socketPath string) bool {
 }
 
 func acquireStartLock(lockPath, socketPath string) bool {
-	// nolint:gosec // G304: lockPath is derived from secure beads directory
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
+	for attempts := 0; attempts < 3; attempts++ {
+		// nolint:gosec // G304: lockPath is derived from secure beads directory
+		lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err == nil {
+			_, _ = fmt.Fprintf(lockFile, "%d\n", os.Getpid())
+			_ = lockFile.Close() // Best-effort close during startup
+			return true
+		}
+
 		// Lock file exists - check if daemon is actually starting
 		lockPID, pidErr := readPIDFromFile(lockPath)
 		if pidErr != nil || !isPIDAlive(lockPID) {
 			// Stale lock from crashed process - clean up immediately (avoids 5s wait)
 			debugLog("startlock is stale (PID %d dead or unreadable), cleaning up", lockPID)
-			_ = os.Remove(lockPath)
-			// Retry lock acquisition after cleanup
-			return acquireStartLock(lockPath, socketPath)
+			if err := os.Remove(lockPath); err != nil {
+				debugLog("failed to remove stale lock file: %v", err)
+				return false // Cannot proceed if we can't clear the lock
+			}
+			// Retry lock acquisition in next iteration
+			continue
 		}
 
 		// PID is alive - but is daemon actually running/starting?
@@ -234,8 +243,11 @@ func acquireStartLock(lockPath, socketPath string) bool {
 		if running, _ := lockfile.TryDaemonLock(beadsDir); !running {
 			// Daemon lock not held - the start attempt failed or process was reused
 			debugLog("startlock PID %d alive but daemon lock not held, cleaning up", lockPID)
-			_ = os.Remove(lockPath)
-			return acquireStartLock(lockPath, socketPath)
+			if err := os.Remove(lockPath); err != nil {
+				debugLog("failed to remove stale lock file: %v", err)
+				return false
+			}
+			continue
 		}
 
 		// Daemon lock is held - daemon is legitimately starting, wait for socket
@@ -245,10 +257,9 @@ func acquireStartLock(lockPath, socketPath string) bool {
 		}
 		return handleStaleLock(lockPath, socketPath)
 	}
-
-	_, _ = fmt.Fprintf(lockFile, "%d\n", os.Getpid())
-	_ = lockFile.Close() // Best-effort close during startup
-	return true
+	
+	debugLog("failed to acquire start lock after 3 attempts")
+	return false
 }
 
 func handleStaleLock(lockPath, socketPath string) bool {

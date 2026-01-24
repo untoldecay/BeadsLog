@@ -74,6 +74,16 @@ To refactor the `bd init` command to include an interactive, multi-select prompt
 
 ---
 
+### **Phase 6: Critical Bug Fix - Daemon Start Recursion**
+
+**Initial Problem:** A user reported a stack overflow panic (`goroutine stack exceeds 1000000000-byte limit`) during `bd onboard`. The stack trace pointed to infinite recursion in `acquireStartLock` in `cmd/bd/daemon_autostart.go`.
+
+*   **My Assumption/Plan #1:** The `acquireStartLock` function recursively called itself when handling stale lock files. If `os.Remove` failed or the file was immediately recreated (race condition), it would enter an infinite loop.
+    *   **Action Taken:** Refactored `acquireStartLock` to use a loop with a hard limit of 3 attempts instead of unbounded recursion. Added explicit error checking for `os.Remove`.
+    *   **Result:** Verified in sandbox that the command no longer panics and handles lock contention gracefully.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** The `bd init` command now features a polished, unified interactive wizard. Users can select agent tools by logical names (e.g., "GitHub Copilot"), and the backend correctly handles the associated file sets. The final output is cleaner, and the "onboard" instruction is precise. Non-interactive execution remains safe and defaults to "all tools".
