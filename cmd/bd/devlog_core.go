@@ -213,6 +213,7 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string)
 			VALUES (?, ?, ?, 1, ?, ?)
 			ON CONFLICT(name) DO UPDATE SET 
 				mention_count = mention_count + 1,
+				source = CASE WHEN excluded.confidence > confidence THEN excluded.source ELSE source END,
 				confidence = MAX(confidence, excluded.confidence)
 		`, entityID, entity.Name, entity.Type, entity.Confidence, entity.Source)
 		

@@ -85,3 +85,5 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] Metadata Corruption | Fixed variable shadowing causing null metadata and path resolution errors | 2026-01-23 | [2026-01-23_interactive-init-and-agent-grouping.md](2026-01-23_interactive-init-and-agent-grouping.md) |
 | [feature] Entity Extraction Evolution | Implemented 2-tier extraction pipeline (Regex + Ollama prep) and schema migration | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [feature] Ollama Integration | Integrated Ollama client for Tier 2 entity extraction with config support | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
+| [fix] Config Persistence & Source Metadata | Fixed bd config set for Ollama keys and entity source updates | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
+| [test] ollama extraction | verification | 2026-01-26 | [2026-01-26_ollama-test.md](2026-01-26_ollama-test.md) |

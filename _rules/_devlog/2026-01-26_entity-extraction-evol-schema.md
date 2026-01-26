@@ -85,3 +85,23 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 
 **Result:** The system now supports a hybrid extraction pipeline. If Ollama is configured and running, it enhances extraction quality. If not (or if configured off), it gracefully degrades to the robust Regex fallback.
 
+---
+
+### **Phase 5: Config Fix and Test**
+
+**Initial Problem:** \`bd config set\` wasn't persisting Ollama settings to \`config.yaml\`, causing \`bd devlog sync\` to default to Regex-only mode.
+
+*   **My Assumption/Plan #1:** Keys must be registered in \`YamlOnlyKeys\` to be written to YAML.
+    *   **Action Taken:** Added \`ollama.\` and \`entity_extraction.\` prefixes to \`YamlOnlyKeys\` in \`internal/config/yaml_config.go\`.
+    *   **Result:** \`bd config set\` now correctly updates \`config.yaml\`.
+
+**Initial Problem:** Entity source wasn't updating when Ollama boosted confidence.
+*   **Analysis:** The SQL \`ON CONFLICT\` clause only updated \`confidence\`, leaving \`source\` as 'regex' (default) even if confidence rose to 1.0.
+    *   **Action Taken:** Updated SQL in \`cmd/bd/devlog_core.go\` to conditionally update \`source\` when \`excluded.confidence > confidence\`.
+
+**Testing:**
+*   Created dummy session \`2026-01-26_ollama-test.md\` with content about Redis/Memcached.
+*   Synced with \`ministral-3:3b\`.
+*   Result: 16 entities extracted (vs 3 with regex), capturing "redis", "memcached", "pgvector".
+
+
