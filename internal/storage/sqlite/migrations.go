@@ -60,13 +60,15 @@ var migrationsList = []Migration{
 			{"devlog_schema", migrations.MigrateDevlogSchema},
 			{"devlog_file_hash", migrations.MigrateDevlogFileHash},
 			{"devlog_missing_flag", migrations.MigrateDevlogMissingFlag},
-			{"populate_fts", migrations.MigratePopulateFTS},
-		}
-		
-		// MigrationInfo contains metadata about a migration for inspection
-		type MigrationInfo struct{	Name        string `json:"name"`
-	Description string `json:"description"`
-}
+		{"populate_fts", migrations.MigratePopulateFTS},
+		{"extraction_evol_schema", migrations.MigrateExtractionEvolSchema},
+	}
+	
+	// MigrationInfo contains metadata about a migration for inspection
+	type MigrationInfo struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
 
 // ListMigrations returns list of all registered migrations with descriptions
 // Note: This returns ALL registered migrations, not just pending ones (all are idempotent)
@@ -128,6 +130,7 @@ func getMigrationDescription(name string) string {
 		"devlog_file_hash":             "Adds file_hash column to sessions table for content change detection",
 		"devlog_missing_flag":          "Adds is_missing column to sessions table for file existence tracking",
 		"populate_fts":                 "Populates FTS5 indexes for existing sessions and entities",
+		"extraction_evol_schema":       "Adds confidence/source columns to entities and creates extraction_log table",
 	}
 
 	if desc, ok := descriptions[name]; ok {

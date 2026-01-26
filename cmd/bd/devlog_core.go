@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
@@ -8,10 +9,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
@@ -173,79 +174,76 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 }
 
 func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string) {
-	entityPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`[A-Z][a-z]+(?:[A-Z][a-z]+)+`), // CamelCase
-		regexp.MustCompile(`(?i)(modal|hook|endpoint|migration|service)`),
-		regexp.MustCompile(`[a-z]+-[a-z]+`), // kebab-case
+	pipeline := extractor.NewPipeline()
+	result, err := pipeline.Run(context.Background(), text)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running extraction pipeline: %v\n", err)
+		return
 	}
 
 	db := store.UnderlyingDB()
-	seen := make(map[string]bool)
+	
+	// Store extraction log
+	_, err = db.Exec(`
+		INSERT INTO extraction_log (session_id, extractor, input_length, entities_found, duration_ms)
+		VALUES (?, ?, ?, ?, ?)
+	`, sessionID, result.Extractor, len(text), len(result.Entities), result.Duration.Milliseconds())
+	if err != nil {
+		// Log but don't fail, table might not exist yet if migration failed or wasn't run
+		// (though it should be run)
+		// fmt.Fprintf(os.Stderr, "Warning: failed to log extraction: %v\n", err)
+	}
 
-	for _, pat := range entityPatterns {
-		matches := pat.FindAllString(text, -1)
-		for _, match := range matches {
-			if len(match) > 3 && !seen[match] {
-				entityID := fmt.Sprintf("ent-%s", hashID(match))
-				matchLower := strings.ToLower(match)
+	// 1. Process Entities
+	for _, entity := range result.Entities {
+		entityID := fmt.Sprintf("ent-%s", hashID(entity.Name))
 
-				// Create/update entity
-				_, err := db.Exec(`
-                    INSERT INTO entities (id, name, type, mention_count)
-                    VALUES (?, ?, 'component', 1)
-                    ON CONFLICT(name) DO UPDATE SET mention_count = mention_count + 1
-                `, entityID, matchLower)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error upserting entity: %v\n", err)
-				}
+		// Create/update entity
+		// We use ON CONFLICT to update mention_count and potentially confidence/source if better
+		// For now, we just increment mention count. 
+		// Future: update confidence if new confidence > old confidence
+		_, err := db.Exec(`
+			INSERT INTO entities (id, name, type, mention_count, confidence, source)
+			VALUES (?, ?, ?, 1, ?, ?)
+			ON CONFLICT(name) DO UPDATE SET 
+				mention_count = mention_count + 1,
+				confidence = MAX(confidence, excluded.confidence)
+		`, entityID, entity.Name, entity.Type, entity.Confidence, entity.Source)
+		
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error upserting entity: %v\n", err)
+		}
 
-				// Get the actual ID if it was an update (in case hash collision or existing name)
-				var actualID string
-				err = db.QueryRow("SELECT id FROM entities WHERE name = ?", matchLower).Scan(&actualID)
-				if err == nil {
-					entityID = actualID
-				}
+		// Get the actual ID if it was an update (in case hash collision or existing name)
+		var actualID string
+		err = db.QueryRow("SELECT id FROM entities WHERE name = ?", entity.Name).Scan(&actualID)
+		if err == nil {
+			entityID = actualID
+		}
 
-				// Link session -> entity
-				_, err = db.Exec(`
-                    INSERT OR IGNORE INTO session_entities (session_id, entity_id, relevance)
-                    VALUES (?, ?, 'primary')
-                `, sessionID, entityID)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error linking session entity: %v\n", err)
-				}
-
-				seen[match] = true
-			}
+		// Link session -> entity
+		_, err = db.Exec(`
+			INSERT OR IGNORE INTO session_entities (session_id, entity_id, relevance)
+			VALUES (?, ?, 'primary')
+		`, sessionID, entityID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error linking session entity: %v\n", err)
 		}
 	}
 
-	// Phase 2: Extract explicit relationships
-	// Looking for pattern: "- EntityA -> EntityB (relationship)"
-	relPat := regexp.MustCompile(`(?m)^\s*-\s+(.+?)\s+->\s+(.+?)(?:\s+\(([^)]+)\))?$`)
-	relMatches := relPat.FindAllStringSubmatch(text, -1)
+	// 2. Process Relationships
+	for _, rel := range result.Relationships {
+		// Ensure both entities exist and get their IDs
+		fromID := ensureEntityExists(store, rel.FromEntity)
+		toID := ensureEntityExists(store, rel.ToEntity)
 
-	for _, match := range relMatches {
-		if len(match) >= 3 {
-			fromName := strings.ToLower(strings.TrimSpace(match[1]))
-			toName := strings.ToLower(strings.TrimSpace(match[2]))
-			relType := "depends_on"
-			if len(match) > 3 && match[3] != "" {
-				relType = strings.TrimSpace(match[3])
-			}
-
-			// Ensure both entities exist and get their IDs
-			fromID := ensureEntityExists(store, fromName)
-			toID := ensureEntityExists(store, toName)
-
-			// Link them using IDs
-			_, err := db.Exec(`
-                INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
-                VALUES (?, ?, ?, ?)
-            `, fromID, toID, relType, sessionID)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error linking entities: %v\n", err)
-			}
+		// Link them using IDs
+		_, err := db.Exec(`
+			INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
+			VALUES (?, ?, ?, ?)
+		`, fromID, toID, rel.Type, sessionID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error linking entities: %v\n", err)
 		}
 	}
 }

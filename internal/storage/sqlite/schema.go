@@ -130,7 +130,9 @@ CREATE TABLE IF NOT EXISTS entities (
     name TEXT UNIQUE NOT NULL,
     type TEXT DEFAULT 'component',
     first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-    mention_count INTEGER DEFAULT 1
+    mention_count INTEGER DEFAULT 1,
+    confidence REAL DEFAULT 1.0,
+    source TEXT DEFAULT 'regex'
 );
 
 CREATE TABLE IF NOT EXISTS session_entities (
@@ -151,6 +153,17 @@ CREATE TABLE IF NOT EXISTS entity_deps (
     FOREIGN KEY(from_entity) REFERENCES entities(id),
     FOREIGN KEY(to_entity) REFERENCES entities(id),
     FOREIGN KEY(discovered_in) REFERENCES sessions(id)
+);
+
+CREATE TABLE IF NOT EXISTS extraction_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    extractor TEXT,
+    input_length INTEGER,
+    entities_found INTEGER,
+    duration_ms INTEGER,
+    FOREIGN KEY(session_id) REFERENCES sessions(id)
 );
 
 -- Events table (audit trail)
