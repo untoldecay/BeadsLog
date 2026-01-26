@@ -50,8 +50,8 @@ func (o *OllamaExtractor) Available(ctx context.Context) bool {
 
 type ollamaResponse struct {
 	Entities []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
+		Name json.RawMessage `json:"name"`
+		Type string          `json:"type"`
 	} `json:"entities"`
 }
 
@@ -66,22 +66,30 @@ func (o *OllamaExtractor) Extract(text string) ([]Entity, error) {
 	prompt := fmt.Sprintf(`
 You are an entity extractor for a Go/React/PostgreSQL codebase.
 
-From this devlog session, extract:
-1. Components (Modal, Service, Hook)
-2. Config files (nginx.conf, env vars)
-3. Services (cloudron, mcp, postgres)
-4. Technologies (pgvector, redis, jwt)
-5. Files/patterns mentioned
+From this devlog session, extract a flat list of entities.
+Focus on: 
+- Components (Modal, Service, Hook, etc.)
+- Config files (nginx.conf, env vars)
+- Services (cloudron, mcp, postgres)
+- Technologies (pgvector, redis, jwt)
+
+RULES:
+1. Output ONLY a valid JSON object.
+2. The object MUST have exactly one key: "entities".
+3. "entities" MUST be an array of objects.
+4. Each entity object MUST have EXACTLY two string fields: "name" and "type".
+5. "name" must be a single string (NOT an array).
+6. DO NOT include headers, descriptions, or explanations.
+7. DO NOT group entities into sub-objects.
 
 Devlog:
 %s
 
-Output JSON only:
+Required Output Format:
 {
   "entities": [
     {"name": "nginx", "type": "config"},
-    {"name": "proxy_buffering", "type": "nginx_setting"},
-    {"name": "managecolumnsmodal", "type": "component"}
+    {"name": "proxy_buffering", "type": "nginx_setting"}
   ]
 }
 `, text)
@@ -115,8 +123,32 @@ Output JSON only:
 
 	var entities []Entity
 	for _, e := range parsed.Entities {
+		var name string
+		// Handle cases where LLM might provide an array of names instead of string
+		if err := json.Unmarshal(e.Name, &name); err != nil {
+			// Try unmarshaling as array and taking first
+			var names []string
+			if err2 := json.Unmarshal(e.Name, &names); err2 == nil && len(names) > 0 {
+				for _, n := range names {
+					entities = append(entities, Entity{
+						Name:       strings.ToLower(n),
+						Type:       e.Type,
+						Confidence: 1.0,
+						Source:     "ollama",
+					})
+				}
+				continue
+			}
+			// Skip entry if we can't parse name at all
+			continue
+		}
+
+		if name == "" || len(name) < 2 {
+			continue
+		}
+
 		entities = append(entities, Entity{
-			Name:       strings.ToLower(e.Name),
+			Name:       strings.ToLower(name),
 			Type:       e.Type,
 			Confidence: 1.0, // Ollama extracted entities have high confidence
 			Source:     "ollama",

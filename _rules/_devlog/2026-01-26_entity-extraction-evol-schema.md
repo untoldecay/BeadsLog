@@ -102,6 +102,25 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 **Testing:**
 *   Created dummy session \`2026-01-26_ollama-test.md\` with content about Redis/Memcached.
 *   Synced with \`ministral-3:3b\`.
-*   Result: 16 entities extracted (vs 3 with regex), capturing "redis", "memcached", "pgvector".
+**Result:** 16 entities extracted (vs 3 with regex), capturing "redis", "memcached", "pgvector".
+
+---
+
+### **Phase 6: Retrofit & Repair Workflow**
+
+**Initial Problem:** Existing devlogs were missing from `_index.md` (orphans) or lacked the new entity metadata. `bd devlog sync` only processes changed files, leaving old sessions outdated.
+
+*   **My Assumption/Plan #1:** `bd devlog verify --fix` should be the active repair tool.
+    *   **Action Taken:** Updated `cmd/bd/devlog_cmds.go`:
+        1.  **Orphan Detection:** Scans the `_devlog` directory for `.md` files missing from `_index.md`.
+        2.  **Adoption:** Automatically appends orphans to `_index.md` with parsed date/title.
+        3.  **Backfill:** Iterates over sessions missing metadata and force-runs `extractAndLinkEntities` using the original narrative.
+    *   **Challenge:** The `OllamaExtractor` parser failed on real data from `ministral-3:3b` because the model output inconsistent JSON (sometimes arrays for names, sometimes headers).
+    *   **Correction:** Refined the prompt in `internal/extractor/ollama.go` to enforce a strict schema and updated the parser to handle `json.RawMessage` for robust unmarshaling.
+    *   **Challenge:** `hashID` panicked on short strings (length < 6).
+    *   **Correction:** Updated `hashID` in `cmd/bd/devlog_core.go` to use `%06x` padding.
+
+**Result:** `bd devlog verify --fix` now successfully adopts orphaned files and enriches old sessions with high-confidence entities from Ollama.
+
 
 

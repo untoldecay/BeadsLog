@@ -275,7 +275,7 @@ func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
 func hashID(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum32())[:6]
+	return fmt.Sprintf("%06x", h.Sum32())
 }
 
 func parseDate(dateStr string) time.Time {

@@ -1299,6 +1299,38 @@ var devlogVerifyCmd = &cobra.Command{
 
 		db := store.UnderlyingDB()
 
+		// 0. Orphaned Files Detection (Disk vs Index)
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+
+		indexedFiles := make(map[string]bool)
+		indexPath := filepath.Join(devlogDir, "_index.md")
+		if rows, err := parseIndexMD(indexPath); err == nil {
+			for _, r := range rows {
+				indexedFiles[filepath.Base(r.Filename)] = true
+			}
+		}
+
+		files, _ := os.ReadDir(devlogDir)
+		var orphans []string
+		for _, f := range files {
+			if !f.IsDir() && strings.HasSuffix(f.Name(), ".md") && !strings.HasPrefix(f.Name(), "_") {
+				if !indexedFiles[f.Name()] {
+					orphans = append(orphans, f.Name())
+				}
+			}
+		}
+
+		if len(orphans) > 0 {
+			fmt.Println("Found orphaned devlog files (on disk but not in _index.md):")
+			for _, o := range orphans {
+				fmt.Printf("- %s\n", o)
+			}
+			fmt.Println()
+		}
+
 		// 1. Sessions marked as missing
 		missingRows, err := db.Query("SELECT id, title, filename FROM sessions WHERE is_missing = 1")
 		if err == nil {
@@ -1347,19 +1379,72 @@ var devlogVerifyCmd = &cobra.Command{
 				fmt.Printf("- [%s] %s (%s)\n", s.ID, s.Title, s.Filename)
 			}
 			fmt.Printf("\nFound %d sessions with missing metadata.\n", len(incomplete))
-			fmt.Println("Tip: Run 'bd devlog verify --fix' to trigger AI re-investigation.")
-		} else {
-			fmt.Println("🚀 **AI RE-INVESTIGATION DIRECTIVE**")
-			fmt.Println("The following sessions are missing architectural metadata (entities or relationships). For EACH file below:")
-			fmt.Println("1. **READ** the entire file to understand the session journey.")
-			fmt.Println("2. **IDENTIFY** the final architectural state (focus on 'Final Session Summary' and the last successful implementation phases).")
-			fmt.Println("3. **IGNORE** discarded hypotheses, failed tests, or deprecated assumptions from earlier phases.")
-			fmt.Println("4. **APPEND** an '### Architectural Relationships' section with accurate 'EntityA -> EntityB (type)' links.")
-			fmt.Println("\nFiles to analyze:")
-			for _, s := range incomplete {
-				fmt.Printf("- %s\n", s.Filename)
+			if len(orphans) > 0 {
+				fmt.Printf("Found %d orphaned files.\n", len(orphans))
 			}
-			fmt.Println("\nAfter updating the files, run 'bd devlog sync'.")
+			fmt.Println("Tip: Run 'bd devlog verify --fix' to automatically adopt orphans and backfill metadata.")
+		} else {
+			// Phase 1: Adopt Orphans
+			if len(orphans) > 0 {
+				fmt.Printf("Adopting %d orphaned files...\n", len(orphans))
+				for _, o := range orphans {
+					// Simple extraction of title/date for adoption
+					title := strings.TrimSuffix(o, ".md")
+					date := time.Now().Format("2006-01-02")
+					// Try to parse date from filename prefix YYYY-MM-DD
+					if len(o) >= 10 {
+						if _, err := time.Parse("2006-01-02", o[:10]); err == nil {
+							date = o[:10]
+							title = strings.TrimSpace(strings.ReplaceAll(title[10:], "-", " "))
+							if title == "" { title = "Adopted session" }
+						}
+					}
+
+					entry := fmt.Sprintf("| [adopt] %s | Automatically adopted during verify | %s | [%s](%s) |\n", title, date, o, o)
+					f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY, 0644)
+					if err == nil {
+						// Ensure index ends with newline
+						stat, _ := f.Stat()
+						if stat.Size() > 0 {
+							lastChar := make([]byte, 1)
+							_, _ = f.ReadAt(lastChar, stat.Size()-1)
+							if lastChar[0] != '\n' {
+								f.WriteString("\n")
+							}
+						}
+						f.WriteString(entry)
+						f.Close()
+						fmt.Printf("  ✓ Adopted %s\n", o)
+					}
+				}
+				fmt.Println("Re-syncing adopted files...")
+				// We don't call devlogSyncCmd.Run directly to avoid re-opening DB, 
+				// but for simplicity here we could just tell user to sync or try a partial sync.
+				// Let's just trigger a full sync call by reusing the logic or asking user.
+				fmt.Println("  Tip: Run 'bd devlog sync' to ingest newly adopted files.")
+			}
+
+			// Phase 2: Backfill Metadata
+			if len(incomplete) > 0 {
+				fmt.Printf("Backfilling metadata for %d sessions...\n", len(incomplete))
+				for _, s := range incomplete {
+					// To backfill, we need the original narrative.
+					var narrative string
+					err := db.QueryRow("SELECT narrative FROM sessions WHERE id = ?", s.ID).Scan(&narrative)
+					if err != nil {
+						fmt.Printf("  ✗ Failed to retrieve narrative for %s: %v\n", s.ID, err)
+						continue
+					}
+
+					fmt.Printf("  → Processing %s (%s)...\n", s.ID, s.Title)
+					extractAndLinkEntities(store, s.ID, narrative)
+				}
+				fmt.Println("✅ Backfill complete.")
+			}
+
+			if len(orphans) == 0 && len(incomplete) == 0 {
+				fmt.Println("Nothing to fix.")
+			}
 		}
 	},
 }
