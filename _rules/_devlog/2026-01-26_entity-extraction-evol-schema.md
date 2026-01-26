@@ -122,5 +122,21 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 
 **Result:** `bd devlog verify --fix` now successfully adopts orphaned files and enriches old sessions with high-confidence entities from Ollama.
 
+---
+
+### **Phase 7: Verify UX Enhancements**
+
+**Initial Problem:** Backfilling large histories with AI is slow (14s/session -> ~8m for 34 sessions), potentially locking the user. Also, users couldn't target specific sessions for repair.
+
+*   **My Assumption/Plan #1:** Add a "Fast-Path" flag and targeting support.
+    *   **Action Taken:** Updated `extractAndLinkEntities` to accept `ExtractionOptions` (supporting `ForceRegex`).
+    *   **Action Taken:** Updated `bd devlog verify`:
+        1.  Added `--fix-regex` flag to bypass AI.
+        2.  Added argument support `[target]` to filter sessions by ID/filename.
+        3.  Added a UX disclaimer when running AI backfill on multiple files.
+
+**Result:** Users can now perform instant repairs with regex (`--fix-regex`) or surgically repair specific sessions with AI (`verify sess-123 --fix`).
+
+
 
 

@@ -94,7 +94,7 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	}
 
 	// Extract and link entities
-	extractAndLinkEntities(store, sessionID, narrative)
+	extractAndLinkEntities(store, sessionID, narrative, ExtractionOptions{})
 
 	return true, nil
 }
@@ -174,9 +174,13 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 	return rows, nil
 }
 
-func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string) {
+type ExtractionOptions struct {
+	ForceRegex bool
+}
+
+func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string, opts ExtractionOptions) {
 	ollamaModel := ""
-	if config.GetBool("entity_extraction.enabled") && config.GetString("entity_extraction.primary_extractor") == "ollama" {
+	if !opts.ForceRegex && config.GetBool("entity_extraction.enabled") && config.GetString("entity_extraction.primary_extractor") == "ollama" {
 		ollamaModel = config.GetString("ollama.model")
 	}
 
