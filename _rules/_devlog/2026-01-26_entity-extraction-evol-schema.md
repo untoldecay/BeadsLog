@@ -137,6 +137,17 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 
 **Result:** Users can now perform instant repairs with regex (`--fix-regex`) or surgically repair specific sessions with AI (`verify sess-123 --fix`).
 
+---
+
+### **Phase 8: Documentation Polish**
+
+**Initial Problem:** The help text for `bd devlog verify --fix` was outdated ("Generate re-investigation directive") and didn't reflect its new active repair capabilities.
+
+*   **Action Taken:** Updated the flag usage description in `cmd/bd/devlog_cmds.go`.
+
+**Result:** `bd devlog verify --help` now correctly describes `--fix` as "Adopt orphans and backfill missing metadata".
+
+
 
 
 

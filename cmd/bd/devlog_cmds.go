@@ -1484,7 +1484,7 @@ func init() {
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
-	devlogVerifyCmd.Flags().Bool("fix", false, "Generate re-investigation directive for AI agents")
+	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (uses AI if configured)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
 
 	devlogCmd.AddCommand(devlogInitCmd)
