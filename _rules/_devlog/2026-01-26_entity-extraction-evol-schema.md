@@ -66,3 +66,22 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 - SyncSession -> Pipeline (uses)
 - entities -> confidence (has column)
 - entities -> source (has column)
+
+---
+
+### **Phase 4: Ollama Integration**
+
+**Initial Problem:** With the architecture in place, I needed to implement the actual LLM-based extraction using Ollama to fulfill the "Tier 2" requirement.
+
+*   **My Assumption/Plan #1:** I would use the `github.com/ollama/ollama/api` client to connect to a local Ollama instance.
+    *   **Action Taken:** Added the dependency via `go get`. Created `internal/extractor/ollama.go`.
+    *   **Challenge:** The `GenerateRequest.Format` field expects a `json.RawMessage` (byte slice) but I initially tried to pass a string "json".
+    *   **Correction:** Updated the code to use `json.RawMessage(`"json"`)`.
+*   **My Assumption/Plan #2:** I needed to update the `Pipeline` to support multiple extractors and merging.
+    *   **Action Taken:** Refactored `NewPipeline` to accept an optional `ollamaModel` string. If provided, it initializes the `OllamaExtractor` and adds it to the list.
+    *   **Logic:** The pipeline runs all extractors. Since `RegexExtractor` runs first, its results populate the map. When `OllamaExtractor` runs (if successful), it updates the map. Since Ollama entities have higher confidence (1.0 vs 0.8), they naturally override regex matches, while unique regex matches (fallback) are preserved.
+*   **My Assumption/Plan #3:** Configuration should drive the enablement of Ollama.
+    *   **Action Taken:** Updated `internal/config/config.go` with default settings for `entity_extraction` and `ollama`. Updated `cmd/bd/devlog_core.go` to read these configs and pass the model to the pipeline.
+
+**Result:** The system now supports a hybrid extraction pipeline. If Ollama is configured and running, it enhances extraction quality. If not (or if configured off), it gracefully degrades to the robust Regex fallback.
+

@@ -6,7 +6,8 @@ import (
 )
 
 func TestPipeline(t *testing.T) {
-	pipeline := NewPipeline()
+	// Test regex-only (empty model)
+	pipeline := NewPipeline("")
 	text := `
 This is a test session.
 We fixed a bug in ManageColumnsModal.

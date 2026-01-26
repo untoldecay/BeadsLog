@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
@@ -174,7 +175,12 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 }
 
 func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string) {
-	pipeline := extractor.NewPipeline()
+	ollamaModel := ""
+	if config.GetBool("entity_extraction.enabled") && config.GetString("entity_extraction.primary_extractor") == "ollama" {
+		ollamaModel = config.GetString("ollama.model")
+	}
+
+	pipeline := extractor.NewPipeline(ollamaModel)
 	result, err := pipeline.Run(context.Background(), text)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running extraction pipeline: %v\n", err)

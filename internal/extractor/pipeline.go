@@ -10,11 +10,22 @@ type Pipeline struct {
 	extractors []Extractor
 }
 
-func NewPipeline() *Pipeline {
+func NewPipeline(ollamaModel string) *Pipeline {
+	extractors := []Extractor{
+		NewRegexExtractor(),
+	}
+
+	// Add Ollama if model provided (and let it fail gracefully if service is down)
+	if ollamaModel != "" {
+		if ollama, err := NewOllamaExtractor(ollamaModel); err == nil {
+			extractors = append(extractors, ollama)
+		} else {
+			fmt.Printf("Warning: Failed to initialize Ollama extractor: %v\n", err)
+		}
+	}
+
 	return &Pipeline{
-		extractors: []Extractor{
-			NewRegexExtractor(),
-		},
+		extractors: extractors,
 	}
 }
 
@@ -29,19 +40,19 @@ type ExtractionResult struct {
 func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, error) {
 	start := time.Now()
 	
-	// For now, we only have regex. Later we'll add Ollama and merging logic.
-	// We'll iterate through extractors (currently just one)
-	
 	allEntities := make(map[string]Entity)
+	usedExtractors := make([]string, 0)
 	
 	for _, ext := range p.extractors {
 		entities, err := ext.Extract(text)
 		if err != nil {
-			// Log error but continue with other extractors if any
-			fmt.Printf("Error running extractor %s: %v\n", ext.Name(), err)
+			// Log error but continue with other extractors
+			// Only verbose log to avoid noise if Ollama is just offline
 			continue
 		}
 		
+		usedExtractors = append(usedExtractors, ext.Name())
+
 		for _, e := range entities {
 			if existing, ok := allEntities[e.Name]; ok {
 				// Merge logic: keep higher confidence
@@ -59,13 +70,25 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 		resultEntities = append(resultEntities, e)
 	}
 	
-	// Extract explicit relationships (always run regex for this for now)
+	// Extract explicit relationships (always run regex for this)
 	relationships := ExtractRelationships(text)
+	
+	extractorName := "regex"
+	if len(usedExtractors) > 0 {
+		// e.g. "regex,ollama" or just "regex"
+		// If ollama was used, prioritize showing it
+		for _, name := range usedExtractors {
+			if name == "ollama" {
+				extractorName = "ollama+regex"
+				break
+			}
+		}
+	}
 	
 	return &ExtractionResult{
 		Entities:      resultEntities,
 		Relationships: relationships,
 		Duration:      time.Since(start),
-		Extractor:     "regex", // Placeholder until we have multi-extractor logic
+		Extractor:     extractorName,
 	}, nil
 }

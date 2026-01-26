@@ -131,6 +131,14 @@ func Initialize() error {
 	// Default matches types.MaxHierarchyDepth constant
 	v.SetDefault("hierarchy.max-depth", 3)
 
+	// Entity Extraction Defaults (bd-byg)
+	v.SetDefault("entity_extraction.enabled", true)
+	v.SetDefault("entity_extraction.primary_extractor", "ollama")
+	v.SetDefault("entity_extraction.fallback_extractor", "regex")
+	v.SetDefault("ollama.model", "llama3.2:3b")
+	v.SetDefault("ollama.url", "http://localhost:11434")
+	v.SetDefault("ollama.timeout", "5s")
+
 	// Git configuration defaults (GH#600)
 	v.SetDefault("git.author", "")         // Override commit author (e.g., "beads-bot <beads@example.com>")
 	v.SetDefault("git.no-gpg-sign", false) // Disable GPG signing for beads commits
