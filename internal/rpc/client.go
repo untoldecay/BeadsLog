@@ -479,6 +479,26 @@ func (c *Client) MolStale(args *MolStaleArgs) (*MolStaleResponse, error) {
 	return &result, nil
 }
 
+// Call executes a generic RPC operation
+func (c *Client) Call(operation string, args interface{}) (*Response, error) {
+	return c.Execute(operation, args)
+}
+
+// GetEnrichmentStats retrieves background AI enrichment status from the daemon
+func (c *Client) GetEnrichmentStats() (*EnrichmentStatsResponse, error) {
+	resp, err := c.Execute(OpGetEnrichmentStats, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var stats EnrichmentStatsResponse
+	if err := json.Unmarshal(resp.Data, &stats); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal enrichment stats response: %w", err)
+	}
+
+	return &stats, nil
+}
+
 // cleanupStaleDaemonArtifacts removes stale daemon.pid file when socket is missing and lock is free.
 // This prevents stale artifacts from accumulating after daemon crashes.
 // Only removes pid file - lock file is managed by OS (released on process exit).

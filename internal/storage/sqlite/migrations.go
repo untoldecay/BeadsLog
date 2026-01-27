@@ -55,16 +55,17 @@ var migrationsList = []Migration{
 	{"owner_column", migrations.MigrateOwnerColumn},
 	{"crystallizes_column", migrations.MigrateCrystallizesColumn},
 	{"work_type_column", migrations.MigrateWorkTypeColumn},
-		{"source_system_column", migrations.MigrateSourceSystemColumn},
-		{"quality_score_column", migrations.MigrateQualityScoreColumn},
-			{"devlog_schema", migrations.MigrateDevlogSchema},
-			{"devlog_file_hash", migrations.MigrateDevlogFileHash},
-			{"devlog_missing_flag", migrations.MigrateDevlogMissingFlag},
-		{"populate_fts", migrations.MigratePopulateFTS},
-		{"extraction_evol_schema", migrations.MigrateExtractionEvolSchema},
-	}
-	
-	// MigrationInfo contains metadata about a migration for inspection
+	{"source_system_column", migrations.MigrateSourceSystemColumn},
+	{"quality_score_column", migrations.MigrateQualityScoreColumn},
+	{"devlog_schema", migrations.MigrateDevlogSchema},
+	{"devlog_file_hash", migrations.MigrateDevlogFileHash},
+	{"devlog_missing_flag", migrations.MigrateDevlogMissingFlag},
+	{"populate_fts", migrations.MigratePopulateFTS},
+	{"extraction_evol_schema", migrations.MigrateExtractionEvolSchema},
+	{"devlog_enrichment_status", migrations.MigrateDevlogEnrichmentStatus},
+}
+
+// MigrationInfo contains metadata about a migration for inspection
 	type MigrationInfo struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -131,6 +132,7 @@ func getMigrationDescription(name string) string {
 		"devlog_missing_flag":          "Adds is_missing column to sessions table for file existence tracking",
 		"populate_fts":                 "Populates FTS5 indexes for existing sessions and entities",
 		"extraction_evol_schema":       "Adds confidence/source columns to entities and creates extraction_log table",
+		"devlog_enrichment_status":     "Adds enrichment_status to sessions for background AI processing",
 	}
 
 	if desc, ok := descriptions[name]; ok {

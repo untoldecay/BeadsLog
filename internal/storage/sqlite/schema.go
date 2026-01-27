@@ -122,7 +122,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     type TEXT, -- fix, feature, enhance, etc.
     filename TEXT,
     narrative TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    file_hash TEXT,
+    is_missing INTEGER DEFAULT 0,
+    enrichment_status INTEGER DEFAULT 0 -- 0:pending, 1:regex_done, 2:ai_crystallized, 3:failed
 );
 
 CREATE TABLE IF NOT EXISTS entities (

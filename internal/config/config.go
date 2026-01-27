@@ -135,6 +135,7 @@ func Initialize() error {
 	v.SetDefault("entity_extraction.enabled", true)
 	v.SetDefault("entity_extraction.primary_extractor", "ollama")
 	v.SetDefault("entity_extraction.fallback_extractor", "regex")
+	v.SetDefault("entity_extraction.background_enrichment", false) // New background worker
 	v.SetDefault("ollama.model", "llama3.2:3b")
 	v.SetDefault("ollama.url", "http://localhost:11434")
 	v.SetDefault("ollama.timeout", "5s")

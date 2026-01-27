@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -215,6 +216,25 @@ func (s *Server) GetRecentMutations(sinceMillis int64) []MutationEvent {
 		}
 	}
 	return result
+}
+
+// GetEnrichmentQueueLength returns the number of sessions pending AI enrichment
+func (s *Server) GetEnrichmentQueueLength(ctx context.Context) int {
+	if s.storage == nil {
+		return 0
+	}
+	// Try to query underlying DB
+	if sqliteStore, ok := s.storage.(interface {
+		UnderlyingDB() *sql.DB
+	}); ok {
+		db := sqliteStore.UnderlyingDB()
+		var count int
+		err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sessions WHERE enrichment_status = 1").Scan(&count)
+		if err == nil {
+			return count
+		}
+	}
+	return 0
 }
 
 // handleGetMutations handles the get_mutations RPC operation

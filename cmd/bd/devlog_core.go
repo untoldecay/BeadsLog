@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -78,13 +79,13 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1)
 			WHERE id = ?
 		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, sessionID)
 	}
@@ -93,10 +94,77 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 		return false, fmt.Errorf("failed to upsert session: %w", err)
 	}
 
-	// Extract and link entities
-	extractAndLinkEntities(store, sessionID, narrative, ExtractionOptions{})
+	// Extract and link entities (SYNC: Always ForceRegex for speed)
+	result, err := extractAndLinkEntities(store, sessionID, narrative, ExtractionOptions{ForceRegex: true})
+	if err == nil && result != nil && !isMissing {
+		// Crystallize (Write-Back) discovered relationships to the file (from Regex)
+		if err := crystallizeRelationships(filePath, result.Relationships); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to crystallize relationships to %s: %v\n", filePath, err)
+		} else if len(result.Relationships) > 0 {
+			// Update hash if crystallized
+			newContent, err := ioutil.ReadFile(filePath)
+			if err == nil {
+				newNarrative := row.Problem + "\n\n" + string(newContent)
+				newSum := sha256.Sum256([]byte(newNarrative))
+				newContentHash := fmt.Sprintf("%x", newSum)
+				_, _ = db.Exec("UPDATE sessions SET file_hash = ?, narrative = ? WHERE id = ?", newContentHash, newNarrative, sessionID)
+			}
+		}
+	}
 
 	return true, nil
+}
+
+func crystallizeRelationships(filename string, relationships []extractor.Relationship) error {
+	if len(relationships) == 0 {
+		return nil
+	}
+
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	contentStr := string(content)
+	
+	var toAppend []string
+	for _, rel := range relationships {
+		// Check if "From -> To" exists in the text (to avoid duplicates)
+		pattern := fmt.Sprintf(`(?i)%s\s*->\s*%s`, regexp.QuoteMeta(rel.FromEntity), regexp.QuoteMeta(rel.ToEntity))
+		matched, _ := regexp.MatchString(pattern, contentStr)
+		if !matched {
+			// Format: - From -> To (Type)
+			relLine := fmt.Sprintf("- %s -> %s (%s)", rel.FromEntity, rel.ToEntity, rel.Type)
+			toAppend = append(toAppend, relLine)
+		}
+	}
+	
+	if len(toAppend) > 0 {
+		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		
+		// Ensure separation
+		if !strings.HasSuffix(contentStr, "\n") {
+			f.WriteString("\n")
+		}
+		if !strings.HasSuffix(contentStr, "\n\n") && !strings.HasSuffix(contentStr, "\n") {
+			f.WriteString("\n")
+		}
+		
+		// Check if header exists
+		if !strings.Contains(contentStr, "### Architectural Relationships") {
+			f.WriteString("\n### Architectural Relationships\n")
+			f.WriteString("<!-- Format: [From Entity] -> [To Entity] (relationship type) -->\n")
+		}
+		
+		for _, line := range toAppend {
+			f.WriteString(line + "\n")
+		}
+		fmt.Printf("  ✨ Crystallized %d new relationships to %s\n", len(toAppend), filepath.Base(filename))
+	}
+	return nil
 }
 
 func parseIndexMD(filename string) ([]IndexRow, error) {
@@ -178,7 +246,7 @@ type ExtractionOptions struct {
 	ForceRegex bool
 }
 
-func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string, opts ExtractionOptions) {
+func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string, opts ExtractionOptions) (*extractor.ExtractionResult, error) {
 	ollamaModel := ""
 	if !opts.ForceRegex && config.GetBool("entity_extraction.enabled") && config.GetString("entity_extraction.primary_extractor") == "ollama" {
 		ollamaModel = config.GetString("ollama.model")
@@ -188,7 +256,7 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 	result, err := pipeline.Run(context.Background(), text)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running extraction pipeline: %v\n", err)
-		return
+		return nil, err
 	}
 
 	db := store.UnderlyingDB()
@@ -257,6 +325,8 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 			fmt.Fprintf(os.Stderr, "Error linking entities: %v\n", err)
 		}
 	}
+
+	return result, nil
 }
 
 func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
@@ -279,12 +349,14 @@ func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
 func hashID(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	// Ensure at least 6 chars with 0 padding, then take first 6
-	hex := fmt.Sprintf("%06x", h.Sum32())
-	if len(hex) > 6 {
+	// Legacy behavior: use %x and take first 6 characters
+	// This matches the existing database IDs.
+	hex := fmt.Sprintf("%x", h.Sum32())
+	if len(hex) >= 6 {
 		return hex[:6]
 	}
-	return hex
+	// Fallback for very short hashes (unlikely but safe)
+	return fmt.Sprintf("%06s", hex)[:6]
 }
 
 func parseDate(dateStr string) time.Time {

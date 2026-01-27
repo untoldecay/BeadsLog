@@ -10,6 +10,7 @@ import (
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
 // DefaultRemoteSyncInterval is the default interval for periodic remote sync.
@@ -120,6 +121,24 @@ func runEventDrivenLoop(
 	parentCheckTicker := time.NewTicker(10 * time.Second)
 	defer parentCheckTicker.Stop()
 
+	// Background AI Enrichment worker
+	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+		go func() {
+			// Small delay before starting first check
+			time.Sleep(2 * time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					_ = ProcessEnrichmentQueue(ctx, sqliteStore, &log)
+					// Wait between sessions to keep CPU/Ollama available for other tasks
+					time.Sleep(5 * time.Second)
+				}
+			}
+		}()
+	}
+
 	// Dropped events safety net (faster recovery than health check)
 	droppedEventsTicker := time.NewTicker(1 * time.Second)
 	defer droppedEventsTicker.Stop()
@@ -195,15 +214,15 @@ func runEventDrivenLoop(
 			return
 
 		case err := <-serverErrChan:
-		log.log("RPC server failed: %v", err)
-		cancel()
-		if watcher != nil {
-		_ = watcher.Close()
-		}
-		if stopErr := server.Stop(); stopErr != nil {
-			log.log("Error stopping server: %v", stopErr)
-		}
-		return
+			log.log("RPC server failed: %v", err)
+			cancel()
+			if watcher != nil {
+				_ = watcher.Close()
+			}
+			if stopErr := server.Stop(); stopErr != nil {
+				log.log("Error stopping server: %v", stopErr)
+			}
+			return
 		}
 	}
 }

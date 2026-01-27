@@ -1291,10 +1291,16 @@ var devlogVerifyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fix, _ := cmd.Flags().GetBool("fix")
 		fixRegex, _ := cmd.Flags().GetBool("fix-regex")
+		fixAI, _ := cmd.Flags().GetBool("fix-ai")
 		
-		// If fix-regex is set, it implies fix
-		if fixRegex {
+		// Priority: fix-ai > fix-regex > fix
+		forceRegex := true // Default to regex for --fix
+		if fixAI {
 			fix = true
+			forceRegex = false
+		} else if fixRegex {
+			fix = true
+			forceRegex = true
 		}
 
 		target := ""
@@ -1438,11 +1444,11 @@ var devlogVerifyCmd = &cobra.Command{
 			// Phase 2: Backfill Metadata
 			if len(incomplete) > 0 {
 				// Disclaimer
-				if !fixRegex {
+				if fixAI {
 					// Check if AI is enabled
 					if config.GetBool("entity_extraction.enabled") && config.GetString("entity_extraction.primary_extractor") == "ollama" {
 						fmt.Printf("\n⚠️  Backfilling %d sessions with AI. This may take a while.\n", len(incomplete))
-						fmt.Println("    (Use Ctrl+C to abort, or run with '--fix-regex' for instant results)")
+						fmt.Println("    (Use Ctrl+C to abort, or run without '--fix-ai' for instant regex results)")
 						fmt.Println()
 					}
 				}
@@ -1457,7 +1463,26 @@ var devlogVerifyCmd = &cobra.Command{
 					}
 
 					fmt.Printf("  → Processing %s (%s)...\n", s.ID, s.Title)
-					extractAndLinkEntities(store, s.ID, narrative, ExtractionOptions{ForceRegex: fixRegex})
+					result, err := extractAndLinkEntities(store, s.ID, narrative, ExtractionOptions{ForceRegex: forceRegex})
+					if err == nil && result != nil {
+						// Resolve path for write-back
+						path := s.Filename
+						if !filepath.IsAbs(path) {
+							// Try devlog_dir first
+							devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+							if devlogDir == "" { devlogDir = "_rules/_devlog" }
+							path = filepath.Join(devlogDir, path)
+						}
+						
+						if err := crystallizeRelationships(path, result.Relationships); err != nil {
+							fmt.Printf("    Warning: failed to crystallize relationships: %v\n", err)
+						}
+
+						// Update status to mark AI done if AI was used
+						if !forceRegex {
+							_, _ = db.Exec("UPDATE sessions SET enrichment_status = 2 WHERE id = ?", s.ID)
+						}
+					}
 				}
 				fmt.Println("✅ Backfill complete.")
 			}
@@ -1484,8 +1509,9 @@ func init() {
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
-	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (uses AI if configured)")
+	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (Fast Regex only)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
+	devlogVerifyCmd.Flags().Bool("fix-ai", false, "Force AI extraction for backfilling (slow, higher quality)")
 
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)

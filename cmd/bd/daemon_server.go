@@ -8,6 +8,7 @@ import (
 
 	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/storage"
+	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
 // startRPCServer initializes and starts the RPC server
@@ -59,7 +60,7 @@ func checkParentProcessAlive(parentPID int) bool {
 }
 
 // runEventLoop runs the daemon event loop (polling mode)
-func runEventLoop(ctx context.Context, cancel context.CancelFunc, ticker *time.Ticker, doSync func(), server *rpc.Server, serverErrChan chan error, parentPID int, log daemonLogger) {
+func runEventLoop(ctx context.Context, cancel context.CancelFunc, ticker *time.Ticker, doSync func(), server *rpc.Server, serverErrChan chan error, parentPID int, store storage.Storage, log daemonLogger) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, daemonSignals...)
 	defer signal.Stop(sigChan)
@@ -67,6 +68,22 @@ func runEventLoop(ctx context.Context, cancel context.CancelFunc, ticker *time.T
 	// Parent process check (every 10 seconds)
 	parentCheckTicker := time.NewTicker(10 * time.Second)
 	defer parentCheckTicker.Stop()
+
+	// Background AI Enrichment worker
+	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+		go func() {
+			time.Sleep(2 * time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					_ = ProcessEnrichmentQueue(ctx, sqliteStore, &log)
+					time.Sleep(5 * time.Second)
+				}
+			}
+		}()
+	}
 
 	for {
 		select {

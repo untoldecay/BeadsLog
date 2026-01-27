@@ -507,148 +507,95 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 				
 
-				var autoSyncStr, enforceDevlogStr string
+				var autoSyncStr, enforceDevlogStr, backgroundEnrichStr string
 
 				autoSyncStr = "true"
-
 				enforceDevlogStr = "true"
+				backgroundEnrichStr = "false"
 
 				var selectedToolNames []string
 
-		
-
-										// Interactive setup if not quiet and stdin is a TTY
-										if !quiet && ui.IsTerminal() {
-											fmt.Println() // Space before questions
-											// Convert AgentToolCandidates to huh options with friendly labels
+				// Interactive setup if not quiet and stdin is a TTY
+				if !quiet && ui.IsTerminal() {
+					fmt.Println() // Space before questions
+					// Convert AgentToolCandidates to huh options with friendly labels
 					agentOptions := make([]huh.Option[string], len(AgentToolCandidates))
-
 					for i, tool := range AgentToolCandidates {
-
 						agentOptions[i] = huh.NewOption(tool.Name, tool.Name).Selected(true)
-
 					}
 
-		
-
-								form := huh.NewForm(
-
-		
-
-									huh.NewGroup(
-
-		
-
-										huh.NewSelect[string]().
-
-		
-
-											Title("Enable Auto-Sync?").
-
+					form := huh.NewForm(
+						huh.NewGroup(
+							huh.NewSelect[string]().
+								Title("Enable Auto-Sync?").
 								Description("Keeps your issue tracker and devlogs in sync automatically via git hooks.").
-
 								Options(
-
 									huh.NewOption("Yes, keep me in sync (Recommended)", "true"),
-
 									huh.NewOption("No, I'll sync manually", "false"),
-
 								).
-
 								Value(&autoSyncStr),
 
-		
-
 							huh.NewSelect[string]().
-
 								Title("Enforce Devlogs?").
-
 								Description("Prevents commits unless a devlog entry is provided. Highly recommended for AI agents.").
-
 								Options(
-
 									huh.NewOption("Yes, enforce best practices", "true"),
-
 									huh.NewOption("No, allow loose commits", "false"),
-
 								).
-
 								Value(&enforceDevlogStr),
 
-		
+							huh.NewSelect[string]().
+								Title("Background AI Enrichment?").
+								Description("Uses Ollama to automatically extract architectural entities in the background.").
+								Options(
+									huh.NewOption("Yes, enrich my graphs (Requires Ollama)", "true"),
+									huh.NewOption("No, use fast Regex only", "false"),
+								).
+								Value(&backgroundEnrichStr),
 
 							huh.NewMultiSelect[string]().
-
 								Title("Agent Instructions").
-
 								Description("Select which agent instruction files to generate or update.\n(Space to toggle, Enter to confirm)").
-
 								Options(agentOptions...).
-
 								Limit(20).
-
 								Value(&selectedToolNames),
-
 						),
-
 					)
 
-		
-
 					if err := form.Run(); err != nil {
-
 						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
-
 						os.Exit(1)
-
 					}
-
 				}
-
-		
 
 				// Map selected tools to file paths
-
 				var targetFiles []string
 
-				
-
 				// If nothing selected (or non-interactive default), select all tools
-
 				if len(selectedToolNames) == 0 && (!ui.IsTerminal() || quiet) {
-
 					for _, tool := range AgentToolCandidates {
-
 						targetFiles = append(targetFiles, tool.Files...)
-
 					}
-
 				} else {
-
 					// Map selected names to files
-
 					for _, name := range selectedToolNames {
-
 						for _, tool := range AgentToolCandidates {
-
 							if tool.Name == name {
-
 								targetFiles = append(targetFiles, tool.Files...)
-
 								break
-
 							}
-
 						}
-
 					}
-
 				}
-
-		
 
 		autoSync := autoSyncStr == "true"
 		enforceDevlog := enforceDevlogStr == "true"
+		backgroundEnrich := backgroundEnrichStr == "true"
+
+		// Persist background enrich setting if enabled
+		if backgroundEnrich {
+			_ = config.SetYamlConfig("entity_extraction.background_enrichment", "true")
+		}
 
 		orchFiles := initializeOrchestration(false)
 		devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, targetFiles)

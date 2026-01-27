@@ -45,6 +45,7 @@ const (
 	OpGetWorkerStatus     = "get_worker_status"
 	OpGetConfig           = "get_config"
 	OpMolStale            = "mol_stale"
+	OpGetEnrichmentStats  = "get_enrichment_stats"
 
 	// Gate operations
 	OpGateCreate = "gate_create"
@@ -637,4 +638,13 @@ type MolStaleResponse struct {
 	StaleMolecules []*StaleMolecule `json:"stale_molecules"`
 	TotalCount     int              `json:"total_count"`
 	BlockingCount  int              `json:"blocking_count"`
+}
+
+// EnrichmentStatsResponse represents the background AI enrichment status
+type EnrichmentStatsResponse struct {
+	Enabled      bool `json:"enabled"`
+	QueueLength  int  `json:"queue_length"`
+	Processed    int  `json:"processed_count"`
+	Failed       int  `json:"failed_count"`
+	OllamaActive bool `json:"ollama_active"`
 }

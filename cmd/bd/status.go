@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/types"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
@@ -18,6 +19,7 @@ import (
 type StatusOutput struct {
 	Summary        *types.Statistics      `json:"summary"`
 	RecentActivity *RecentActivitySummary `json:"recent_activity,omitempty"`
+	Enrichment     *rpc.EnrichmentStatsResponse `json:"enrichment,omitempty"`
 }
 
 // RecentActivitySummary represents activity from git history
@@ -83,6 +85,7 @@ Examples:
 		}
 
 		// If daemon is running, use RPC
+		var enrichmentStats *rpc.EnrichmentStatsResponse
 		if daemonClient != nil {
 			resp, rpcErr := daemonClient.Stats()
 			if rpcErr != nil {
@@ -93,6 +96,12 @@ Examples:
 			if err := json.Unmarshal(resp.Data, &stats); err != nil {
 				fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
 				os.Exit(1)
+			}
+
+			// Fetch enrichment stats
+			enrichResp, err := daemonClient.Call(rpc.OpGetEnrichmentStats, nil)
+			if err == nil && enrichResp.Success {
+				_ = json.Unmarshal(enrichResp.Data, &enrichmentStats)
 			}
 		} else {
 			// Direct mode
@@ -122,6 +131,7 @@ Examples:
 		output := &StatusOutput{
 			Summary:        stats,
 			RecentActivity: recentActivity,
+			Enrichment:     enrichmentStats,
 		}
 
 		// JSON output
@@ -132,6 +142,13 @@ Examples:
 
 		// Human-readable colorized output using semantic ui package
 		fmt.Printf("\n%s Issue Database Status\n\n", ui.RenderAccent("📊"))
+		
+		if enrichmentStats != nil && enrichmentStats.Enabled {
+			if enrichmentStats.QueueLength > 0 {
+				fmt.Printf("%s Background AI Enrichment: %s pending\n\n", ui.RenderAccent("🤖"), ui.RenderWarn(fmt.Sprintf("%d", enrichmentStats.QueueLength)))
+			}
+		}
+
 		fmt.Printf("Summary:\n")
 		fmt.Printf("  Total Issues:           %d\n", stats.TotalIssues)
 		fmt.Printf("  Open:                   %s\n", ui.RenderPass(fmt.Sprintf("%d", stats.OpenIssues)))

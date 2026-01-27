@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/types"
 	"golang.org/x/mod/semver"
 )
@@ -229,6 +231,8 @@ func (s *Server) handleRequest(req *Request) Response {
 		resp = s.handleGetConfig(req)
 	case OpMolStale:
 		resp = s.handleMolStale(req)
+	case OpGetEnrichmentStats:
+		resp = s.handleGetEnrichmentStats(req)
 	case OpShutdown:
 		resp = s.handleShutdown(req)
 	// Gate operations
@@ -276,6 +280,37 @@ func (s *Server) reqActor(req *Request) string {
 }
 
 // Handler implementations
+
+func (s *Server) handleGetEnrichmentStats(req *Request) Response {
+	ctx := s.reqCtx(req)
+	
+	queueLength := s.GetEnrichmentQueueLength(ctx)
+	
+	// Check for processed/failed counts
+	processed := 0
+	failed := 0
+	if sqliteStore, ok := s.storage.(interface {
+		UnderlyingDB() *sql.DB
+	}); ok {
+		db := sqliteStore.UnderlyingDB()
+		_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sessions WHERE enrichment_status = 2").Scan(&processed)
+		_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sessions WHERE enrichment_status = 3").Scan(&failed)
+	}
+
+	stats := EnrichmentStatsResponse{
+		Enabled:      config.GetBool("entity_extraction.enabled") && config.GetBool("entity_extraction.background_enrichment"),
+		QueueLength:  queueLength,
+		Processed:    processed,
+		Failed:       failed,
+		OllamaActive: false, // Updated by caller or check here?
+	}
+	
+	data, _ := json.Marshal(stats)
+	return Response{
+		Success: true,
+		Data:    data,
+	}
+}
 
 func (s *Server) handlePing(_ *Request) Response {
 	data, _ := json.Marshal(PingResponse{

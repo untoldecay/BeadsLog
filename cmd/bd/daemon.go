@@ -551,7 +551,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 		if jsonlPath == "" {
 			log.Error("JSONL path not found, cannot use event-driven mode")
 			log.Info("falling back to polling mode")
-			runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, log)
+			runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, store, log)
 		} else {
 			// Event-driven mode uses separate export-only and import-only functions
 			var doExport, doAutoImport func()
@@ -566,10 +566,10 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 		}
 	case "poll":
 		log.Info("using polling mode", "interval", interval)
-		runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, log)
+		runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, store, log)
 	default:
 		log.Warn("unknown BEADS_DAEMON_MODE, defaulting to poll", "mode", daemonMode, "valid", "poll, events")
-		runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, log)
+		runEventLoop(ctx, cancel, ticker, doSync, server, serverErrChan, parentPID, store, log)
 	}
 }
 
