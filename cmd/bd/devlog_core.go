@@ -279,7 +279,12 @@ func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
 func hashID(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	return fmt.Sprintf("%06x", h.Sum32())
+	// Ensure at least 6 chars with 0 padding, then take first 6
+	hex := fmt.Sprintf("%06x", h.Sum32())
+	if len(hex) > 6 {
+		return hex[:6]
+	}
+	return hex
 }
 
 func parseDate(dateStr string) time.Time {
