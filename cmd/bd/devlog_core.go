@@ -139,28 +139,35 @@ func crystallizeRelationships(filename string, relationships []extractor.Relatio
 	}
 	
 	if len(toAppend) > 0 {
-		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		
-		// Ensure separation
-		if !strings.HasSuffix(contentStr, "\n") {
-			f.WriteString("\n")
-		}
-		if !strings.HasSuffix(contentStr, "\n\n") && !strings.HasSuffix(contentStr, "\n") {
-			f.WriteString("\n")
-		}
-		
+		// Prepare content to write
+		var newContent strings.Builder
+		newContent.WriteString(contentStr)
+
 		// Check if header exists
-		if !strings.Contains(contentStr, "### Architectural Relationships") {
-			f.WriteString("\n### Architectural Relationships\n")
-			f.WriteString("<!-- Format: [From Entity] -> [To Entity] (relationship type) -->\n")
+		header := "### Architectural Relationships"
+		if !strings.Contains(contentStr, header) {
+			// Ensure separation
+			if !strings.HasSuffix(contentStr, "\n") {
+				newContent.WriteString("\n")
+			}
+			if !strings.HasSuffix(contentStr, "\n\n") {
+				newContent.WriteString("\n")
+			}
+			newContent.WriteString(header + "\n")
+			newContent.WriteString("<!-- Format: [From Entity] -> [To Entity] (relationship type) -->\n")
+		} else {
+			// Header exists, make sure we end with a newline before appending
+			if !strings.HasSuffix(contentStr, "\n") {
+				newContent.WriteString("\n")
+			}
 		}
 		
 		for _, line := range toAppend {
-			f.WriteString(line + "\n")
+			newContent.WriteString(line + "\n")
+		}
+
+		if err := os.WriteFile(filename, []byte(newContent.String()), 0644); err != nil {
+			return err
 		}
 		fmt.Printf("  ✨ Crystallized %d new relationships to %s\n", len(toAppend), filepath.Base(filename))
 	}

@@ -92,6 +92,7 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] HashID Safeguard | Fixed potential panic in hashID generation for short strings | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [feature] Background AI Enrichment | Implemented non-blocking AI extraction pipeline in daemon worker | 2026-01-27 | [2026-01-27_background-enrichment-pipeline.md](2026-01-27_background-enrichment-pipeline.md) |
 | [feature] Protocol Hardening | Enforced Devlog-First workflow in onboarding and bootloader templates | 2026-01-27 | [2026-01-27_background-enrichment-pipeline.md](2026-01-27_background-enrichment-pipeline.md) |
+| [feature] Regeneration & Enrichment Controls | Added 'bd devlog extract' and 'bd devlog enrich' for manual and scheduled metadata repair | 2026-01-27 | [2026-01-27_background-enrichment-pipeline.md](2026-01-27_background-enrichment-pipeline.md) |
 | [docs] Verify Help Update | Updated CLI help to reflect new repair capabilities | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [test] ollama extraction | verification | 2026-01-26 | [2026-01-26_ollama-test.md](2026-01-26_ollama-test.md) |
 

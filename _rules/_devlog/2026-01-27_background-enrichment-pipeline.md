@@ -57,6 +57,19 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 - ProcessEnrichmentQueue -> sessions (updates enrichment_status)
 - bd status -> get_enrichment_stats (queries queue length)
 
+---
+
+### **Phase 11: Regeneration & Enrichment Controls**
+
+**Initial Problem:** Users needed a way to "upgrade" existing devlogs with new AI extraction logic (e.g., when improving prompts or switching models) without waiting for a file change.
+
+*   **Action Taken:** Implemented `bd devlog extract [target]`. This is a foreground command that force-runs the full AI + Regex pipeline on any session, even if it's already "complete."
+*   **Action Taken:** Implemented `bd devlog enrich [target] [--all]`. This command resets the `enrichment_status` to 1, effectively "re-scheduling" sessions for background processing by the daemon.
+*   **Action Taken:** Refined **Crystallization** logic to support merging. It now identifies existing `### Architectural Relationships` blocks and appends new discoveries without duplicating headers or existing arrows.
+
+**Result:** The "Retrofit" workflow is now complete. Users can surgically upgrade a single session in the foreground or trigger a full project-wide background enrichment.
+
+
 ### Architectural Relationships
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
 - sessions -> enrichment_status (has)
@@ -80,3 +93,10 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 
 **Result:** The agent instructions now programmatically enforce the intended workflow, ensuring the knowledge graph is used as the primary source of truth.
 
+- fullbootloader -> protocolmdtemplate (uses)
+- protocolmdtemplate -> bd sync (mandates)
+- protocolmdtemplate -> bd devlog sync (mandates)
+- protocolmdtemplate -> bd devlog verify --fix (mandates)
+- onboard.go -> memory first policy (enforces)
+- memory first policy -> map it step (requires)
+- working_protocol.md -> map it step (mandates)

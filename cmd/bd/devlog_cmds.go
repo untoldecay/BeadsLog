@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -1466,6 +1467,124 @@ var devlogResetCmd = &cobra.Command{
 }
 
 // devlogVerifyCmd identifies sessions missing metadata
+// devlogExtractCmd performs immediate foreground regeneration of entities/relationships
+var devlogExtractCmd = &cobra.Command{
+	Use:   "extract [target]",
+	Short: "Regenerate entities and relationships for a session (Foreground AI)",
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		target := ""
+		if len(args) > 0 {
+			target = args[0]
+		}
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		query := "SELECT id, title, filename, narrative FROM sessions"
+		var queryArgs []interface{}
+		if target != "" {
+			query += " WHERE id = ? OR filename LIKE ?"
+			queryArgs = append(queryArgs, target, "%"+target+"%")
+		} else {
+			// If no target, extract from the most recent session
+			query += " ORDER BY timestamp DESC LIMIT 1"
+		}
+
+		rows, err := db.Query(query, queryArgs...)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error querying sessions: %v\n", err)
+			os.Exit(1)
+		}
+		defer rows.Close()
+
+		found := false
+		for rows.Next() {
+			var id, title, filename, narrative string
+			if err := rows.Scan(&id, &title, &filename, &narrative); err != nil {
+				continue
+			}
+			found = true
+
+			fmt.Printf("Extracting from %s (%s)...\n", id, title)
+			result, err := extractAndLinkEntities(store, id, narrative, ExtractionOptions{ForceRegex: false})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  ✗ Extraction failed: %v\n", err)
+				continue
+			}
+
+			// Resolve path for write-back
+			path := filename
+			if !filepath.IsAbs(path) {
+				devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+				if devlogDir == "" { devlogDir = "_rules/_devlog" }
+				path = filepath.Join(devlogDir, path)
+			}
+
+			if err := crystallizeRelationships(path, result.Relationships); err != nil {
+				fmt.Printf("    Warning: failed to crystallize: %v\n", err)
+			}
+
+			// Update status to 2 (Done)
+			_, _ = db.Exec("UPDATE sessions SET enrichment_status = 2 WHERE id = ?", id)
+			fmt.Printf("  ✓ Extraction complete (%d entities, %d rels)\n", len(result.Entities), len(result.Relationships))
+		}
+
+		if !found {
+			fmt.Println("No session found matching target.")
+		}
+	},
+}
+
+// devlogEnrichCmd schedules background AI enrichment
+var devlogEnrichCmd = &cobra.Command{
+	Use:   "enrich [target]",
+	Short: "Schedule sessions for background AI enrichment (Daemon)",
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		all, _ := cmd.Flags().GetBool("all")
+		target := ""
+		if len(args) > 0 {
+			target = args[0]
+		}
+
+		if !all && target == "" {
+			fmt.Println("Please specify a [target] or use --all")
+			return
+		}
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		var res sql.Result
+		if all {
+			fmt.Println("Scheduling ALL sessions for background enrichment...")
+			res, err = db.Exec("UPDATE sessions SET enrichment_status = 1")
+		} else {
+			fmt.Printf("Scheduling session '%s' for background enrichment...\n", target)
+			res, err = db.Exec("UPDATE sessions SET enrichment_status = 1 WHERE id = ? OR filename LIKE ?", target, "%"+target+"%")
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating status: %v\n", err)
+			os.Exit(1)
+		}
+
+		affected, _ := res.RowsAffected()
+		fmt.Printf("✓ %d sessions queued. Run 'bd status' to monitor progress.\n", affected)
+	},
+}
+
 var devlogVerifyCmd = &cobra.Command{
 	Use:   "verify [target]",
 	Short: "Audit sessions for missing architectural metadata (entities/relationships)",
@@ -1694,6 +1813,8 @@ func init() {
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
 	devlogVerifyCmd.Flags().Bool("fix-ai", false, "Force AI extraction for backfilling (slow, higher quality)")
 
+	devlogEnrichCmd.Flags().Bool("all", false, "Schedule all sessions for enrichment")
+
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)
 	devlogCmd.AddCommand(devlogSyncCmd)
@@ -1708,6 +1829,8 @@ func init() {
 	devlogCmd.AddCommand(installHooksCmd)
 	devlogCmd.AddCommand(devlogResetCmd)
 	devlogCmd.AddCommand(devlogVerifyCmd)
+	devlogCmd.AddCommand(devlogExtractCmd)
+	devlogCmd.AddCommand(devlogEnrichCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
 }
