@@ -88,6 +88,7 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] Config Persistence & Source Metadata | Fixed bd config set for Ollama keys and entity source updates | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [enhance] Verify Retrofit & Repair | Added orphan adoption and metadata backfilling to 'bd devlog verify --fix' | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [enhance] Verify UX & Fast-Path | Added --fix-regex and target filtering to verify command | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
+| [feature] Semantic Relationship Extraction | Upgraded Ollama prompt and pipeline to extract architectural relationships | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [docs] Verify Help Update | Updated CLI help to reflect new repair capabilities | 2026-01-26 | [2026-01-26_entity-extraction-evol-schema.md](2026-01-26_entity-extraction-evol-schema.md) |
 | [test] ollama extraction | verification | 2026-01-26 | [2026-01-26_ollama-test.md](2026-01-26_ollama-test.md) |
 

@@ -53,32 +53,34 @@ type ollamaResponse struct {
 		Name json.RawMessage `json:"name"`
 		Type string          `json:"type"`
 	} `json:"entities"`
+	Relationships []struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+		Type string `json:"type"`
+	} `json:"relationships"`
 }
 
-func (o *OllamaExtractor) Extract(text string) ([]Entity, error) {
+func (o *OllamaExtractor) Extract(text string) ([]Entity, []Relationship, error) {
 	ctx := context.Background()
 
 	// Check availability first to avoid long timeouts if service is down
 	if !o.Available(ctx) {
-		return nil, fmt.Errorf("ollama service not available")
+		return nil, nil, fmt.Errorf("ollama service not available")
 	}
 
 	prompt := fmt.Sprintf(`
 You are an entity extractor for a Go/React/PostgreSQL codebase.
 
-From this devlog session, extract a flat list of entities.
-Focus on: 
-- Components (Modal, Service, Hook, etc.)
-- Config files (nginx.conf, env vars)
-- Services (cloudron, mcp, postgres)
-- Technologies (pgvector, redis, jwt)
+From this devlog session, extract:
+1. A flat list of entities (Components, Config, Services, Technologies).
+2. A list of architectural relationships between them.
 
 RULES:
 1. Output ONLY a valid JSON object.
-2. The object MUST have exactly one key: "entities".
-3. "entities" MUST be an array of objects.
-4. Each entity object MUST have EXACTLY two string fields: "name" and "type".
-5. "name" must be a single string (NOT an array).
+2. The object MUST have exactly two keys: "entities" and "relationships".
+3. "entities" MUST be an array of objects with "name" (string) and "type" (string).
+4. "relationships" MUST be an array of objects with "from" (string), "to" (string), and "type" (string).
+5. "name", "from", and "to" must be single strings (NOT arrays).
 6. DO NOT include headers, descriptions, or explanations.
 7. DO NOT group entities into sub-objects.
 
@@ -89,7 +91,10 @@ Required Output Format:
 {
   "entities": [
     {"name": "nginx", "type": "config"},
-    {"name": "proxy_buffering", "type": "nginx_setting"}
+    {"name": "auth-service", "type": "component"}
+  ],
+  "relationships": [
+    {"from": "nginx", "to": "auth-service", "type": "proxies_to"}
   ]
 }
 `, text)
@@ -109,16 +114,15 @@ Required Output Format:
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("ollama generation failed: %w", err)
+		return nil, nil, fmt.Errorf("ollama generation failed: %w", err)
 	}
 
 	// Parse JSON
 	var parsed ollamaResponse
-	// Clean up potential markdown code blocks if Ollama adds them despite JSON mode
 	cleanedJSON := cleanJSON(respText)
 	
 	if err := json.Unmarshal([]byte(cleanedJSON), &parsed); err != nil {
-		return nil, fmt.Errorf("failed to parse ollama json: %w (response: %s)", err, respText)
+		return nil, nil, fmt.Errorf("failed to parse ollama json: %w (response: %s)", err, respText)
 	}
 
 	var entities []Entity
@@ -139,7 +143,6 @@ Required Output Format:
 				}
 				continue
 			}
-			// Skip entry if we can't parse name at all
 			continue
 		}
 
@@ -150,12 +153,23 @@ Required Output Format:
 		entities = append(entities, Entity{
 			Name:       strings.ToLower(name),
 			Type:       e.Type,
-			Confidence: 1.0, // Ollama extracted entities have high confidence
+			Confidence: 1.0,
 			Source:     "ollama",
 		})
 	}
 
-	return entities, nil
+	var relationships []Relationship
+	for _, r := range parsed.Relationships {
+		if r.From != "" && r.To != "" {
+			relationships = append(relationships, Relationship{
+				FromEntity: strings.ToLower(r.From),
+				ToEntity:   strings.ToLower(r.To),
+				Type:       r.Type,
+			})
+		}
+	}
+
+	return entities, relationships, nil
 }
 
 func cleanJSON(s string) string {

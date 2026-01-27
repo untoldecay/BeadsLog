@@ -41,10 +41,11 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	start := time.Now()
 	
 	allEntities := make(map[string]Entity)
+	allRelationships := make([]Relationship, 0)
 	usedExtractors := make([]string, 0)
 	
 	for _, ext := range p.extractors {
-		entities, err := ext.Extract(text)
+		entities, relationships, err := ext.Extract(text)
 		if err != nil {
 			// Log error but continue with other extractors
 			// Only verbose log to avoid noise if Ollama is just offline
@@ -53,6 +54,7 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 		
 		usedExtractors = append(usedExtractors, ext.Name())
 
+		// Merge Entities
 		for _, e := range entities {
 			if existing, ok := allEntities[e.Name]; ok {
 				// Merge logic: keep higher confidence
@@ -63,6 +65,9 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 				allEntities[e.Name] = e
 			}
 		}
+		
+		// Merge Relationships (simple append for now, duplicates handled by DB UNIQUE constraint or ignored)
+		allRelationships = append(allRelationships, relationships...)
 	}
 	
 	resultEntities := make([]Entity, 0, len(allEntities))
@@ -70,8 +75,8 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 		resultEntities = append(resultEntities, e)
 	}
 	
-	// Extract explicit relationships (always run regex for this)
-	relationships := ExtractRelationships(text)
+	// Note: We don't call ExtractRelationships separately anymore, it's part of RegexExtractor
+	// which is always in the pipeline.
 	
 	extractorName := "regex"
 	if len(usedExtractors) > 0 {
@@ -87,7 +92,7 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	
 	return &ExtractionResult{
 		Entities:      resultEntities,
-		Relationships: relationships,
+		Relationships: allRelationships,
 		Duration:      time.Since(start),
 		Extractor:     extractorName,
 	}, nil

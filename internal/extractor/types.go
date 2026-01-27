@@ -10,7 +10,7 @@ type Entity struct {
 
 // Extractor is the interface for entity extraction strategies
 type Extractor interface {
-	Extract(text string) ([]Entity, error)
+	Extract(text string) ([]Entity, []Relationship, error)
 	Name() string
 }
 

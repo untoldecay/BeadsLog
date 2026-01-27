@@ -15,7 +15,7 @@ func (r *RegexExtractor) Name() string {
 	return "regex"
 }
 
-func (r *RegexExtractor) Extract(text string) ([]Entity, error) {
+func (r *RegexExtractor) Extract(text string) ([]Entity, []Relationship, error) {
 	entityPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`[A-Z][a-z]+(?:[A-Z][a-z]+)+`), // CamelCase (e.g. ManageColumnsModal)
 		regexp.MustCompile(`(?i)(modal|hook|endpoint|migration|service)`), // Keywords
@@ -52,7 +52,11 @@ func (r *RegexExtractor) Extract(text string) ([]Entity, error) {
 			}
 		}
 	}
-	return entities, nil
+	
+	// Also extract explicit relationships
+	relationships := ExtractRelationships(text)
+	
+	return entities, relationships, nil
 }
 
 // ExtractRelationships extracts explicit relationships from text

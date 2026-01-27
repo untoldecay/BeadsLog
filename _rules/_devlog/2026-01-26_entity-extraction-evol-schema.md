@@ -147,6 +147,20 @@ To implement the "Entity Extraction with Ollama + Regex Fallback" feature (Issue
 
 **Result:** `bd devlog verify --help` now correctly describes `--fix` as "Adopt orphans and backfill missing metadata".
 
+---
+
+### **Phase 9: Semantic Relationship Extraction**
+
+**Initial Problem:** Entities were being extracted, but the "Architectural Knowledge Graph" was limited to explicit `A -> B` arrows in the text. The LLM had the context to infer relationships (e.g., "uses", "configures") but wasn't asked for them.
+
+*   **My Assumption/Plan #1:** Upgrade the Ollama prompt to request a `relationships` array.
+    *   **Action Taken:** Updated `internal/extractor/ollama.go` prompt to ask for `{"from": "A", "to": "B", "type": "rel"}`.
+    *   **Action Taken:** Updated `Extractor` interface and `Pipeline` to propagate these relationships.
+    *   **Action Taken:** Updated `RegexExtractor` to match the new interface (wrapping its existing logic).
+
+**Result:** `bd devlog sync` now extracts semantic relationships. Verified with `sess-d4fa27` where it correctly inferred `extraction-pipeline -> regex-extractor (uses)` from code snippets.
+
+
 
 
 
