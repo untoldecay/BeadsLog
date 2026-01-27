@@ -67,3 +67,16 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 - crystallization -> file hash (updates)
 - processenrichmentqueue -> default goroutine (runs_in)
 - rpc -> get_enrichment_stats (provides)
+
+---
+
+### **Phase 10: Protocol Hardening**
+
+**Initial Problem:** Agents were bypassing the Devlog system and jumping straight to manual file searching, missing the architectural context provided by the graph.
+
+*   **Action Taken:** Updated `FullBootloader` and `ProtocolMdTemplate` in `cmd/bd/init_templates.go` to explicitly list mandatory starting commands (`bd sync`, `bd devlog sync`, `bd devlog verify --fix`).
+*   **Action Taken:** Updated `cmd/bd/onboard.go` activation guide to enforce a "Memory First" policy, explicitly telling agents to STOP and map the landscape before using `ls` or `grep`.
+*   **Action Taken:** Standardized `_rules/_orchestration/PROTOCOL.md` and `WORKING_PROTOCOL.md` to mandate the "Map It" step at the beginning of every task.
+
+**Result:** The agent instructions now programmatically enforce the intended workflow, ensuring the knowledge graph is used as the primary source of truth.
+

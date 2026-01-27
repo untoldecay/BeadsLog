@@ -1,7 +1,10 @@
-# Prompt: Generate Chronological Debugging & Development Log
+# Prompt: Generate Chronological Debugging & Development Log (AI Enhanced)
 
 ## Objective:
 Analyze the entire conversation history of the current session and generate a comprehensive, chronological development log. The primary purpose is to be a transparent record of the entire problem-solving process, detailing every assumption (especially flawed ones), every action taken, the resulting outcomes, and the evidence-based corrections that led to the final solution.
+
+## ✨ Background AI Active:
+Background AI Enrichment is ENABLED. You do NOT need to manually extract relationships or use arrows. Focus strictly on the technical narrative and your problem-solving journey. The system will automatically build the architectural graph from your prose in the background.
 
 ## Persona:
 Act as a meticulous technical writer and project manager, documenting the development journey with a focus on learning from mistakes.

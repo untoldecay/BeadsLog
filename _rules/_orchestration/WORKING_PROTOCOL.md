@@ -1,38 +1,30 @@
-# Working Protocol
+# Working Protocol: Task Loop
 
 ⚠️ **Load for every task during active work**
 
-## 🔄 The Loop (Repeat)
+## 🔄 The Loop
 
-### Before Coding
+### Step 1: Map It (BeadsLog First)
+Before reading code or making a plan, you MUST use the graph:
 ```bash
-bd devlog graph "ComponentName"  # Dependencies
-bd devlog impact "ComponentName" # What breaks if changed?
-bd devlog search "error/feature" # Past solutions?
+bd devlog graph "ComponentName"  # Visualize dependencies
+bd devlog impact "ComponentName" # Verify what depends on this
+bd devlog search "error/feature" # Find how this was solved before
 ```
 
-### Code + Commit (Auto-Devlog)
+### Step 2: Verify It (Code Reading)
+Read the actual code files identified in Step 1 to confirm architectural assumptions.
+
+### Step 3: Implement & Crystallize
 ```bash
+# Code change...
 git add .
-git commit -m "fix: descriptive message"
+git commit -m "fix: message" # Auto-generates devlog
+bd update <id> --status closed
 ```
-*Pre-commit automatically generates devlog*
-
-### Update Issue
-```bash
-bd update <id> --status "in-progress" | closed
-```
-
-## 🆘 Common Scenarios
-**Split work?** `bd split <id> "sub-task"`
-**Blocked?** `bd block <current> <blocking>`
-**New bug?** `bd new "Bug title" --priority high`
 
 ## ✅ End Session
 ```bash
-bd status          # Verify sync
-git push           # Share with team
+bd status          # Final health check
+git push           # Share crystallized knowledge
 ```
-
-## 🔍 Still Need Help?
-bd --help | bd devlog --help → Load *_REFERENCE.md

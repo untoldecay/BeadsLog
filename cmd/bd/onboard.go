@@ -129,6 +129,17 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	}
 
 	fmt.Printf("\n%s BeadsLog Activation Guide\n", ui.RenderAccent("🚀"))
+	fmt.Printf("------------------------------------------------------------\n")
+	fmt.Printf("⚠️ **STOP**: Follow these steps in order to initialize your memory.\n")
+	fmt.Printf("Do NOT perform manual file searching (ls/grep) until Step 4.\n\n")
+	
+	fmt.Printf("1. **Sync Database**: Run %s to get latest issues.\n", ui.RenderAccent("bd sync"))
+	fmt.Printf("2. **Sync Knowledge**: Run %s to ingest all devlog history.\n", ui.RenderAccent("bd devlog sync"))
+	fmt.Printf("3. **Verify Graph**: Run %s to ensure graph integrity.\n", ui.RenderAccent("bd devlog verify --fix"))
+	fmt.Printf("4. **Map Landscape**: Use %s or %s to identify relevant components.\n", ui.RenderAccent("bd devlog entities"), ui.RenderAccent("bd devlog graph"))
+	fmt.Printf("5. **Unlock Protocol**: Run %s to finalize your session.\n\n", ui.RenderAccent("bd ready"))
+
+	fmt.Printf("👉 **GOAL:** Memory First. Use the architectural graph to 'Map it' before you 'Verify it' in code.\n")
 
 	if store != nil {
 		_ = store.SetConfig(ctx, "onboarding_finalized", "false")

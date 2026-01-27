@@ -1,70 +1,61 @@
 package main
 
-const ProtocolMdTemplate = `# Protocol: First Execution
+const ProtocolMdTemplate = `# Protocol: Session Activation (First Message)
 
-⚠️ **Load ONLY on first message per session**
+⚠️ **STOP: You MUST execute these steps in order before any manual file searching**
 
-## 1. Beads Starting Workflow
+## 1. 🟢 Initialize Memory (Quantified Mapping)
 [codeblock=bash]
+bd onboard       # Refresh your instructions
 bd sync          # Get latest issues
-bd status        # Health check
-bd ready         # Find prioritized work
+bd devlog sync   # Ingest latest team knowledge
+bd devlog verify --fix # Check graph integrity
 [/codeblock]
 
-## 2. Devlog Starting Workflow
-[codeblock=bash]
-bd devlog verify --fix # Health check (Fix if needed)
-bd devlog sync         # Get latest team knowledge
-bd devlog resume --last 1  # Load your last session
-bd devlog status       # Verify database state
-[/codeblock]
+## 2. 🔍 Map the Landscape (Mandatory)
+Before using ` + "`ls`" + `, ` + "`grep`" + `, or ` + "`glob`" + `, you MUST query the architectural graph:
+- **Entities:** ` + "`bd devlog entities`" + ` (Identify key components)
+- **Relationships:** ` + "`bd devlog graph \"Subject\"`" + ` (See dependencies)
+- **History:** ` + "`bd devlog search \"Keywords\"`" + ` (Find past solutions)
 
-## 3. Pick Task
-- Choose from ` + "`bd ready`" + `
-- ` + "`bd update <id>`" + ` to claim
-- Check: ` + "`bd devlog search \"<issue keywords>\"`" + `
+## 3. 🎯 Select and Claim Task
+- List ready work: ` + "`bd ready`" + `
+- Claim task: ` + "`bd update <id> --status in_progress`" + `
+- Resume context: ` + "`bd devlog resume --last 1`" + `
 
-## ✅ Now Ready
-Load WORKING_PROTOCOL.md for task loop.
+## ✅ Activation Complete
+Load ` + "`WORKING_PROTOCOL.md`" + ` to begin the development loop.
 `
-const WorkingProtocolMdTemplate = `# Working Protocol
+const WorkingProtocolMdTemplate = `# Working Protocol: Task Loop
 
 ⚠️ **Load for every task during active work**
 
-## 🔄 The Loop (Repeat)
+## 🔄 The Loop
 
-### Before Coding
+### Step 1: Map It (BeadsLog First)
+Before reading code or making a plan, you MUST use the graph:
 [codeblock=bash]
-bd devlog graph "ComponentName"  # Dependencies
-bd devlog impact "ComponentName" # What breaks if changed?
-bd devlog search "error/feature" # Past solutions?
+bd devlog graph "ComponentName"  # Visualize dependencies
+bd devlog impact "ComponentName" # Verify what depends on this
+bd devlog search "error/feature" # Find how this was solved before
 [/codeblock]
 
-### Code + Commit (Auto-Devlog)
+### Step 2: Verify It (Code Reading)
+Read the actual code files identified in Step 1 to confirm architectural assumptions.
+
+### Step 3: Implement & Crystallize
 [codeblock=bash]
+# Code change...
 git add .
-git commit -m "fix: descriptive message"
+git commit -m "fix: message" # Auto-generates devlog
+bd update <id> --status closed
 [/codeblock]
-*Pre-commit automatically generates devlog*
-
-### Update Issue
-[codeblock=bash]
-bd update <id> --status "in-progress" | closed
-[/codeblock]
-
-## 🆘 Common Scenarios
-**Split work?** ` + "`bd split <id> \"sub-task\"`" + `
-**Blocked?** ` + "`bd block <current> <blocking>`" + `
-**New bug?** ` + "`bd new \"Bug title\" --priority high`" + `
 
 ## ✅ End Session
 [codeblock=bash]
-bd status          # Verify sync
-git push           # Share with team
+bd status          # Final health check
+git push           # Share crystallized knowledge
 [/codeblock]
-
-## 🔍 Still Need Help?
-bd --help | bd devlog --help → Load *_REFERENCE.md
 `
 const BeadsReferenceMdTemplate = `# Beads Commands
 
@@ -169,10 +160,13 @@ bd devlog --help          # All devlog commands
 const FullBootloader = `# BeadsLog Agent Protocol
 
 ## 🚀 Session Start? (First Message Only)
-IF this is your first message:
-1. Read: _rules/_orchestration/PROTOCOL.md  
-2. Execute: Beads + Devlog starting workflows
-3. Proceed to regular workflow
+IF this is your first message, you MUST execute these commands in order:
+[codeblock=bash]
+bd sync          # Get latest issues
+bd devlog sync   # Ingest latest knowledge
+bd devlog verify --fix # Ensure graph integrity
+bd devlog resume --last 1 # Load context
+[/codeblock]
 
 ## 🔄 Regular Workflow (Every Task)
 Read: _rules/_orchestration/WORKING_PROTOCOL.md
