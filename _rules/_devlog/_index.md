@@ -97,3 +97,5 @@ This index provides a concise record of all development work for easy scanning a
 | [adopt] _refactor agent onboarding tool limitations | Automatically adopted during verify | 2026-01-15 | [2026-01-15_refactor-agent-onboarding-tool-limitations.md](2026-01-15_refactor-agent-onboarding-tool-limitations.md) |
 
 | [adopt] _orphaned test | Automatically adopted during verify | 2026-01-26 | [2026-01-26_orphaned-test.md](2026-01-26_orphaned-test.md) |
+
+| [test] background | enrichment test | 2026-01-27 | [2026-01-27_background-test.md](2026-01-27_background-test.md) |

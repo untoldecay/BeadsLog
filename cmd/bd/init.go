@@ -598,7 +598,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		}
 
 		orchFiles := initializeOrchestration(false)
-		devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, targetFiles)
+		devlogRes := initializeDevlog("_rules/_devlog", quiet, autoSync, enforceDevlog, backgroundEnrich, targetFiles)
 
 		// Collect information for the final report
 		initResult := ui.InitResult{

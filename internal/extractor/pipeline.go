@@ -3,6 +3,7 @@ package extractor
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -47,8 +48,8 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	for _, ext := range p.extractors {
 		entities, relationships, err := ext.Extract(text)
 		if err != nil {
-			// Log error but continue with other extractors
-			// Only verbose log to avoid noise if Ollama is just offline
+			// Log warning to stderr so user knows why AI failed
+			fmt.Fprintf(os.Stderr, "Warning: Extractor %s failed: %v\n", ext.Name(), err)
 			continue
 		}
 		

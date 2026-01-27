@@ -111,23 +111,7 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	// Ensure orchestration structure exists
 	initializeOrchestration(false)
 
-	// Ensure agent rules are configured (inject bootstrap trigger if missing)
-	configureAgentRules(false, true, Candidates)
-
-	fmt.Printf("\n%s BeadsLog Activation Guide\n", ui.RenderAccent("🚀"))
-	fmt.Printf("------------------------------------------------------------\n")
-	fmt.Printf("Welcome! To unlock the project context and finish your setup, follow these steps:\n\n")
-	
-	fmt.Printf("1. **Verify Health**: Run %s to ensure devlog integrity.\n", ui.RenderAccent("bd devlog verify --fix"))
-	fmt.Printf("2. **Sync Tasks**: Run %s to get latest issues.\n", ui.RenderAccent("bd sync"))
-	fmt.Printf("3. **Sync Memory**: Run %s to ingest all devlog history.\n", ui.RenderAccent("bd devlog sync"))
-	fmt.Printf("4. **Unlock Environment**: Run %s to finalize your session.\n\n", ui.RenderAccent("bd ready"))
-
-	fmt.Printf("👉 **GOAL:** Once %s is run, your instruction file will be automatically updated\n", ui.RenderAccent("bd ready"))
-	fmt.Printf("with links to all project modules and conventions.\n")
-
-	// Set state to uninitialized
-	// Config operations require direct database access (GH#536)
+	// Establish store for config checks
 	if daemonClient != nil && store == nil && dbPath != "" {
 		var err error
 		store, err = sqlite.New(ctx, dbPath)
@@ -135,6 +119,16 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 			defer store.Close()
 		}
 	}
+
+	// Ensure agent rules are configured (inject bootstrap trigger if missing)
+	configureAgentRules(false, true, Candidates)
+
+	// Refresh devlog instructions if config changed
+	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+		refreshDevlogPrompt(sqliteStore)
+	}
+
+	fmt.Printf("\n%s BeadsLog Activation Guide\n", ui.RenderAccent("🚀"))
 
 	if store != nil {
 		_ = store.SetConfig(ctx, "onboarding_finalized", "false")

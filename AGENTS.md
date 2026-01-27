@@ -47,7 +47,3 @@ bd devlog --help          # All devlog commands
 4. Reference files only when commands fail
 
 <!-- BD_PROTOCOL_END -->
-
-This is a placeholder for agent instructions.
-## Devlog Protocol (MANDATORY)
-This is a placeholder protocol.

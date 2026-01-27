@@ -56,3 +56,14 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 - ProcessEnrichmentQueue -> extractAndLinkEntities (uses AI mode)
 - ProcessEnrichmentQueue -> sessions (updates enrichment_status)
 - bd status -> get_enrichment_stats (queries queue length)
+
+### Architectural Relationships
+<!-- Format: [From Entity] -> [To Entity] (relationship type) -->
+- sessions -> enrichment_status (has)
+- syncsession -> sessions (updates)
+- processenrichmentqueue -> ollama (executes)
+- processenrichmentqueue -> regex (executes)
+- daemon -> get_enrichment_stats (exposes)
+- crystallization -> file hash (updates)
+- processenrichmentqueue -> default goroutine (runs_in)
+- rpc -> get_enrichment_stats (provides)

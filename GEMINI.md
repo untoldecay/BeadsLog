@@ -1,5 +1,3 @@
-BEFORE ANYTHING ELSE: run 'bd onboard'
-
 <!-- BD_PROTOCOL_START -->
 # BeadsLog Agent Protocol
 
