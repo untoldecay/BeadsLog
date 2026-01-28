@@ -69,6 +69,19 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 
 **Result:** The "Retrofit" workflow is now complete. Users can surgically upgrade a single session in the foreground or trigger a full project-wide background enrichment.
 
+---
+
+### **Phase 12: Project Identity & Documentation Rewrite**
+
+**Initial Problem:** The project README was outdated and didn't reflect the new agent-first, graph-powered architecture.
+
+*   **Action Taken:** Rewrote `README.md` following the Design OS template.
+*   **Focus:** Highlighted **Crystallization** (AI writing to Markdown), the **Background Pipeline** (zero-latency sync), and **Hybrid Search**.
+*   **Deliverable:** Included real-world use cases specifically for AI agents and team planning.
+
+**Result:** The project now has a professional, scannable entry point that clearly communicates its value proposition to both human vibecoders and technical teams.
+
+
 
 ### Architectural Relationships
 <!-- Format: [From Entity] -> [To Entity] (relationship type) -->
@@ -93,6 +106,24 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 
 **Result:** The agent instructions now programmatically enforce the intended workflow, ensuring the knowledge graph is used as the primary source of truth.
 
+---
+
+### **Phase 13: Project Documentation Overhaul**
+
+**Initial Problem:** The documentation was scattered and didn't reflect the sophisticated "Probe -> Map -> Iterate" workflow or the background automation provided by the daemon.
+
+*   **Action Taken:** Rewrote `README.md` to follow a high-impact, agent-centric structure.
+*   **Action Taken:** Created specialized documentation sub-pages:
+    - `docs/USE_CASES.md`: Real-world scenarios for agents and teams.
+    - `docs/DEVLOG.md`: Explaining the "Bead" concept and the crystallization process.
+    - `docs/DEVLOG_ARCHITECTURE.md`: Technical deep-dive into the 2-tier pipeline.
+    - `docs/COMMANDS.md`: Categorized CLI reference.
+    - `docs/VISUALIZATION.md`: Visual guide to Search, Graph, and Impact.
+    - `docs/HOOKS.md`: Explaining the Git-native automation triggers.
+
+**Result:** BeadsLog now has a comprehensive, professional documentation suite that clearly explains both the *how* and the *why* of the system to new users and AI agents.
+
+
 - fullbootloader -> protocolmdtemplate (uses)
 - protocolmdtemplate -> bd sync (mandates)
 - protocolmdtemplate -> bd devlog sync (mandates)
@@ -100,3 +131,6 @@ To decouple slow Ollama entity extraction (15s+) from the critical user path (`b
 - onboard.go -> memory first policy (enforces)
 - memory first policy -> map it step (requires)
 - working_protocol.md -> map it step (mandates)
+- bd devlog extract -> processenrichmentqueue (triggers)
+- bd devlog enrich -> sessions (resets)
+- workingprotocolmd -> map it step (mandates)

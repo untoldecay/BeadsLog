@@ -1,92 +1,60 @@
-# bd - BeadsLog
+# BeadsLog
 
-**Distributed, git-backed graph issue tracker & session memory for AI agents.**
+**Git-backed devlog sessions that capture why you built things, for AI agents and teams.**
 
-[![License](https://img.shields.io/github/license/untoldecay/BeadsLog)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/untoldecay/BeadsLog)](https://goreportcard.com/report/github.com/untoldecay/BeadsLog)
-
-BeadsLog forks Beads to provide a persistent, structured memory for coding agents. It merges a dependency-aware task graph with a semantic **Devlog** system, allowing agents to "remember" past sessions, understand architecture, and solve recurring problems instantly.
-
----
-
-## ☯️ Philosophy: The Loop
-
-BeadsLog is designed around a cycle of **Planning** (Forward) and **Reflection** (Backward).
-
-| System | Direction | Purpose | Question Answered |
-| :--- | :--- | :--- | :--- |
-| **Tasks** | ➡️ **Forward** | Planning & Execution | *What do we need to do next?* |
-| **Devlog** | ⬅️ **Backward** | Context & Memory | *How and why did we do that?* |
-
-**The Workflow Loop:**
-1.  **Resume:** Load history (`bd devlog resume --last 1`).
-2.  **Context:** Check dependencies/impact (`bd devlog impact`).
-3.  **Execute:** Code the task.
-4.  **Log:** Document the session (`_rules/_devlog/_generate-devlog.md`).
-5.  **Sync:** Ingest changes (`git commit` triggers auto-sync).
-
----
-
-## ⚡ Quick Start
-
-No external databases required. It's a single binary.
+BeadsLog extends [Beads](https://github.com/steveyegge/beads) with automated session mapping and background AI enrichment. It turns your natural devlog narratives into a permanent, version-controlled knowledge graph.
 
 ```bash
-# 1. Install (requires Go)
+# Install
 go install github.com/untoldecay/BeadsLog/cmd/bd@latest
 
-# 2. Initialize (Setup Tasks & Devlog assets)
+# Initialize in repo
 bd init
 
-# 3. AI Onboarding (Run once per repo by the first agent)
-bd devlog onboard
+# Connect AI agent
+bd onboard
 ```
 
----
+## 🔄 The BeadsLog Workflow
 
-## 🧠 Power Scenarios
+BeadsLog is engineered for the era of AI coding agents where context is the most valuable resource. The workflow follows a high-efficiency iterative loop:
 
-*   **"Resume Context"**: Start a new chat session with full context of what you did last time.  
-    `bd devlog resume --last 1`
-*   **"I've seen this error before..."**: Find the exact session where you fixed a specific bug.  
-    `bd devlog search "nginx 400 error"`
-*   **"Refactoring Anxiety"**: See every component that historically depends on an entity before you change it.  
-    `bd devlog impact "auth-hook"`
-*   **"Architectural Graph"**: Visualize the parent/child/related tree of a component.  
-    `bd devlog graph "AuthService"`
+1. **Probing:** Efficient building begins with architectural awareness. Rather than forcing agents to "brute-force" the entire codebase using slow, token-intensive searches, BeadsLog provides an instant structural probe. By querying the local knowledge graph via `graph`, `impact`, and `entities`, you can immediately pinpoint the exact components and dependencies relevant to your task.
+2. **Mapping:** As work progresses, the system automatically records the evolving architecture, intent, and decision-making process. This transforms the session into a structured map of technical relationships and historical context.
+3. **Iterating:** This creates a continuous, high-velocity development loop: *acquire context -> implement -> iterate -> record context*. Every "Bead" added to the chain ensures the project's collective memory grows stronger and more precise.
 
----
+By offloading slow AI tasks to a background process, your CLI interactions remain instant while your architectural foresight grows automatically.
 
-## 📚 Command Reference
+## 🌟 Real Use Cases
 
-| Command | Usage | Description |
-| :--- | :--- | :--- |
-| **Help** | `bd devlog --help` | Display all devlog commands and usage details. |
-| **Onboard** | `bd devlog onboard` | Enrolls AI agent into the **MANDATORY Devlog Protocol**. |
-| **Search** | `bd devlog search "query"` | Hybrid search across sessions, narratives, and entities. |
-| **Resume** | `bd devlog resume [--last N]` | Finds relevant context or shows the last N sessions. |
-| **Impact** | `bd devlog impact "entity"` | Shows components that depend on or relate to a specific entity. |
-| **Graph** | `bd devlog graph "entity"` | Visualizes the architectural dependency tree. |
-| **Verify** | `bd devlog verify [--fix]` | Audits for missing metadata and generates recovery directives. |
-| **List** | `bd devlog list [--type]` | Lists chronological sessions (fix, feature, chore, etc.). |
-| **Show** | `bd devlog show <date>` | Displays the full content of a specific session log. |
-| **Sync** | `bd devlog sync` | Manually triggers ingestion of new or updated devlogs. |
-| **Hooks** | `bd devlog install-hooks` | Installs git hooks for automatic background synchronization. |
-| **Reset** | `bd devlog reset` | **Truncates** all devlog tables (sessions, entities) for a fresh start. |
-| **Status** | `bd devlog status` | Checks configuration, stats, and git hook health. |
+**🔍 New agent debugging a complex flow:**
+```bash
+bd devlog search "auth session timeout"
+# Returns: "Switched from Redis to Memcached (memory spike fix),
+#          impacts AuthService and SessionManager"
+```
 
----
+**🤝 Architectural impact before refactoring:**
+```bash
+bd devlog impact "PostgresConnector"
+# Returns: "Used by UserManager, BillingService, and AnalyticsJob."
+```
 
-## 🛠 Core Features (Standard Beads)
+**⚡ Resuming context after a 3-day break:**
+```bash
+bd devlog resume --last 1
+# Returns: "Last session: Fixed redirect loop, left off at validation tests."
+```
 
-*   **Git as Database:** Issues stored as JSONL in `.beads/`. Versioned with your code.
-*   **Zero Conflict:** Hash-based IDs allow concurrent agent work without merge conflicts.
-*   **Invisible Infrastructure:** SQLite local cache for fast queries; auto-sync via git hooks.
-*   **Self-Healing Index:** Strict linting and AI instructions protect `_index.md` from corruption.
+## 📚 Docs
 
-## 📝 Documentation
+- [Use Cases](docs/USE_CASES.md) — Real-world scenarios for agents and teams.
+- [Devlog](docs/DEVLOG.md) — Understanding the "Bead" concept and the narrative format.
+- [Devlog Architecture](docs/DEVLOG_ARCHITECTURE.md) — How the background AI and crystallization engine works.
+- [Issue Architecture](docs/ARCHITECTURE.md) — Standard Beads data model and sync mechanism.
+- [Hooks](docs/HOOKS.md) — Automating your workflow with Git integration.
+- [Visualization](docs/VISUALIZATION.md) — Exploring Search, Impact, and the Graph.
+- [Commands](docs/COMMANDS.md) — Full categorized CLI reference.
+- [Installation](docs/INSTALLING.md) — Setup guide and platform requirements.
 
-*   [Installing](docs/INSTALLING.md)
-*   [Agent Workflow](AGENT_INSTRUCTIONS.md)
-*   [Sync Branch Mode](docs/PROTECTED_BRANCHES.md)
-*   [Troubleshooting](docs/TROUBLESHOOTING.md)
+***
