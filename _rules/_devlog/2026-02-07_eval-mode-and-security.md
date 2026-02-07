@@ -68,3 +68,13 @@ To implement a robust, on-demand evaluation mode (`bd eval`) for measuring agent
     *   **Action Taken:** Configured the table to show attributes (Methodology, Tools, Tokens, etc.) as rows and actual test sessions as columns.
     *   **Action Taken:** Added high-contrast styling and semantic emojis to distinguish between strategies (Retrieval-First, Brute-Force, Hybrid).
     *   **Result:** `bd eval report` now produces a clear, comparative matrix that dynamically adapts to the number of sessions analyzed.
+
+### **Phase 5: Advanced Analytics & Scalable UI**
+
+**Initial Problem:** The column-based layout broke with too many sessions, and "Status" was too binary to measure improvement.
+
+*   **My Assumption/Plan #1:** Switch to a row-based layout and introduce fuzzy grouping for apples-to-apples comparison.
+    *   **Action Taken:** Implemented `Levenshtein` distance for fuzzy prompt matching, clustering sessions into "Task Groups".
+    *   **Action Taken:** Refactored `RenderEvalReport` to display sessions as rows with attributes as columns (Tools, Tokens, Time).
+    *   **Action Taken:** Developed a **Weighted Efficiency Metric** (Strategy Weight × Relative Cost) to reward optimal behavior (🟢🟢🟢) over "cheap but risky" shortcuts.
+    *   **Result:** The report now scales to any number of runs and provides nuanced, data-driven feedback on agent performance.
