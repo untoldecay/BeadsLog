@@ -296,6 +296,10 @@ func extractEvalSessions(n int) ([]evalSession, error) {
 
 		if entry.Kind == "tool_call" {
 			s.Tools = append(s.Tools, entry.ToolName)
+			// Capture scenario ID from extra metadata if present
+			if sid, ok := entry.Extra["scenario_id"].(string); ok && sid != "" {
+				s.ScenarioID = sid
+			}
 		}
 	}
 
@@ -320,21 +324,23 @@ func clusterSessions(sessions []evalSession) []EvalGroup {
 	var groups []EvalGroup
 
 	for _, s := range sessions {
-		// 1. Try to find existing group by ID match
+		// 1. Try to find existing group
 		found := false
+		
+		name := s.ScenarioID
+		if name == "" {
+			name = "Untitled Session"
+		}
+
 		for i, g := range groups {
-			// If session has specific ScenarioID, match exactly
-			if s.ScenarioID != "" && g.Name == s.ScenarioID {
+			// Match exactly on name (which handles both ID match and "Untitled" grouping)
+			if g.Name == name {
 				groups[i].Sessions = append(groups[i].Sessions, s)
 				found = true
 				break
 			}
 			
-			// Fuzzy match on prompt if available (assuming ScenarioID might be the prompt)
-			// If ScenarioID is "A1", we don't fuzzy match "A1".
-			// But if user did `bd eval start "Fix auth bug"`, then ScenarioID is the prompt.
-			// Let's assume ScenarioID holds the prompt/intent.
-			
+			// Fuzzy match on prompt if available
 			if s.ScenarioID != "" && len(s.ScenarioID) > 5 {
 				dist := Levenshtein(strings.ToLower(g.Name), strings.ToLower(s.ScenarioID))
 				// Similarity threshold: distance < 30% of length
@@ -348,10 +354,6 @@ func clusterSessions(sessions []evalSession) []EvalGroup {
 		}
 
 		if !found {
-			name := s.ScenarioID
-			if name == "" {
-				name = "Untitled Session"
-			}
 			groups = append(groups, EvalGroup{
 				Name:     name,
 				Sessions: []evalSession{s},

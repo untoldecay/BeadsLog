@@ -928,6 +928,8 @@ func recordInteraction(cmd *cobra.Command, args []string, err error) {
 		return
 	}
 
+	scenarioID := config.GetString("eval.scenario_id")
+
 	exitCode := 0
 	if err != nil {
 		exitCode = 1
@@ -940,7 +942,8 @@ func recordInteraction(cmd *cobra.Command, args []string, err error) {
 		ExitCode:      &exitCode,
 		Actor:         actor,
 		Extra: map[string]any{
-			"args": audit.RedactSlice(args),
+			"args":        audit.RedactSlice(args),
+			"scenario_id": scenarioID,
 		},
 	}
 
