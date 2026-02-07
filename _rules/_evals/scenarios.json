@@ -1,0 +1,42 @@
+[
+  {
+    "id": "1",
+    "prompt": "Investigate why the login page is timing out.",
+    "category": "investigation",
+    "expected_behavior": "retrieval_first",
+    "required_tools": ["bd devlog graph", "bd devlog search", "bd devlog impact"],
+    "anti_patterns": ["grep", "find", "search_file_content"]
+  },
+  {
+    "id": "2",
+    "prompt": "Add a new endpoint for user profile update.",
+    "category": "feature",
+    "expected_behavior": "retrieval_first",
+    "required_tools": ["bd devlog impact", "bd devlog graph", "bd devlog entities"],
+    "anti_patterns": ["ls -R", "write_file"]
+  },
+  {
+    "id": "3",
+    "prompt": "What is the status of the 'auth-refactor' epic?",
+    "category": "status",
+    "expected_behavior": "issue_query",
+    "required_tools": ["bd show", "bd list", "bd ready", "bd search"],
+    "anti_patterns": ["grep", "search_file_content"]
+  },
+  {
+    "id": "4",
+    "prompt": "Fix the bug in the payment retry logic.",
+    "category": "fix",
+    "expected_behavior": "retrieval_first",
+    "required_tools": ["bd devlog resume", "bd devlog search"],
+    "anti_patterns": ["grep", "read_file"]
+  },
+  {
+    "id": "5",
+    "prompt": "Summarize the architectural changes from last week.",
+    "category": "summary",
+    "expected_behavior": "history_query",
+    "required_tools": ["bd devlog list", "bd devlog search"],
+    "anti_patterns": ["git log"]
+  }
+]
