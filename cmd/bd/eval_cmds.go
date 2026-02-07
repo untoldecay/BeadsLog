@@ -128,43 +128,37 @@ var evalReportCmd = &cobra.Command{
 			strategy := detectStrategy(s.Tools)
 			cost := estimateCostSummary(s.Tools)
 			
+			duration := "0s"
+			if s.EndTime.After(s.StartTime) {
+				duration = s.EndTime.Sub(s.StartTime).Round(time.Second).String()
+			}
+
 			run := ui.EvalRun{
 				ID:        s.ID,
 				Strategy:  strategy,
 				Tools:     strings.Join(s.Tools, "\n"),
 				TokenCost: fmt.Sprintf("%d", cost),
+				TimeSpent: duration,
 			}
 
-			// Map strategy to qualitative attributes (from user provided table)
+			// Map strategy to qualitative attributes
 			switch strategy {
 			case "Retrieval-First":
-				run.Methodology = "Metadata Only"
-				run.PrimaryFocus = "The \"Why\" & \"Where\"\n(Intent, Dependencies, Bugs)"
-				run.EfficiencyRatio = "High Context / Low Detail\nGreat for understanding risk, but misses implementation specifics."
-				run.BestUsedFor = "🟢 Onboarding\n🟢 Impact Analysis\n🟢 Architecture Review"
-				run.CriticalMissing = "❌ The Code Reality\n(Doesn't know how it works now)"
 				run.Pass = "PASS"
 				run.Score = 100
+				run.Efficiency = "🟢"
 			case "Brute-Force":
-				run.Methodology = "Brute Force Code"
-				run.PrimaryFocus = "The \"What\" & \"How\"\n(Current Logic, Syntax, Regex)"
-				run.EfficiencyRatio = "High Detail / High Cost\nWasteful reading of irrelevant files to find the right ones."
-				run.BestUsedFor = "🟢 Refactoring\n🟢 Debugging specific lines\n🟢 Writing Docs"
-				run.CriticalMissing = "❌ The Hidden Context\n(Doesn't know why it was built)"
 				run.Pass = "FAIL"
 				run.Score = 0
+				run.Efficiency = "🔴"
 			case "Hybrid":
-				run.Methodology = "Indexed Verification"
-				run.PrimaryFocus = "Synthesis\n(Intent + Reality)"
-				run.EfficiencyRatio = "Maximum Efficiency\nLowest token cost for the highest quality, comprehensive insight."
-				run.BestUsedFor = "👑 Master Reports\n👑 Complex Bug Fixes\n👑 Feature Planning"
-				run.CriticalMissing = "✅ Nothing Critical\n(Complete picture)"
 				run.Pass = "PASS"
 				run.Score = 85
+				run.Efficiency = "🟠"
 			default:
-				run.Methodology = "Unknown"
 				run.Pass = "FAIL"
 				run.Score = 0
+				run.Efficiency = "🔴"
 			}
 
 			runs[i] = run
@@ -197,7 +191,8 @@ type evalSession struct {
 	ID         string
 	ScenarioID string
 	Tools      []string
-	Timestamp  time.Time
+	StartTime  time.Time
+	EndTime    time.Time
 }
 
 func extractEvalSessions(n int) ([]evalSession, error) {
@@ -234,11 +229,13 @@ func extractEvalSessions(n int) ([]evalSession, error) {
 		if !ok {
 			s = &evalSession{
 				ID:        entry.EvalSessionID,
-				Timestamp: entry.CreatedAt,
+				StartTime: entry.CreatedAt,
 			}
 			sessionMap[entry.EvalSessionID] = s
 			sessionOrder = append(sessionOrder, entry.EvalSessionID)
 		}
+
+		s.EndTime = entry.CreatedAt
 
 		if entry.Kind == "tool_call" {
 			s.Tools = append(s.Tools, entry.ToolName)
