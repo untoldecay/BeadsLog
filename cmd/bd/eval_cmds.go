@@ -122,69 +122,126 @@ var evalReportCmd = &cobra.Command{
 			return
 		}
 
-		// Prepare runs for the report
-		runs := make([]ui.EvalRun, len(sessions))
-		for i, s := range sessions {
-			strategy := detectStrategy(s.Tools)
-			cost := estimateCostSummary(s.Tools)
+		// Group sessions by prompt similarity
+		groups := clusterSessions(sessions)
+
+		for _, g := range groups {
+			fmt.Printf("\nTASK GROUP: %q (Matched %d runs)\n", g.Name, len(g.Sessions))
 			
-			duration := "0s"
-			if s.EndTime.After(s.StartTime) {
-				duration = s.EndTime.Sub(s.StartTime).Round(time.Second).String()
+			// Calculate group average tokens for baseline
+			totalTokens := 0
+			for _, s := range g.Sessions {
+				totalTokens += estimateCostSummary(s.Tools)
 			}
+			avgTokens := float64(totalTokens) / float64(len(g.Sessions))
+			if avgTokens == 0 { avgTokens = 1 } // Prevent div by zero
 
-			run := ui.EvalRun{
-				ID:        s.ID,
-				Strategy:  strategy,
-				Tools:     strings.Join(s.Tools, "\n"),
-				TokenCost: fmt.Sprintf("%d", cost),
-				TimeSpent: duration,
+			// Prepare runs for the report
+			runs := make([]ui.EvalRun, len(g.Sessions))
+			for i, s := range g.Sessions {
+				strategy, weight, emoji := detectRefinedStrategy(s.Tools)
+				cost := estimateCostSummary(s.Tools)
+				
+				duration := "0s"
+				if s.EndTime.After(s.StartTime) {
+					duration = s.EndTime.Sub(s.StartTime).Round(time.Second).String()
+				}
+
+				// Calculate Weighted Efficiency
+				// Efficiency = (Strategy Weight) * (Baseline Cost / Actual Cost)
+				costFactor := avgTokens / float64(cost)
+				if cost == 0 { costFactor = 0 } // Avoid infinity if cost is 0
+				efficiencyScore := weight * costFactor
+				
+				effStr := fmt.Sprintf("%.1fx %s", efficiencyScore, emoji)
+
+				run := ui.EvalRun{
+					ID:        s.ID,
+					Strategy:  strategy,
+					Tools:     strings.Join(s.Tools, "\n"),
+					TokenCost: fmt.Sprintf("%d", cost),
+					TimeSpent: duration,
+					Efficiency: effStr,
+				}
+
+				// Map strategy to qualitative attributes (simplified for row layout)
+				if strings.Contains(strategy, "Optimal") {
+					run.Pass = "PASS"
+					run.Score = 100
+				} else if strings.Contains(strategy, "Shallow") {
+					run.Pass = "PASS"
+					run.Score = 85
+				} else if strings.Contains(strategy, "Disordered") {
+					run.Pass = "FAIL"
+					run.Score = 50
+				} else {
+					run.Pass = "FAIL"
+					run.Score = 0
+				}
+
+				runs[i] = run
 			}
-
-			// Map strategy to qualitative attributes
-			switch strategy {
-			case "Retrieval-First":
-				run.Pass = "PASS"
-				run.Score = 100
-				run.Efficiency = "🟢"
-			case "Brute-Force":
-				run.Pass = "FAIL"
-				run.Score = 0
-				run.Efficiency = "🔴"
-			case "Hybrid":
-				run.Pass = "PASS"
-				run.Score = 85
-				run.Efficiency = "🟠"
-			default:
-				run.Pass = "FAIL"
-				run.Score = 0
-				run.Efficiency = "🔴"
-			}
-
-			runs[i] = run
+			fmt.Println(ui.RenderEvalReport(runs, ui.GetWidth()))
 		}
-
-		fmt.Println()
-		fmt.Println(ui.RenderEvalReport(runs, ui.GetWidth()))
 		fmt.Println()
 	},
 }
 
-func detectStrategy(tools []string) string {
+func detectRefinedStrategy(tools []string) (string, float64, string) {
 	if len(tools) == 0 {
-		return "Unknown"
+		return "Unknown", 0.0, "🔴"
 	}
+
 	firstTool := strings.ToLower(tools[0])
-	if strings.Contains(firstTool, "devlog") || strings.Contains(firstTool, "onboard") {
-		return "Retrieval-First"
-	}
+	hasDevlogFirst := strings.Contains(firstTool, "devlog") || strings.Contains(firstTool, "onboard")
 	
-	for _, t := range tools {
-		if strings.Contains(strings.ToLower(t), "devlog") {
-			return "Hybrid"
+	hasVerify := false
+	hasMap := false
+	mapIndex := -1
+	verifyIndex := -1
+
+	for i, t := range tools {
+		t = strings.ToLower(t)
+		if strings.Contains(t, "devlog") {
+			hasMap = true
+			if mapIndex == -1 { mapIndex = i }
+		}
+		if strings.Contains(t, "read_file") || strings.Contains(t, "grep") || strings.Contains(t, "cat") {
+			hasVerify = true
+			if verifyIndex == -1 { verifyIndex = i }
 		}
 	}
-	return "Brute-Force"
+
+	if hasDevlogFirst {
+		if hasVerify {
+			return "Optimal (Mastery)", 1.5, "🟢🟢🟢"
+		}
+		return "Shallow", 0.8, "🟠"
+	}
+
+	if hasMap {
+		// Mapped, but not first (Disordered)
+		return "Disordered", 0.5, "🔴🟠"
+	}
+
+	return "Blind", 0.1, "🔴"
+}
+
+func estimateCostSummary(trace []string) int {
+	total := 0
+	for _, cmd := range trace {
+		cmd = strings.ToLower(cmd)
+		if strings.Contains(cmd, "grep") || strings.Contains(cmd, "search_file_content") {
+			total += 2500 
+		} else if strings.Contains(cmd, "read_file") {
+			total += 1200 
+		} else if strings.Contains(cmd, "devlog") {
+			total += 150 
+		} else {
+			total += 300 
+		}
+	}
+	return total
 }
 
 type evalSession struct {
@@ -254,21 +311,54 @@ func extractEvalSessions(n int) ([]evalSession, error) {
 	return results, nil
 }
 
-func estimateCostSummary(trace []string) int {
-	total := 0
-	for _, cmd := range trace {
-		cmd = strings.ToLower(cmd)
-		if strings.Contains(cmd, "grep") || strings.Contains(cmd, "search_file_content") {
-			total += 2500 
-		} else if strings.Contains(cmd, "read_file") {
-			total += 1200 
-		} else if strings.Contains(cmd, "devlog") {
-			total += 150 
-		} else {
-			total += 300 
+type EvalGroup struct {
+	Name     string
+	Sessions []evalSession
+}
+
+func clusterSessions(sessions []evalSession) []EvalGroup {
+	var groups []EvalGroup
+
+	for _, s := range sessions {
+		// 1. Try to find existing group by ID match
+		found := false
+		for i, g := range groups {
+			// If session has specific ScenarioID, match exactly
+			if s.ScenarioID != "" && g.Name == s.ScenarioID {
+				groups[i].Sessions = append(groups[i].Sessions, s)
+				found = true
+				break
+			}
+			
+			// Fuzzy match on prompt if available (assuming ScenarioID might be the prompt)
+			// If ScenarioID is "A1", we don't fuzzy match "A1".
+			// But if user did `bd eval start "Fix auth bug"`, then ScenarioID is the prompt.
+			// Let's assume ScenarioID holds the prompt/intent.
+			
+			if s.ScenarioID != "" && len(s.ScenarioID) > 5 {
+				dist := Levenshtein(strings.ToLower(g.Name), strings.ToLower(s.ScenarioID))
+				// Similarity threshold: distance < 30% of length
+				threshold := len(s.ScenarioID) / 3
+				if dist <= threshold {
+					groups[i].Sessions = append(groups[i].Sessions, s)
+					found = true
+					break
+				}
+			}
+		}
+
+		if !found {
+			name := s.ScenarioID
+			if name == "" {
+				name = "Untitled Session"
+			}
+			groups = append(groups, EvalGroup{
+				Name:     name,
+				Sessions: []evalSession{s},
+			})
 		}
 	}
-	return total
+	return groups
 }
 
 func init() {
@@ -277,4 +367,51 @@ func init() {
 	evalCmd.AddCommand(evalReportCmd)
 	evalCmd.AddCommand(evalStopCmd)
 	rootCmd.AddCommand(evalCmd)
+}
+
+// Levenshtein calculates the Levenshtein distance between two strings
+func Levenshtein(s1, s2 string) int {
+	r1, r2 := []rune(s1), []rune(s2)
+	n, m := len(r1), len(r2)
+	if n == 0 {
+		return m
+	}
+	if m == 0 {
+		return n
+	}
+	matrix := make([][]int, n+1)
+	for i := range matrix {
+		matrix[i] = make([]int, m+1)
+		matrix[i][0] = i
+	}
+	for j := range matrix[0] {
+		matrix[0][j] = j
+	}
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= m; j++ {
+			cost := 0
+			if r1[i-1] != r2[j-1] {
+				cost = 1
+			}
+			matrix[i][j] = min(
+				matrix[i-1][j]+1,      // deletion
+				matrix[i][j-1]+1,      // insertion
+				matrix[i-1][j-1]+cost, // substitution
+			)
+		}
+	}
+	return matrix[n][m]
+}
+
+func min(a, b, c int) int {
+	if a < b {
+		if a < c {
+			return a
+		}
+		return c
+	}
+	if b < c {
+		return b
+	}
+	return c
 }
