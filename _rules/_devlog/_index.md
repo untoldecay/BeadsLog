@@ -105,3 +105,5 @@ This index provides a concise record of all development work for easy scanning a
 | [test] background | enrichment test | 2026-01-27 | [2026-01-27_background-test.md](2026-01-27_background-test.md) |
 
 | [fix] Devlog show usability | Fixed ID lookup and timestamp matching in show command | 2026-02-07 | [2026-02-07_fix-devlog-show-usability.md](2026-02-07_fix-devlog-show-usability.md) |
+
+| [test] Ollama verification | Verifying background entity extraction | 2026-02-07 | [2026-02-07_ollama-test-verification.md](2026-02-07_ollama-test-verification.md) |
