@@ -122,40 +122,78 @@ var evalReportCmd = &cobra.Command{
 			return
 		}
 
-		// Header
-		fmt.Printf("\n%-25s | %-5s | %-6s | %-15s | %s\n", "Session ID", "Pass", "Score", "Tokens (Est)", "Strategy")
-		fmt.Println(strings.Repeat("-", 90))
+		// Map sessions to columns
+		cols := make([]ui.EvalColumn, 3)
+		
+		// Fill placeholders/defaults
+		cols[0] = ui.EvalColumn{
+			Methodology: "Metadata Only",
+			Tools:       "bd search, graph, impact",
+			PrimaryFocus: "The \"Why\" & \"Where\"\n(Intent, Dependencies, Bugs)",
+			EfficiencyRatio: "High Context / Low Detail\nGreat for understanding risk, but misses implementation specifics.",
+			BestUsedFor: "🟢 Onboarding\n🟢 Impact Analysis\n🟢 Architecture Review",
+			CriticalMissing: "❌ The Code Reality\n(Doesn't know how it works now)",
+		}
+		cols[1] = ui.EvalColumn{
+			Methodology: "Brute Force Code",
+			Tools:       "grep, ls, cat (all files)",
+			PrimaryFocus: "The \"What\" & \"How\"\n(Current Logic, Syntax, Regex)",
+			EfficiencyRatio: "High Detail / High Cost\nWasteful reading of irrelevant files to find the right ones.",
+			BestUsedFor: "🟢 Refactoring\n🟢 Debugging specific lines\n🟢 Writing Docs",
+			CriticalMissing: "❌ The Hidden Context\n(Doesn't know why it was built)",
+		}
+		cols[2] = ui.EvalColumn{
+			Methodology: "Indexed Verification",
+			Tools:       "bd (Map) -> read (Verify)",
+			PrimaryFocus: "Synthesis\n(Intent + Reality)",
+			EfficiencyRatio: "Maximum Efficiency\nLowest token cost for the highest quality, comprehensive insight.",
+			BestUsedFor: "👑 Master Reports\n👑 Complex Bug Fixes\n👑 Feature Planning",
+			CriticalMissing: "✅ Nothing Critical\n(Complete picture)",
+		}
 
+		// Update with actual session data if found
 		for _, s := range sessions {
-			passStr := "FAIL"
-			score := 0
-			strategy := "Mixed"
-			if len(s.Tools) > 0 {
-				// Simple heuristic: if first tool is devlog, it's retrieval-first
-				firstTool := strings.ToLower(s.Tools[0])
-				if strings.Contains(firstTool, "devlog") || strings.Contains(firstTool, "onboard") {
-					strategy = "Retrieval-First"
-					score = 100
-					passStr = "PASS"
-				} else {
-					strategy = "Brute-Force"
-					score = 50 // Partial if they used it later, 0 if never
-					for _, t := range s.Tools {
-						if strings.Contains(strings.ToLower(t), "devlog") {
-							strategy = "Hybrid"
-							break
-						}
-					}
-					if strategy == "Brute-Force" {
-						score = 0
-					}
-				}
+			cost := estimateCostSummary(s.Tools)
+			costStr := fmt.Sprintf("%d", cost)
+			
+			strategy := detectStrategy(s.Tools)
+			idx := -1
+			switch strategy {
+			case "Retrieval-First":
+				idx = 0
+			case "Brute-Force":
+				idx = 1
+			case "Hybrid":
+				idx = 2
 			}
 
-			fmt.Printf("%-25s | %-5s | %-6d | %-15d | %s\n", s.ID, passStr, score, estimateCostSummary(s.Tools), strategy)
+			if idx != -1 {
+				cols[idx].TokenCost = costStr
+				// Optionally add session ID to title or similar
+			}
 		}
+
+		fmt.Println()
+		fmt.Println(ui.RenderEvalReport(cols, ui.GetWidth()))
 		fmt.Println()
 	},
+}
+
+func detectStrategy(tools []string) string {
+	if len(tools) == 0 {
+		return "Unknown"
+	}
+	firstTool := strings.ToLower(tools[0])
+	if strings.Contains(firstTool, "devlog") || strings.Contains(firstTool, "onboard") {
+		return "Retrieval-First"
+	}
+	
+	for _, t := range tools {
+		if strings.Contains(strings.ToLower(t), "devlog") {
+			return "Hybrid"
+		}
+	}
+	return "Brute-Force"
 }
 
 type evalSession struct {

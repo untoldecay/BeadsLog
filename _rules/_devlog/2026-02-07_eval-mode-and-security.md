@@ -58,3 +58,13 @@ To implement a robust, on-demand evaluation mode (`bd eval`) for measuring agent
 - recordInteraction -> audit.Append (logs)
 - audit.RedactSlice -> recordInteraction (secures)
 - evalStartCmd -> config (toggles)
+
+### **Phase 4: Beautiful Reporting (Lipgloss UI)**
+
+**Initial Problem:** The text-based eval report was difficult to read and didn't clearly contrast different agent strategies.
+
+*   **My Assumption/Plan #1:** Use `lipgloss` to build a high-contrast, side-by-side comparison table.
+    *   **Action Taken:** Implemented `RenderEvalReport` in `internal/ui/table.go` using the `lipgloss/table` component.
+    *   **Action Taken:** Added a dark background (`#1a1a1a`) and semantic emojis to make the results stand out.
+    *   **Action Taken:** Updated the reporting logic to map live sessions to three strategic categories: "Metadata Only" (Only bd), "Brute Force" (No bd), and "Indexed Verification" (Hybrid).
+    *   **Result:** `bd eval report` now produces a professional dashboard that visually proves the efficiency of the Always-On Protocol.
