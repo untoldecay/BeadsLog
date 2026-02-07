@@ -185,6 +185,14 @@ TOOL PRIORITY ORDER:
 3. Issue commands
 4. Code reading/editing last
 
+🚨 SESSION CLOSE PROTOCOL (REQUIRED) 🚨
+Before saying "done" or "complete", you MUST run this checklist:
+1. git status (Check what changed)
+2. git add <files> (Stage changes)
+3. git commit -m "..." (Commit code)
+4. bd sync && bd devlog sync (Persist Beads data)
+5. git push (Share with team)
+
 NEVER:
 - Modify .beads/issues.jsonl manually (ALWAYS use bd)
 - Skip sync steps (DB must → JSONL → git)

@@ -300,23 +300,24 @@ func outputCLIContext(w io.Writer, stealthMode bool) error {
 	} else if store != nil {
 		finalized, _ = store.GetConfig(rootCtx, "onboarding_finalized")
 	}
-	// fmt.Fprintf(os.Stderr, "DEBUG: finalized=[%s] store=%v\n", finalized, store != nil)
 
 	bootloader := restoreCodeBlocks(FullBootloader)
-	if strings.TrimSpace(finalized) != "true" {
+	isFinalized := strings.TrimSpace(finalized) == "true"
+	if !isFinalized {
 		bootloader = restoreCodeBlocks(RestrictedBootloader)
 	}
 
-	// Try to load WORKING_PROTOCOL.md
-	workingProtocol := ""
-	if data, err := os.ReadFile("_rules/_orchestration/WORKING_PROTOCOL.md"); err == nil {
-		workingProtocol = "\n---\n\n" + string(data)
-	}
-
-	protocol, note, workflow := getSessionCloseProtocol(stealthMode)
 	redirectNotice := getRedirectNotice(true)
 
-	context := bootloader + workingProtocol + `
+	// If not finalized, show the traditional detailed loop and checklist
+	if !isFinalized {
+		workingProtocol := ""
+		if data, err := os.ReadFile("_rules/_orchestration/WORKING_PROTOCOL.md"); err == nil {
+			workingProtocol = "\n---\n\n" + string(data)
+		}
+
+		protocol, note, workflow := getSessionCloseProtocol(stealthMode)
+		context := bootloader + workingProtocol + `
 
 ` + redirectNotice + `
 # 🚨 SESSION CLOSE PROTOCOL 🚨
@@ -332,6 +333,11 @@ func outputCLIContext(w io.Writer, stealthMode bool) error {
 ## Completing Work
 ` + workflow + `
 `
-	_, _ = fmt.Fprint(w, context)
+		_, _ = fmt.Fprint(w, context)
+		return nil
+	}
+
+	// Finalized: The Always-On Protocol is sufficient and contains its own checklist
+	_, _ = fmt.Fprint(w, bootloader+"\n"+redirectNotice)
 	return nil
 }
