@@ -46,3 +46,13 @@ To improve agent reliability and compliance by adopting the "Always-On Protocol"
 - finalizeOnboarding -> AGENT.md (writes)
 - bd ready -> finalizeOnboarding (calls)
 - ProtocolMdTemplate -> PROTOCOL.md (generates)
+
+### **Phase 3: Live Protocol Verification**
+
+**Initial Problem:** Verify that the "Always-On Protocol" works for the main agent in a live scenario.
+
+*   **Action Taken:** Executed "Fix auth middleware bug" task following the protocol steps:
+    1.  `bd devlog search/graph` (Retrieval First).
+    2.  `bd create/update` (Task Claiming).
+    3.  `git commit` (Implementation).
+*   **Result:** The pre-commit hook correctly blocked the commit because I hadn't updated the devlog yet. This confirms the safety mechanisms are active.

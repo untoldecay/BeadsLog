@@ -109,3 +109,4 @@ This index provides a concise record of all development work for easy scanning a
 | [test] Ollama verification | Verifying background entity extraction | 2026-02-07 | [2026-02-07_ollama-test-verification.md](2026-02-07_ollama-test-verification.md) |
 | [enhance] Always-On Protocol | Implemented Vercel-style protocol injection | 2026-02-07 | [2026-02-07_implement-always-on-protocol.md](2026-02-07_implement-always-on-protocol.md) |
 | [test] Protocol Evals | Created trace-based agent evaluation framework | 2026-02-07 | [2026-02-07_create-eval-framework.md](2026-02-07_create-eval-framework.md) |
+| [fix] Auth middleware | Verified protocol compliance with live bug fix | 2026-02-07 | [2026-02-07_implement-always-on-protocol.md](2026-02-07_implement-always-on-protocol.md) |
