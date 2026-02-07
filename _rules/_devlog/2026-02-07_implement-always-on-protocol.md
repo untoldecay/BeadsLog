@@ -29,6 +29,15 @@ To improve agent reliability and compliance by adopting the "Always-On Protocol"
     *   **Correction:** Updated the test script to run `$BD ready` after onboarding.
     *   **Result:** Test passed. `AGENT.md` was correctly transformed from the trap to the Always-On Protocol.
 
+### **Phase 4: Protocol Resilience & Anti-Panic Policy**
+
+**Initial Problem:** Agents observed to immediately abandon the protocol and pivot to brute-force `grep` if an initial `bd sync` fails (e.g., in a fresh repo).
+
+*   **My Assumption/Plan #1:** Explicitly forbid brute-force fallbacks and mandate local retrieval as a secondary path.
+    *   **Action Taken:** Updated `FullBootloader` in `cmd/bd/init_templates.go` with a **RESILIENCE POLICY (ANTI-PANIC)**.
+    *   **Action Taken:** Instructed agents to use `bd status` for diagnosis and proceed with local `devlog search/graph` even if the remote is unreachable.
+    *   **Result:** `bd prime` now outputs this high-resilience instruction set, preventing "Protocol Abandonment."
+
 ---
 
 ### **Final Session Summary**

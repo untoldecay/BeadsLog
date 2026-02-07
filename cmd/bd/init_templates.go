@@ -179,6 +179,13 @@ CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
 4. IMPLEMENT: Code changes → Tests → git commit -m "fix: clear message" (auto-generates devlog)
 5. CLOSE: Run bd close "id" --reason "Done" → bd sync → bd devlog sync (persist everything)
 
+RESILIENCE POLICY (ANTI-PANIC):
+If a bd command fails (e.g., sync error), DO NOT fallback to brute-force grep/ls.
+Instead:
+1. Run 'bd status' to diagnose the environment.
+2. Proceed with 'bd devlog search' or 'bd devlog graph' LOCALLY.
+3. Retrieval-led reasoning is MANDATORY even if the remote metadata is offline.
+
 TOOL PRIORITY ORDER:
 1. --help flags first (bd --help, bd devlog --help)
 2. Devlog/graph queries
