@@ -63,8 +63,8 @@ To implement a robust, on-demand evaluation mode (`bd eval`) for measuring agent
 
 **Initial Problem:** The text-based eval report was difficult to read and didn't clearly contrast different agent strategies.
 
-*   **My Assumption/Plan #1:** Use `lipgloss` to build a high-contrast, side-by-side comparison table.
-    *   **Action Taken:** Implemented `RenderEvalReport` in `internal/ui/table.go` using the `lipgloss/table` component.
-    *   **Action Taken:** Added a dark background (`#1a1a1a`) and semantic emojis to make the results stand out.
-    *   **Action Taken:** Updated the reporting logic to map live sessions to three strategic categories: "Metadata Only" (Only bd), "Brute Force" (No bd), and "Indexed Verification" (Hybrid).
-    *   **Result:** `bd eval report` now produces a professional dashboard that visually proves the efficiency of the Always-On Protocol.
+*   **My Assumption/Plan #1:** Use `lipgloss` to build a dynamic, side-by-side comparison table where each run is a column.
+    *   **Action Taken:** Implemented `RenderEvalReport` in `internal/ui/table.go` using `lipgloss/table` with `NormalBorder` for row separators.
+    *   **Action Taken:** Configured the table to show attributes (Methodology, Tools, Tokens, etc.) as rows and actual test sessions as columns.
+    *   **Action Taken:** Added high-contrast styling and semantic emojis to distinguish between strategies (Retrieval-First, Brute-Force, Hybrid).
+    *   **Result:** `bd eval report` now produces a clear, comparative matrix that dynamically adapts to the number of sessions analyzed.

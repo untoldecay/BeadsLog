@@ -122,59 +122,56 @@ var evalReportCmd = &cobra.Command{
 			return
 		}
 
-		// Map sessions to columns
-		cols := make([]ui.EvalColumn, 3)
-		
-		// Fill placeholders/defaults
-		cols[0] = ui.EvalColumn{
-			Methodology: "Metadata Only",
-			Tools:       "bd search, graph, impact",
-			PrimaryFocus: "The \"Why\" & \"Where\"\n(Intent, Dependencies, Bugs)",
-			EfficiencyRatio: "High Context / Low Detail\nGreat for understanding risk, but misses implementation specifics.",
-			BestUsedFor: "🟢 Onboarding\n🟢 Impact Analysis\n🟢 Architecture Review",
-			CriticalMissing: "❌ The Code Reality\n(Doesn't know how it works now)",
-		}
-		cols[1] = ui.EvalColumn{
-			Methodology: "Brute Force Code",
-			Tools:       "grep, ls, cat (all files)",
-			PrimaryFocus: "The \"What\" & \"How\"\n(Current Logic, Syntax, Regex)",
-			EfficiencyRatio: "High Detail / High Cost\nWasteful reading of irrelevant files to find the right ones.",
-			BestUsedFor: "🟢 Refactoring\n🟢 Debugging specific lines\n🟢 Writing Docs",
-			CriticalMissing: "❌ The Hidden Context\n(Doesn't know why it was built)",
-		}
-		cols[2] = ui.EvalColumn{
-			Methodology: "Indexed Verification",
-			Tools:       "bd (Map) -> read (Verify)",
-			PrimaryFocus: "Synthesis\n(Intent + Reality)",
-			EfficiencyRatio: "Maximum Efficiency\nLowest token cost for the highest quality, comprehensive insight.",
-			BestUsedFor: "👑 Master Reports\n👑 Complex Bug Fixes\n👑 Feature Planning",
-			CriticalMissing: "✅ Nothing Critical\n(Complete picture)",
-		}
-
-		// Update with actual session data if found
-		for _, s := range sessions {
-			cost := estimateCostSummary(s.Tools)
-			costStr := fmt.Sprintf("%d", cost)
-			
+		// Prepare runs for the report
+		runs := make([]ui.EvalRun, len(sessions))
+		for i, s := range sessions {
 			strategy := detectStrategy(s.Tools)
-			idx := -1
+			cost := estimateCostSummary(s.Tools)
+			
+			run := ui.EvalRun{
+				ID:        s.ID,
+				Strategy:  strategy,
+				Tools:     strings.Join(s.Tools, "\n"),
+				TokenCost: fmt.Sprintf("%d", cost),
+			}
+
+			// Map strategy to qualitative attributes (from user provided table)
 			switch strategy {
 			case "Retrieval-First":
-				idx = 0
+				run.Methodology = "Metadata Only"
+				run.PrimaryFocus = "The \"Why\" & \"Where\"\n(Intent, Dependencies, Bugs)"
+				run.EfficiencyRatio = "High Context / Low Detail\nGreat for understanding risk, but misses implementation specifics."
+				run.BestUsedFor = "🟢 Onboarding\n🟢 Impact Analysis\n🟢 Architecture Review"
+				run.CriticalMissing = "❌ The Code Reality\n(Doesn't know how it works now)"
+				run.Pass = "PASS"
+				run.Score = 100
 			case "Brute-Force":
-				idx = 1
+				run.Methodology = "Brute Force Code"
+				run.PrimaryFocus = "The \"What\" & \"How\"\n(Current Logic, Syntax, Regex)"
+				run.EfficiencyRatio = "High Detail / High Cost\nWasteful reading of irrelevant files to find the right ones."
+				run.BestUsedFor = "🟢 Refactoring\n🟢 Debugging specific lines\n🟢 Writing Docs"
+				run.CriticalMissing = "❌ The Hidden Context\n(Doesn't know why it was built)"
+				run.Pass = "FAIL"
+				run.Score = 0
 			case "Hybrid":
-				idx = 2
+				run.Methodology = "Indexed Verification"
+				run.PrimaryFocus = "Synthesis\n(Intent + Reality)"
+				run.EfficiencyRatio = "Maximum Efficiency\nLowest token cost for the highest quality, comprehensive insight."
+				run.BestUsedFor = "👑 Master Reports\n👑 Complex Bug Fixes\n👑 Feature Planning"
+				run.CriticalMissing = "✅ Nothing Critical\n(Complete picture)"
+				run.Pass = "PASS"
+				run.Score = 85
+			default:
+				run.Methodology = "Unknown"
+				run.Pass = "FAIL"
+				run.Score = 0
 			}
 
-			if idx != -1 {
-				cols[idx].TokenCost = costStr
-				// Optionally add session ID to title or similar
-			}
+			runs[i] = run
 		}
 
 		fmt.Println()
-		fmt.Println(ui.RenderEvalReport(cols, ui.GetWidth()))
+		fmt.Println(ui.RenderEvalReport(runs, ui.GetWidth()))
 		fmt.Println()
 	},
 }

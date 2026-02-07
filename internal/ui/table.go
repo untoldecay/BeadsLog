@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 )
@@ -33,45 +35,76 @@ func NewSearchTable(width int) *table.Table {
 		Width(width)
 }
 
-// EvalColumn represents a column in the comparative eval report
-type EvalColumn struct {
-	Title            string
+// EvalRun represents a single session's data for the report
+type EvalRun struct {
+	ID              string
+	Strategy        string
 	Methodology      string
 	Tools            string
 	TokenCost        string
-	Context          string
 	PrimaryFocus     string
 	EfficiencyRatio  string
 	BestUsedFor      string
 	CriticalMissing  string
+	Pass            string
+	Score           int
 }
 
-func RenderEvalReport(cols []EvalColumn, width int) string {
+func RenderEvalReport(runs []EvalRun, width int) string {
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.NormalBorder()).
 		BorderStyle(TableBorderStyle).
 		Width(width)
 
-	headers := []string{"", "1 - Only bd commands", "2 - Only brute force", "3 - Hybrid"}
-	// Ensure we have exactly 3 columns of data even if empty
-	displayCols := make([]EvalColumn, 3)
-	for i := range displayCols {
-		if i < len(cols) {
-			displayCols[i] = cols[i]
+	headers := []string{"Attribute"}
+	for i, r := range runs {
+		// Truncate long session IDs for display
+		displayID := r.ID
+		if len(displayID) > 12 {
+			displayID = displayID[:12]
 		}
+		headers = append(headers, fmt.Sprintf("Run %d\n(%s)", i+1, displayID))
 	}
-
 	t.Headers(headers...)
 
-	// Define rows
-	rows := [][]string{
-		{"Methodology", displayCols[0].Methodology, displayCols[1].Methodology, displayCols[2].Methodology},
-		{"Tools", displayCols[0].Tools, displayCols[1].Tools, displayCols[2].Tools},
-		{"Token Cost", displayCols[0].TokenCost, displayCols[1].TokenCost, displayCols[2].TokenCost},
-		{"Primary Focus", displayCols[0].PrimaryFocus, displayCols[1].PrimaryFocus, displayCols[2].PrimaryFocus},
-		{"Efficiency Ratio", displayCols[0].EfficiencyRatio, displayCols[1].EfficiencyRatio, displayCols[2].EfficiencyRatio},
-		{"Best Used For", displayCols[0].BestUsedFor, displayCols[1].BestUsedFor, displayCols[2].BestUsedFor},
-		{"Critical Missing", displayCols[0].CriticalMissing, displayCols[1].CriticalMissing, displayCols[2].CriticalMissing},
+	// Define attributes to show as rows
+	attrs := []string{
+		"Methodology",
+		"Tools",
+		"Token Cost",
+		"Primary Focus",
+		"Efficiency Ratio",
+		"Best Used For",
+		"Critical Missing",
+		"Status",
+	}
+
+	var rows [][]string
+	for _, attr := range attrs {
+		row := []string{attr}
+		for _, run := range runs {
+			val := ""
+			switch attr {
+			case "Methodology":
+				val = run.Methodology
+			case "Tools":
+				val = run.Tools
+			case "Token Cost":
+				val = run.TokenCost
+			case "Primary Focus":
+				val = run.PrimaryFocus
+			case "Efficiency Ratio":
+				val = run.EfficiencyRatio
+			case "Best Used For":
+				val = run.BestUsedFor
+			case "Critical Missing":
+				val = run.CriticalMissing
+			case "Status":
+				val = fmt.Sprintf("%s (%d/100)", run.Pass, run.Score)
+			}
+			row = append(row, val)
+		}
+		rows = append(rows, row)
 	}
 
 	t.Rows(rows...)
@@ -81,14 +114,14 @@ func RenderEvalReport(cols []EvalColumn, width int) string {
 		style := lipgloss.NewStyle().Padding(0, 1)
 		
 		if row == 0 { // Headers
-			return TableHeaderStyle
+			return TableHeaderStyle.Height(2)
 		}
 		
 		if col == 0 { // First column (Labels)
 			return style.Bold(true).Foreground(ColorAccent)
 		}
 
-		// Plain background for the whole table content to make it stand out
+		// Background for data cells
 		return style.Background(lipgloss.Color("#1a1a1a"))
 	})
 
