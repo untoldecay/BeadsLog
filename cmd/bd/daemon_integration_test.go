@@ -165,7 +165,7 @@ func TestRunEventLoop(t *testing.T) {
 		defer cancel2()
 
 		go func() {
-			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 0, log)
+			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 0, testStore, log)
 		}()
 
 		// Wait for context to finish
@@ -188,7 +188,7 @@ func TestRunEventLoop(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 0, log)
+			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 0, testStore, log)
 			close(done)
 		}()
 
@@ -220,7 +220,7 @@ func TestRunEventLoop(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			// Use an invalid (non-existent) parent PID so event loop thinks parent died
-			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 999999, log)
+			runEventLoop(ctx2, cancel2, ticker, syncFunc, server, serverErrChan, 999999, testStore, log)
 			close(done)
 		}()
 
@@ -438,7 +438,7 @@ func TestEventLoopSignalHandling(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			runEventLoop(ctx2, cancel2, ticker, func() {}, server, serverErrChan, 0, log)
+			runEventLoop(ctx2, cancel2, ticker, func() {}, server, serverErrChan, 0, testStore, log)
 			close(done)
 		}()
 

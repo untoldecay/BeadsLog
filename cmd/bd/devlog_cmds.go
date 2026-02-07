@@ -959,7 +959,7 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		query := "SELECT title, timestamp, type FROM sessions"
+		query := "SELECT id, title, timestamp, type FROM sessions"
 		var queryArgs []interface{}
 		if sessionType != "" {
 			query += " WHERE type = ?"
@@ -975,8 +975,8 @@ var devlogListCmd = &cobra.Command{
 		defer rows.Close()
 
 		for rows.Next() {
-			var title, timestampStr, typ string
-			if err := rows.Scan(&title, &timestampStr, &typ); err != nil {
+			var id, title, timestampStr, typ string
+			if err := rows.Scan(&id, &title, &timestampStr, &typ); err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
@@ -990,7 +990,7 @@ var devlogListCmd = &cobra.Command{
 				displayTime = timestampStr[:16] 
 			}
 
-			fmt.Printf("[%s] %s - %s\n", displayTime, typ, title)
+			fmt.Printf("[%s] [%s] %s - %s\n", displayTime, id, typ, title)
 		}
 	},
 }
@@ -1033,7 +1033,7 @@ var entitiesCmd = &cobra.Command{
 }
 
 var devlogShowCmd = &cobra.Command{
-	Use:   "show [date/filename]",
+	Use:   "show [id/date/filename]",
 	Short: "Show session details",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -1045,13 +1045,90 @@ var devlogShowCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		var filename string
-		err = store.UnderlyingDB().QueryRowContext(rootCtx, "SELECT filename FROM sessions WHERE filename LIKE ? OR timestamp LIKE ?", "%"+target+"%", target+"%").Scan(&filename)
+		// 1. Direct Lookup (ID, Filename, or UTC Timestamp prefix)
+		timestampQuery := target
+		if len(target) >= 10 { // At least YYYY-MM-DD
+			// If input is "2026-01-27 01:00", convert to "2026-01-27T01:00" for LIKE
+			if strings.Contains(target, " ") {
+				parts := strings.Split(target, " ")
+				if len(parts) == 2 {
+					timestampQuery = parts[0] + "T" + parts[1]
+				}
+			}
+		}
+
+		rows, err := store.UnderlyingDB().QueryContext(rootCtx, 
+			"SELECT id, filename, timestamp FROM sessions WHERE id = ? OR filename LIKE ? OR timestamp LIKE ?", 
+			target, "%"+target+"%", timestampQuery+"%")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Session not found: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error querying sessions: %v\n", err)
 			os.Exit(1)
 		}
 
+		var matches []struct {
+			ID, Filename, Timestamp string
+		}
+		for rows.Next() {
+			var m struct{ ID, Filename, Timestamp string }
+			if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp); err == nil {
+				matches = append(matches, m)
+			}
+		}
+		rows.Close()
+
+		// 2. Fallback: Local Time Matching (if no direct match and target looks like a date)
+		if len(matches) == 0 && len(target) >= 10 {
+			// Query by date prefix to narrow down
+			datePart := target[:10]
+			rows, err := store.UnderlyingDB().QueryContext(rootCtx, 
+				"SELECT id, filename, timestamp FROM sessions WHERE timestamp LIKE ?", 
+				datePart+"%")
+			if err == nil {
+				for rows.Next() {
+					var m struct{ ID, Filename, Timestamp string }
+					if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp); err == nil {
+						// Convert DB timestamp to Local and check if it matches target
+						if t, err := time.Parse(time.RFC3339, m.Timestamp); err == nil {
+							localStr := t.Local().Format("2006-01-02 15:04")
+							if strings.HasPrefix(localStr, target) {
+								matches = append(matches, m)
+							}
+						}
+					}
+				}
+				rows.Close()
+			}
+		}
+
+		if len(matches) == 0 {
+			fmt.Fprintf(os.Stderr, "Session not found.\n")
+			os.Exit(1)
+		}
+
+		if len(matches) > 1 {
+			// Check for exact ID match first
+			for _, m := range matches {
+				if m.ID == target {
+					matches = []struct{ ID, Filename, Timestamp string }{m}
+					goto found
+				}
+			}
+
+			fmt.Println("Multiple sessions found:")
+			for _, m := range matches {
+				ts := m.Timestamp
+				if t, err := time.Parse(time.RFC3339, m.Timestamp); err == nil {
+					ts = t.Local().Format("2006-01-02 15:04")
+				}
+				fmt.Printf("- %s [%s] %s\n", ts, m.ID, m.Filename)
+			}
+			fmt.Println("\nPlease specify the ID or full filename.")
+			return
+		}
+
+	found:
+		filename := matches[0].Filename
+		
 		// Try to find the file
 		// 1. As is (absolute or relative to cwd)
 		content, err := os.ReadFile(filename)
