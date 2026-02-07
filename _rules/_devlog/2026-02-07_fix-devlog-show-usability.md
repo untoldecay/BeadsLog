@@ -49,14 +49,29 @@ To resolve usability issues where `bd devlog show` failed to find sessions using
     *   **Action Taken:** Created `cmd/bd/cli_devlog_test.go` which sets up a temporary devlog environment, creates a session, runs `sync`, and then verifies `list` (contains ID) and `show` (works with ID, Date, and Local Timestamp).
     *   **Result:** The new test `TestCLI_Devlog_Show_List` passed successfully.
 
+### **Phase 4: Debugging Test Harness (Label Problem)**
+
+**Initial Problem:** `TestCLI_UpdateLabels` started failing with `Unexpected label: feature` after test refactoring, despite logic appearing sound.
+
+*   **My Assumption/Plan #1:** The application logic for `set-labels` was failing to remove old labels.
+    *   **Action Taken:** Audited `applyLabelUpdates` in `cmd/bd/show_unit_helpers.go` and created a standalone reproduction test (`cmd/bd/label_repro_test.go`).
+    *   **Result:** The reproduction test passed, proving the application logic was correct.
+
+*   **My Assumption/Plan #2:** The test harness itself was flawed.
+    *   **Action Taken:** Analyzed `runBDInProcess` in `cmd/bd/cli_fast_test.go`.
+    *   **Result:** Discovered that `runBDInProcess` reuses the global `updateCmd` Cobra object without resetting its flags. This meant flags from previous test steps (like `--add-label feature`) persisted into subsequent steps (like `--set-labels ...`), causing unintended merging of labels.
+    *   **Correction:** Updated `TestCLI_UpdateLabels` to use `runBDExec` (subprocess isolation) instead of `runBDInProcess`. This ensures a clean state for each command.
+    *   **Verification:** `TestCLI_UpdateLabels` passed consistently.
+
 ---
 
 ### **Final Session Summary**
 
-**Final Status:** **Fixed.** `bd devlog show` is now fully compatible with `list` and `search` outputs.
+**Final Status:** **Fixed.** `bd devlog show` is now fully compatible with `list` and `search` outputs. The "label problem" in tests was identified as a harness bug and fixed.
 **Key Learnings:**
 *   **Timezone Complexity:** Matching user-provided dates (Local) against database dates (UTC/RFC3339) often requires fetching and formatting on the application side if exact SQL conversion is difficult or database-dependent.
 *   **Test Maintenance:** Integration tests that rely on internal functions (like `runEventLoop`) are fragile to signature changes. They should ideally use public interfaces or stable helpers.
+*   **Cobra Flag Persistence:** When testing CLI commands in-process by reusing global command objects, remember that Cobra flags persist across calls unless explicitly reset. Subprocess testing (`exec.Command`) avoids this class of bugs entirely.
 
 ---
 
@@ -67,3 +82,4 @@ To resolve usability issues where `bd devlog show` failed to find sessions using
 - devlogListCmd -> sessions (displays id)
 - TestCLI_Devlog_Show_List -> devlogShowCmd (verifies)
 - TestCLI_Devlog_Show_List -> devlogListCmd (verifies)
+- runBDExec -> TestCLI_UpdateLabels (isolates)

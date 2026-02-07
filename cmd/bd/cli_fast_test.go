@@ -253,16 +253,17 @@ func TestCLI_UpdateLabels(t *testing.T) {
 	}
 	// Note: Not using t.Parallel() because inProcessMutex serializes execution anyway
 	tmpDir := setupCLITestDB(t)
-	out := runBDInProcess(t, tmpDir, "create", "Issue for label testing", "-p", "2", "--json")
+	// Use runBDExec (sub-process) for label tests to avoid flag contamination in shared Cobra commands
+	out := runBDExec(t, tmpDir, "create", "Issue for label testing", "-p", "2", "--json")
 
 	var issue map[string]interface{}
 	json.Unmarshal([]byte(out), &issue)
 	id := issue["id"].(string)
 
 	// Test adding labels
-	runBDInProcess(t, tmpDir, "update", id, "--add-label", "feature", "--add-label", "backend")
+	runBDExec(t, tmpDir, "update", id, "--add-label", "feature", "--add-label", "backend")
 
-	out = runBDInProcess(t, tmpDir, "show", id, "--json")
+	out = runBDExec(t, tmpDir, "show", id, "--json")
 	var updated []map[string]interface{}
 	json.Unmarshal([]byte(out), &updated)
 	labels := updated[0]["labels"].([]interface{})
@@ -283,9 +284,9 @@ func TestCLI_UpdateLabels(t *testing.T) {
 	}
 
 	// Test removing a label
-	runBDInProcess(t, tmpDir, "update", id, "--remove-label", "backend")
+	runBDExec(t, tmpDir, "update", id, "--remove-label", "backend")
 
-	out = runBDInProcess(t, tmpDir, "show", id, "--json")
+	out = runBDExec(t, tmpDir, "show", id, "--json")
 	json.Unmarshal([]byte(out), &updated)
 	labels = updated[0]["labels"].([]interface{})
 	if len(labels) != 1 {
@@ -296,9 +297,9 @@ func TestCLI_UpdateLabels(t *testing.T) {
 	}
 
 	// Test setting labels (replaces all)
-	runBDInProcess(t, tmpDir, "update", id, "--set-labels", "api,database,critical")
+	runBDExec(t, tmpDir, "update", id, "--set-labels", "api,database,critical")
 
-	out = runBDInProcess(t, tmpDir, "show", id, "--json")
+	out = runBDExec(t, tmpDir, "show", id, "--json")
 	json.Unmarshal([]byte(out), &updated)
 	labels = updated[0]["labels"].([]interface{})
 	if len(labels) != 3 {
