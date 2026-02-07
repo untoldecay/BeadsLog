@@ -2,10 +2,13 @@
 # BeadsLog Agent Protocol
 
 ## 🚀 Session Start? (First Message Only)
-IF this is your first message:
-1. Read: _rules/_orchestration/PROTOCOL.md  
-2. Execute: Beads + Devlog starting workflows
-3. Proceed to regular workflow
+IF this is your first message, you MUST execute these commands in order:
+```bash
+bd sync          # Get latest issues
+bd devlog sync   # Ingest latest knowledge
+bd devlog verify --fix # Ensure graph integrity
+bd devlog resume --last 1 # Load context
+```
 
 ## 🔄 Regular Workflow (Every Task)
 Read: _rules/_orchestration/WORKING_PROTOCOL.md

@@ -1,0 +1,3 @@
+ls cmd/bd
+read_file "cmd/bd/main.go"
+bd devlog search "db schema"

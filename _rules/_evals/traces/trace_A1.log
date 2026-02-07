@@ -1,0 +1,3 @@
+bd devlog search "login flow"
+bd devlog graph "login"
+read_file "internal/auth/login.go"

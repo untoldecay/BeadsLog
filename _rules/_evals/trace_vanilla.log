@@ -1,0 +1,3 @@
+grep -r "timeout" .
+ls cmd/bd
+read_file "cmd/bd/main.go"

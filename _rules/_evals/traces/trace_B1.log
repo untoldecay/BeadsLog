@@ -1,0 +1,4 @@
+bd devlog resume --last 1
+bd devlog search "middleware"
+bd ready
+bd update "bd-123" --status in-progress
