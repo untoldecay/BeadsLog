@@ -79,10 +79,10 @@ var auditRecordCmd = &cobra.Command{
 				Kind:     auditRecordKind,
 				Actor:    actor,
 				IssueID:  auditRecordIssueID,
-				Model:    auditRecordModel,
-				Prompt:   auditRecordPrompt,
-				Response: auditRecordResponse,
-				ToolName: auditRecordToolName,
+				Model:    audit.Redact(auditRecordModel),
+				Prompt:   audit.Redact(auditRecordPrompt),
+				Response: audit.Redact(auditRecordResponse),
+				ToolName: audit.Redact(auditRecordToolName),
 				Error:    auditRecordError,
 			}
 			if auditRecordExitCode >= 0 {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/beads"
@@ -45,7 +46,65 @@ type Entry struct {
 	Label    string `json:"label,omitempty"`  // "good" | "bad" | etc
 	Reason   string `json:"reason,omitempty"` // human / pipeline explanation
 
+	// Evaluation (bd-2zb)
+	EvalSessionID string `json:"eval_session_id,omitempty"`
+
 	Extra map[string]any `json:"extra,omitempty"`
+}
+
+var sensitivePatterns = []string{
+	"api-key",
+	"apikey",
+	"token",
+	"secret",
+	"password",
+	"auth",
+}
+
+// Redact masks sensitive information in command arguments or config values
+func Redact(s string) string {
+	lower := strings.ToLower(s)
+	for _, p := range sensitivePatterns {
+		if strings.Contains(lower, p) {
+			// If it looks like a flag/key, redact the value part if possible
+			if strings.Contains(s, "=") {
+				parts := strings.SplitN(s, "=", 2)
+				return parts[0] + "=[REDACTED]"
+			}
+			return "[REDACTED]"
+		}
+	}
+	return s
+}
+
+// RedactSlice redacts an entire slice of strings (e.g. command args)
+func RedactSlice(args []string) []string {
+	if args == nil {
+		return nil
+	}
+	redacted := make([]string, len(args))
+	for i, arg := range args {
+		// If current arg is a sensitive flag (e.g. --api-key), redact the NEXT arg if it's not a flag
+		isFlag := strings.HasPrefix(arg, "-")
+		if isFlag {
+			redacted[i] = Redact(arg)
+			continue
+		}
+
+		// Check if previous arg was a sensitive flag
+		if i > 0 && strings.HasPrefix(args[i-1], "-") {
+			prevLower := strings.ToLower(args[i-1])
+			for _, p := range sensitivePatterns {
+				if strings.Contains(prevLower, p) {
+					redacted[i] = "[REDACTED]"
+					goto next
+				}
+			}
+		}
+		redacted[i] = arg
+	next:
+	}
+	return redacted
 }
 
 func Path() (string, error) {

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/audit"
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/debug"
@@ -916,8 +917,54 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// recordInteraction logs the current command to interactions.jsonl if eval mode is active
+func recordInteraction(cmd *cobra.Command, args []string, err error) {
+	if !config.GetBool("eval.mode") {
+		return
+	}
+
+	sessionID := config.GetString("eval.session_id")
+	if sessionID == "" {
+		return
+	}
+
+	exitCode := 0
+	if err != nil {
+		exitCode = 1
+	}
+
+	entry := &audit.Entry{
+		Kind:          "tool_call",
+		ToolName:      cmd.CommandPath(),
+		EvalSessionID: sessionID,
+		ExitCode:      &exitCode,
+		Actor:         actor,
+		Extra: map[string]any{
+			"args": audit.RedactSlice(args),
+		},
+	}
+
+	if err != nil {
+		entry.Error = err.Error()
+	}
+
+	_, _ = audit.Append(entry)
+}
+
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	cmd, err := rootCmd.ExecuteC()
+	
+	// Final automatic recording for eval mode
+	if config.GetBool("eval.mode") && cmd != nil {
+		// Skip eval commands themselves to avoid noise
+		if cmd.Name() != "eval" && cmd.Parent() != nil && cmd.Parent().Name() != "eval" {
+			// Extract original args (this is tricky because os.Args has everything)
+			// For simplicity we'll just log the command name for now
+			recordInteraction(cmd, os.Args[1:], err)
+		}
+	}
+
+	if err != nil {
 		os.Exit(1)
 	}
 }
