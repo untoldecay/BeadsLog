@@ -54,6 +54,7 @@ bd devlog resume --last 1
 - [Issue Architecture](docs/ARCHITECTURE.md) — Standard Beads data model and sync mechanism.
 - [Hooks](docs/HOOKS.md) — Automating your workflow with Git integration.
 - [Visualization](docs/VISUALIZATION.md) — Exploring Search, Impact, and the Graph.
+- [Evaluation](docs/EVAL.md) — Measuring agent performance and token efficiency.
 - [Commands](docs/COMMANDS.md) — Full categorized CLI reference.
 - [Installation](docs/INSTALLING.md) — Setup guide and platform requirements.
 
