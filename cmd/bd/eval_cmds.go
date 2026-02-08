@@ -368,6 +368,7 @@ func init() {
 	evalCmd.AddCommand(evalNextCmd)
 	evalCmd.AddCommand(evalReportCmd)
 	evalCmd.AddCommand(evalStopCmd)
+	evalCmd.AddCommand(evalTaskCmd)
 	rootCmd.AddCommand(evalCmd)
 }
 
