@@ -114,4 +114,5 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] Onboard downgrade | Prevented bd onboard from overwriting full protocol with bootstrap trap | 2026-02-08 | [2026-02-08_fix-onboard-downgrade.md](2026-02-08_fix-onboard-downgrade.md) |
 | [enhance] Protocol Tags | Migrated from HTML comments to XML tags for stronger instruction signaling | 2026-02-08 | [2026-02-08_migrate-protocol-tags.md](2026-02-08_migrate-protocol-tags.md) |
 | [enhance] Help Tips | Added --help reminder tips to devlog and core command outputs | 2026-02-08 | [2026-02-08_add-help-tips.md](2026-02-08_add-help-tips.md) |
+| [analysis] Worktree Eval | Validated worktree-based sandboxing and gemini-cli wrapper for revamp | 2026-02-08 | [2026-02-08_worktree-eval-validation.md](2026-02-08_worktree-eval-validation.md) |
 | [enhance] Anti-Panic Protocol | Added guidance footer to CLI errors to prevent agent fallback | 2026-02-08 | [2026-02-08_anti-panic-protocol.md](2026-02-08_anti-panic-protocol.md) |
