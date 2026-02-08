@@ -546,6 +546,7 @@ var devlogSyncCmd = &cobra.Command{
 		} else if !quietFlag {
 			fmt.Println("Already up to date.")
 		}
+		fmt.Printf("\n%s Tip: Use -v for detailed sync logs or --help for options.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -948,6 +949,7 @@ var devlogGraphCmd = &cobra.Command{
 		} else {
 			fmt.Println("No graphs found.")
 		}
+		fmt.Printf("\n%s Tip: Use --help for depth and filtering options.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -997,6 +999,7 @@ var devlogListCmd = &cobra.Command{
 
 			fmt.Printf("[%s] [%s] %s - %s\n", displayTime, id, typ, title)
 		}
+		fmt.Printf("\n%s Tip: Use --help to filter by session type.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1034,6 +1037,7 @@ var entitiesCmd = &cobra.Command{
 		} else {
 			fmt.Println("No entities found.")
 		}
+		fmt.Printf("\n%s Tip: Use --help for command options.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1151,6 +1155,7 @@ var devlogShowCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		fmt.Println(string(content))
+		fmt.Printf("\n%s Tip: Use --help to see how to match IDs or dates.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1198,7 +1203,7 @@ var devlogSearchCmd = &cobra.Command{
 			return
 		}
 
-		if len(response.Results) > 0 {
+		if len(response.Results) > 0 || len(response.RelatedEntities) > 0 {
 			// Fetch graph neighbors for the first matched entity if available
 			var graphNeighbors []string
 			if len(response.RelatedEntities) > 0 {
@@ -1218,8 +1223,9 @@ var devlogSearchCmd = &cobra.Command{
 				}
 			}
 
-			// Found direct results
+			// Found direct results (sessions and/or related entities)
 			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth()))
+			fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
 			return
 		}
 
@@ -1240,6 +1246,7 @@ var devlogSearchCmd = &cobra.Command{
 
 				if err == nil && len(correctedResponse.Results) > 0 {
 					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
+					fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
@@ -1252,12 +1259,12 @@ var devlogSearchCmd = &cobra.Command{
 				suggestionNames[i] = s.Name
 			}
 			fmt.Println(ui.RenderNoResults(query, suggestionNames, ui.GetWidth()))
-			fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
+			fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 			return
 		}
 
 		fmt.Println(ui.RenderNoResults(query, nil, ui.GetWidth()))
-		fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
+		fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 	},
 }
 
@@ -1335,6 +1342,7 @@ var devlogImpactCmd = &cobra.Command{
 			fmt.Println(ui.RenderImpactTable(t.Name, deps, ui.GetWidth()))
 			fmt.Println()
 		}
+		fmt.Printf("\n%s Tip: Use --help for command options (limit, strict).\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1375,6 +1383,7 @@ var devlogResumeCmd = &cobra.Command{
 		fmt.Printf("Resuming context for: %s\n", query)
 		// Minimal implementation: search sessions and show latest
 		devlogSearchCmd.Run(cmd, args)
+		fmt.Printf("\n%s Tip: Use --help to customize context window size.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1492,6 +1501,7 @@ var devlogStatusCmd = &cobra.Command{
 			fmt.Printf("  %s %s\n", status, h)
 		}
 		
+		fmt.Printf("\n%s Tip: Use --help for detailed configuration info.\n", ui.RenderAccent("💡"))
 		fmt.Println()
 	},
 }
@@ -1783,8 +1793,8 @@ var devlogVerifyCmd = &cobra.Command{
 			if len(orphans) > 0 {
 				fmt.Printf("Found %d orphaned files.\n", len(orphans))
 			}
-			fmt.Println("Tip: Run 'bd devlog verify --fix' to automatically adopt orphans and backfill metadata.")
-			fmt.Println("     Use '--fix-regex' for fast, non-AI extraction.")
+			fmt.Printf("\n%s Tip: Run 'bd devlog verify --fix' to automatically adopt orphans and backfill metadata.\n", ui.RenderAccent("💡"))
+			fmt.Println("     Use '--fix-regex' for fast extraction or '--fix-ai' for high quality.")
 		} else {
 			// Phase 1: Adopt Orphans (Only if not targeting, or if we want to support adopting specific file?)
 			// For simplicity, we only adopt all orphans if no target is specified.

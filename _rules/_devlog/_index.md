@@ -113,3 +113,4 @@ This index provides a concise record of all development work for easy scanning a
 | [fix] Auth middleware | Verified protocol compliance with live bug fix | 2026-02-07 | [2026-02-07_implement-always-on-protocol.md](2026-02-07_implement-always-on-protocol.md) |
 | [fix] Onboard downgrade | Prevented bd onboard from overwriting full protocol with bootstrap trap | 2026-02-08 | [2026-02-08_fix-onboard-downgrade.md](2026-02-08_fix-onboard-downgrade.md) |
 | [enhance] Protocol Tags | Migrated from HTML comments to XML tags for stronger instruction signaling | 2026-02-08 | [2026-02-08_migrate-protocol-tags.md](2026-02-08_migrate-protocol-tags.md) |
+| [enhance] Help Tips | Added --help reminder tips to devlog and core command outputs | 2026-02-08 | [2026-02-08_add-help-tips.md](2026-02-08_add-help-tips.md) |

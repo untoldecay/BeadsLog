@@ -365,6 +365,25 @@ func initDefaultTips() {
 		1.0,         // 100% probability - always show when condition is true
 		syncConflictCondition,
 	)
+
+	// Help reminders - educational tips to improve agent/user autonomy
+	InjectTip(
+		"help_filters",
+		"Use --help to discover advanced filters (date ranges, patterns, labels)",
+		30,
+		48*time.Hour,
+		0.4,
+		func() bool { return true },
+	)
+
+	InjectTip(
+		"help_display",
+		"Use --help to explore display modes like --short, --pretty, or --thread",
+		30,
+		48*time.Hour,
+		0.4,
+		func() bool { return true },
+	)
 }
 
 // syncConflictCondition checks if there's a sync conflict that needs manual resolution.
