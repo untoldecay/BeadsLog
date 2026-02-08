@@ -173,6 +173,11 @@ func createEvalWorktree(path string) error {
 	// Ensure we remove any inherited .beads from worktree checkout (if somehow tracked)
 	_ = os.RemoveAll(beadsDir)
 
+	// Copy AGENT.md to worktree root (ensures protocol is available)
+	if data, err := os.ReadFile("AGENT.md"); err == nil {
+		_ = os.WriteFile(filepath.Join(path, "AGENT.md"), data, 0644)
+	}
+
 	// Add current exe dir to PATH so it can find 'bd' if called simply
 	newPath := exeDir + string(os.PathListSeparator) + os.Getenv("PATH")
 
@@ -227,14 +232,12 @@ func runEvalSession(wtPath, task, traceId string, explicit bool) {
 		env = append(env, "GEMINI_API_KEY="+key)
 	}
 
-	// Build context file path (absolute)
-	contextFile := filepath.Join(wtPath, "AGENT.md")
-
 	// Configure Gemini CLI
+	// -p: prompt
+	// -y: automatically accept actions (YOLO)
 	cmd := exec.Command(geminiPath,
 		"-p", task,
 		"-y",
-		"--context-file", contextFile,
 		"--model", "gemini-2.0-flash-exp",
 	)
 	cmd.Dir = wtPath
@@ -247,6 +250,9 @@ func runEvalSession(wtPath, task, traceId string, explicit bool) {
 
 	if err != nil {
 		fmt.Printf("Failed (Error: %v)\n", err)
+		if len(output) > 0 {
+			fmt.Printf("      Output Snippet: %s\n", string(output)[:200])
+		}
 	} else {
 		fmt.Print("Done\n")
 	}

@@ -443,8 +443,7 @@ func hasBeadsProjectFiles(beadsDir string) bool {
 // Validates that the directory contains actual project files.
 // Redirect files are supported: if a .beads/redirect file exists, its contents
 // are used as the actual .beads directory path.
-// For worktrees, prioritizes the main repository's .beads directory.
-// This is useful for commands that need to detect beads projects without requiring a database.
+// For worktrees, prioritizes local .beads if present, otherwise uses main repo.
 func FindBeadsDir() string {
 	// 1. Check BEADS_DIR environment variable (preferred)
 	if beadsDir := os.Getenv("BEADS_DIR"); beadsDir != "" {
@@ -461,11 +460,44 @@ func FindBeadsDir() string {
 		}
 	}
 
-	// 2. For worktrees, check main repository root first
-	var mainRepoRoot string
+	// 2. Search for .beads/ in current directory and ancestors (Local Discovery)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+
+	// Find git root to limit the search
+	gitRoot := findGitRoot()
+
+	for dir := cwd; ; {
+		beadsDir := filepath.Join(dir, ".beads")
+		if info, err := os.Stat(beadsDir); err == nil && info.IsDir() {
+			// Follow redirect if present
+			beadsDir = FollowRedirect(beadsDir)
+
+			// Validate directory contains actual project files
+			if hasBeadsProjectFiles(beadsDir) {
+				return beadsDir
+			}
+		}
+
+		// Stop at git root boundary for local discovery
+		if gitRoot != "" && dir == gitRoot {
+			break
+		}
+
+		// Move up one directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	// 3. For worktrees, fall back to main repository root if local discovery failed
 	if git.IsWorktree() {
 		var err error
-		mainRepoRoot, err = git.GetMainRepoRoot()
+		mainRepoRoot, err := git.GetMainRepoRoot()
 		if err == nil && mainRepoRoot != "" {
 			beadsDir := filepath.Join(mainRepoRoot, ".beads")
 			if info, err := os.Stat(beadsDir); err == nil && info.IsDir() {
@@ -478,47 +510,6 @@ func FindBeadsDir() string {
 				}
 			}
 		}
-	}
-
-	// 3. Search for .beads/ in current directory and ancestors
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-
-	// Find git root to limit the search
-	gitRoot := findGitRoot()
-	if git.IsWorktree() && mainRepoRoot != "" {
-		// For worktrees, extend search boundary to include main repo
-		gitRoot = mainRepoRoot
-	}
-
-	for dir := cwd; dir != "/" && dir != "."; {
-		beadsDir := filepath.Join(dir, ".beads")
-		if info, err := os.Stat(beadsDir); err == nil && info.IsDir() {
-			// Follow redirect if present
-			beadsDir = FollowRedirect(beadsDir)
-
-			// Validate directory contains actual project files
-			if hasBeadsProjectFiles(beadsDir) {
-				return beadsDir
-			}
-		}
-
-		// Stop at git root to avoid finding unrelated directories
-		if gitRoot != "" && dir == gitRoot {
-			break
-		}
-
-		// Move up one directory
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached filesystem root (works on both Unix and Windows)
-			// On Unix: filepath.Dir("/") returns "/"
-			// On Windows: filepath.Dir("C:\\") returns "C:\\"
-			break
-		}
-		dir = parent
 	}
 
 	return ""
