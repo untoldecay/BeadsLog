@@ -1,52 +1,41 @@
 <!-- BD_PROTOCOL_START -->
-# BeadsLog Agent Protocol
+# BEADSLOG AGENTS.MD - ALWAYS-ON PROTOCOL
+================================================
 
-## 🚀 Session Start? (First Message Only)
-IF this is your first message, you MUST execute these commands in order:
-```bash
-bd sync          # Get latest issues
-bd devlog sync   # Ingest latest knowledge
-bd devlog verify --fix # Ensure graph integrity
-bd devlog resume --last 1 # Load context
-```
+ROLE: BeadsLog Agent. Maintain project memory via git-backed devlog graph. 
+NEVER fabricate architecture, history, or state from training data.
 
-## 🔄 Regular Workflow (Every Task)
-Read: _rules/_orchestration/WORKING_PROTOCOL.md
+IMPORTANT: Prefer retrieval-led reasoning over training-led reasoning for ALL project questions, history, architecture, or state.
+Before inferring, summarizing, or planning, ALWAYS query devlog/graph first via bd commands.
 
-## 📋 Core Commands (Always Available)
+BEADSLOG INDEX | root: beadslog://
+Sessions: bd devlog resume --last 1 (immediate context), bd devlog search "query" (history/solutions)
+Graph: bd devlog graph "entity" (dependencies), bd devlog impact "entity" (dependents), bd devlog entities (overview)
+Issues: bd ready (ready work), bd list --status open (queue), bd show "id" (details)
+Sync: bd sync (issues→git), bd devlog sync (logs→db), bd devlog verify --fix (integrity)
+Help: bd --help, bd devlog --help (always first)
 
-### Beads (Issues)
-bd ready                 # Find next task
-bd update <id>           # Mark in progress  
-bd close <id>            # Complete task
-bd sync                  # Sync issues (auto via git hook)
+CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
+1. RESUME: Run bd devlog resume --last 1 to load last session context
+2. MAP: Run bd devlog graph "component" OR bd devlog search "topic/error" (graph/history BEFORE code)
+3. TASK: Run bd ready → bd update "id" --status in-progress --json (claim work)
+4. IMPLEMENT: Code changes → Tests → git commit -m "fix: clear message" (auto-generates devlog)
+5. CLOSE: Run bd close "id" --reason "Done" → bd sync → bd devlog sync (persist everything)
 
-### Devlog (Memory)
-bd devlog resume --last 1    # Load last session
-bd devlog search "query"     # Find past solutions
-bd devlog graph "entity"     # See dependencies
-bd devlog impact "entity"    # What depends on this?
+TOOL PRIORITY ORDER:
+1. --help flags first (bd --help, bd devlog --help)
+2. Devlog/graph queries
+3. Issue commands
+4. Code reading/editing last
 
-### Commit (Auto-Devlog)
-git commit -m "fix: message" # Generates devlog automatically
+NEVER:
+- Modify .beads/issues.jsonl manually (ALWAYS use bd)
+- Skip sync steps (DB must → JSONL → git)
+- Plan/implement without graph query first
+- Create markdown TODO lists (use bd create --description "..." --type task --priority 2)
+- Commit without tests or bd devlog verify --fix
 
-## 🔍 Discover More
-bd --help                 # All bd commands
-bd devlog --help          # All devlog commands
-
-## 📚 On-Demand Files (Load Only When Needed)
-| File | When to Load |
-|------|-------------|
-| **PROTOCOL.md** | First execution only |
-| **WORKING_PROTOCOL.md** | Every task |
-| **BEADS_REFERENCE.md** | bd --help insufficient |
-| **DEVLOG_REFERENCE.md** | bd devlog --help insufficient |
-| **PROJECT_CONTEXT.md** | Need project overview/architecture |
-
-## ⚠️ Loading Rules
-1. Always try --help first
-2. Load PROTOCOL.md only once per session
-3. Load WORKING_PROTOCOL.md at task start
-4. Reference files only when commands fail
+END PROTOCOL
+================================================
 
 <!-- BD_PROTOCOL_END -->

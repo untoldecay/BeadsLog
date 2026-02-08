@@ -111,3 +111,5 @@ This index provides a concise record of all development work for easy scanning a
 | [test] Protocol Evals | Created trace-based agent evaluation framework | 2026-02-07 | [2026-02-07_create-eval-framework.md](2026-02-07_create-eval-framework.md) |
 | [feature] Eval Mode & Security | Implemented bd eval and log redaction | 2026-02-07 | [2026-02-07_eval-mode-and-security.md](2026-02-07_eval-mode-and-security.md) |
 | [fix] Auth middleware | Verified protocol compliance with live bug fix | 2026-02-07 | [2026-02-07_implement-always-on-protocol.md](2026-02-07_implement-always-on-protocol.md) |
+| [fix] Onboard downgrade | Prevented bd onboard from overwriting full protocol with bootstrap trap | 2026-02-08 | [2026-02-08_fix-onboard-downgrade.md](2026-02-08_fix-onboard-downgrade.md) |
+| [enhance] Protocol Tags | Migrated from HTML comments to XML tags for stronger instruction signaling | 2026-02-08 | [2026-02-08_migrate-protocol-tags.md](2026-02-08_migrate-protocol-tags.md) |

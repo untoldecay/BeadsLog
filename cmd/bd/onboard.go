@@ -72,12 +72,23 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 			modified := false
 
 			if strings.Contains(sContent, ProtocolStartTag) {
-				// Case 1: Already has tags, just update between them
+				// Case 1: Already has NEW tags, just update between them
 				startIndex := strings.Index(sContent, ProtocolStartTag)
 				endIndex := strings.Index(sContent, ProtocolEndTag)
 				if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
 					pre := sContent[:startIndex]
 					post := sContent[endIndex+len(ProtocolEndTag):]
+					newContent = pre + fullBlock + post
+					modified = true
+				}
+			} else if strings.Contains(sContent, LegacyProtocolStartTag) {
+				// Case 1b: Has LEGACY tags, migrate to NEW tags
+				startIndex := strings.Index(sContent, LegacyProtocolStartTag)
+				endIndex := strings.Index(sContent, LegacyProtocolEndTag)
+				if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
+					pre := sContent[:startIndex]
+					post := sContent[endIndex+len(LegacyProtocolEndTag):]
+					// Replace the entire legacy block with the new fullBlock (which has new tags)
 					newContent = pre + fullBlock + post
 					modified = true
 				}

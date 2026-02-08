@@ -347,6 +347,11 @@ func injectBootstrapTrigger(file, trigger string) bool {
 		return false
 	}
 
+	// If it already contains the full protocol (New or Legacy), skip (GH#BeadsLog-976, GH#BeadsLog-061)
+	if strings.Contains(sContent, ProtocolStartTag) || strings.Contains(sContent, LegacyProtocolStartTag) {
+		return false
+	}
+
 	// Identify Legacy Content (Anything outside current protocol tags if they exist)
 	startIndex := strings.Index(sContent, ProtocolStartTag)
 	endIndex := strings.Index(sContent, ProtocolEndTag)

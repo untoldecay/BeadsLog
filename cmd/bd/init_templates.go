@@ -171,6 +171,7 @@ Graph: bd devlog graph "entity" (dependencies), bd devlog impact "entity" (depen
 Issues: bd ready (ready work), bd list --status open (queue), bd show "id" (details)
 Sync: bd sync (issues→git), bd devlog sync (logs→db), bd devlog verify --fix (integrity)
 Help: bd --help, bd devlog --help (always first)
+Context: _rules/_orchestration/PROJECT_CONTEXT.md (PRD, Tech Stack, Conventions)
 
 CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
 1. RESUME: Run bd devlog resume --last 1 to load last session context
