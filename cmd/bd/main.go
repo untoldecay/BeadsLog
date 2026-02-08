@@ -26,6 +26,7 @@ import (
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/memory"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 	"github.com/untoldecay/BeadsLog/internal/utils"
 )
 
@@ -968,6 +969,15 @@ func main() {
 	}
 
 	if err != nil {
+		// Anti-Panic Guidance for Agents
+		// If a command fails, agents often panic and revert to primitive tools (grep/find).
+		// We explicitly instruct them to stay within the protocol.
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, ui.RenderWarn("⚠️  PROTOCOL ENFORCEMENT"))
+		fmt.Fprintln(os.Stderr, "   Do NOT fall back to grep, find, or manual file reading.")
+		fmt.Fprintln(os.Stderr, "   1. Check syntax with 'bd --help' or 'bd <command> --help'")
+		fmt.Fprintln(os.Stderr, "   2. Run 'bd doctor' if you suspect environment issues")
+		fmt.Fprintln(os.Stderr, "   3. Retry the command with corrected arguments")
 		os.Exit(1)
 	}
 }
