@@ -116,3 +116,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Help Tips | Added --help reminder tips to devlog and core command outputs | 2026-02-08 | [2026-02-08_add-help-tips.md](2026-02-08_add-help-tips.md) |
 | [analysis] Worktree Eval | Validated worktree-based sandboxing and gemini-cli wrapper for revamp | 2026-02-08 | [2026-02-08_worktree-eval-validation.md](2026-02-08_worktree-eval-validation.md) |
 | [enhance] Anti-Panic Protocol | Added guidance footer to CLI errors to prevent agent fallback | 2026-02-08 | [2026-02-08_anti-panic-protocol.md](2026-02-08_anti-panic-protocol.md) |
+| [feature] Pivot Eval Harness to OpenCode CLI | Integrated OpenCode CLI for robust A/B testing and structured tracing | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
