@@ -121,3 +121,4 @@ This index provides a concise record of all development work for easy scanning a
 | [rationalize] Eval Harness Stability | Isolated OpenCode harness in new file to prevent automated rollbacks | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
 | [enhance] Eval Cleanup & TTY | Improved artifact pruning and reliable user prompts via /dev/tty | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
 | [enhance] Chronological Reporting | Added full tool call sequence to A/B comparison report | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
+| [feature] Finalize OpenCode Eval Harness | Implemented token counting, worktree isolation, auto-stash, and interactive menu for 'bd eval task'. | 2026-02-10 | [2026-02-10_opencode-eval-harness-finalization.md](2026-02-10_opencode-eval-harness-finalization.md) |
