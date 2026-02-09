@@ -665,7 +665,7 @@ func createEvalWorktree(path string) error {
 	_ = readyCmd.Run()
 
 	absExe, _ := filepath.Abs(exe)
-	// FIX: opencode.json with git safeguards
+	// Simplified opencode.json
 	defaultConfig := `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -674,11 +674,6 @@ func createEvalWorktree(path string) error {
       "command": ["` + absExe + `", "mcp"],
       "enabled": true
     }
-  },
-  "git": {
-    "autoAdd": false,
-    "autoCommit": false,
-    "indexUpdate": "manual"
   }
 }`
 	_ = os.WriteFile(filepath.Join(path, "opencode.json"), []byte(defaultConfig), 0644)
