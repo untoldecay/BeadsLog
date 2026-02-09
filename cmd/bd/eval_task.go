@@ -171,6 +171,25 @@ func createEvalWorktree(path string) error {
 		return err
 	}
 
+	// PREPEND AGENTS.md (plural) with explicit onboarding instruction
+	agentPath := filepath.Join(path, "AGENTS.md")
+	// If AGENTS.md missing, try AGENT.md fallback
+	if _, err := os.Stat(agentPath); os.IsNotExist(err) {
+		agentPath = filepath.Join(path, "AGENT.md")
+	}
+
+	if content, err := os.ReadFile(agentPath); err == nil {
+		override := "# SANDBOX OVERRIDE (REQUIRED FIRST STEPS)\n\n" +
+			"⚠️ **YOU ARE IN A FRESH SANDBOX.**\n\n" +
+			"1. **CHECK STATUS**: Run `bd status`.\n" +
+			"2. **IF NOT INITIALIZED**: Run `bd onboard` IMMEDIATELY.\n" +
+			"3. **THEN RESUME**: Run `bd devlog resume`.\n\n" +
+			"⛔ **DO NOT RUN `bd prime`** (It is for context loading, not actions).\n\n" +
+			"---\n\n"
+		newContent := override + string(content)
+		_ = os.WriteFile(agentPath, []byte(newContent), 0644)
+	}
+
 	beadsDir := filepath.Join(path, ".beads")
 	_ = os.RemoveAll(beadsDir)
 
@@ -192,7 +211,7 @@ func createEvalWorktree(path string) error {
 		return fmt.Errorf("bd ready failed: %v, output: %s", err, string(out))
 	}
 
-	// bd eval start (Enables logging in sandbox)
+	// bd eval start
 	startCmd := exec.Command(exe, "eval", "start", "--quiet")
 	startCmd.Dir = path
 	startCmd.Env = append(os.Environ(), "BEADS_DIR="+beadsDir, "PATH="+newPath)
@@ -222,24 +241,66 @@ func getEvalApiKey() string {
 	return os.Getenv("GEMINI_API_KEY")
 }
 
-// ProtocolFilterWriter suppresses protocol noise from logs
+// ProtocolFilterWriter parses JSON stream AND captures Debug output
 type ProtocolFilterWriter struct {
 	w io.Writer
 }
 
 func (pw *ProtocolFilterWriter) Write(p []byte) (n int, err error) {
-	s := string(p)
-	if strings.Contains(s, "Hook system message: # BEADSLOG AGENTS.MD") {
+	input := string(p)
+	
+	// Direct passthrough for debug lines (stderr)
+	if strings.Contains(input, "[DEBUG]") || strings.Contains(input, "[Tool:") {
+		_, _ = fmt.Fprint(pw.w, input)
 		return len(p), nil
 	}
-	// Filter out common noise
-	if strings.Contains(s, "Loading extension:") || 
-	   strings.Contains(s, "Server '") || 
-	   strings.Contains(s, "Hook registry initialized") ||
-	   strings.Contains(s, "YOLO mode is enabled") {
-		return len(p), nil
+
+	// Split by newline as stream-json outputs one JSON object per line
+	lines := strings.Split(input, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" { continue }
+
+		// Check for protocol noise (not JSON)
+		if strings.Contains(line, "Hook system message:") || 
+		   strings.Contains(line, "Loading extension:") || 
+		   strings.Contains(line, "Server '") || 
+		   strings.Contains(line, "Hook registry initialized") ||
+		   strings.Contains(line, "YOLO mode is enabled") {
+			continue
+		}
+
+		// Try to parse as JSON (stdout)
+		var event map[string]any
+		if err := json.Unmarshal([]byte(line), &event); err == nil {
+			if kind, ok := event["type"].(string); ok {
+				switch kind {
+				case "text":
+					if text, ok := event["text"].(string); ok {
+						_, _ = fmt.Fprintf(pw.w, "\n[AGENT] %s\n", text)
+					}
+				case "tool_call":
+					if name, ok := event["name"].(string); ok {
+						args, _ := json.Marshal(event["arguments"])
+						_, _ = fmt.Fprintf(pw.w, "🛠️  [TOOL] %s(%s)\n", name, string(args))
+					}
+				case "tool_response":
+					if output, ok := event["output"].(string); ok {
+						displayOutput := output
+						if len(displayOutput) > 500 {
+							displayOutput = displayOutput[:500] + "... [TRUNCATED]"
+						}
+						_, _ = fmt.Fprintf(pw.w, "✅ [RESULT] %s\n", displayOutput)
+					}
+				}
+			}
+		} else {
+			// Not JSON, write as is (raw model output or errors)
+			_, _ = fmt.Fprintf(pw.w, "%s\n", line)
+		}
 	}
-	return pw.w.Write(p)
+	
+	return len(p), nil
 }
 
 func runEvalSession(wtPath, task, traceId string, explicit bool) {
@@ -262,7 +323,6 @@ func runEvalSession(wtPath, task, traceId string, explicit bool) {
 	exeDir := filepath.Dir(exe)
 	newPath := exeDir + string(os.PathListSeparator) + os.Getenv("PATH")
 
-	// Create log file early
 	debugFile := filepath.Join("eval", "traces", traceId+".log")
 	_ = os.MkdirAll(filepath.Dir(debugFile), 0755)
 	logF, _ := os.Create(debugFile)
@@ -277,18 +337,23 @@ func runEvalSession(wtPath, task, traceId string, explicit bool) {
 	env = append(env, "BD_EVAL_MODE=true")
 	env = append(env, "BD_EVAL_SESSION_ID=eval-"+traceId)
 
-	cmd := exec.Command(geminiPath, "-p", task, "-y", "--extensions", "")
+	// Use --debug + --output-format stream-json for maximum visibility
+	cmd := exec.Command(geminiPath, 
+		"-p", task, 
+		"-y", 
+		"--extensions", "",
+		"--output-format", "stream-json",
+		"--debug",
+	)
 	cmd.Dir = wtPath
 	cmd.Env = env
 	
-	// Stream output to log file via filter
 	filter := &ProtocolFilterWriter{w: logF}
 	cmd.Stdout = filter
 	cmd.Stderr = filter
 	
 	err = cmd.Run()
 	
-	// EXTRACT AUDIT LOG FROM SANDBOX
 	extractAuditLog(wtPath, traceId, task)
 
 	if err != nil {
