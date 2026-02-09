@@ -117,3 +117,7 @@ This index provides a concise record of all development work for easy scanning a
 | [analysis] Worktree Eval | Validated worktree-based sandboxing and gemini-cli wrapper for revamp | 2026-02-08 | [2026-02-08_worktree-eval-validation.md](2026-02-08_worktree-eval-validation.md) |
 | [enhance] Anti-Panic Protocol | Added guidance footer to CLI errors to prevent agent fallback | 2026-02-08 | [2026-02-08_anti-panic-protocol.md](2026-02-08_anti-panic-protocol.md) |
 | [feature] Pivot Eval Harness to OpenCode CLI | Integrated OpenCode CLI for robust A/B testing and structured tracing | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
+| [enhance] OpenCode Eval Visibility | Implemented real-time event printing for live agent monitoring | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
+| [rationalize] Eval Harness Stability | Isolated OpenCode harness in new file to prevent automated rollbacks | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
+| [enhance] Eval Cleanup & TTY | Improved artifact pruning and reliable user prompts via /dev/tty | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |
+| [enhance] Chronological Reporting | Added full tool call sequence to A/B comparison report | 2026-02-09 | [2026-02-09_opencode-eval-harness-pivot.md](2026-02-09_opencode-eval-harness-pivot.md) |

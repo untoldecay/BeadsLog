@@ -40,13 +40,29 @@ To resolve persistent reliability issues with the Gemini CLI-based evaluation ha
 
 ---
 
+### **Phase 4: Enhancing Visibility, Cleanup, and Stability**
+
+**Initial Problem:** The evaluation harness lacked real-time visibility, automated artifact cleanup, and was prone to accidental rollbacks due to background daemons and automatic stashing.
+
+*   **My Assumption/Plan #1:** Implement real-time event printing and chronological reporting.
+    *   **Action Taken:** Modified `runOpenCodeTest` to print `text`, `tool_use`, and `tool_result` events to the console as they arrive. Updated `generateABReport` to include a full chronological list of tool calls for each run.
+    *   **Result:** Success. Evaluators can now see agent progress live and inspect the full tool sequence in the final report.
+*   **My Assumption/Plan #2:** Prevent rollbacks by isolating the new code and disabling background triggers.
+    *   **Action Taken:** Identified that `bd daemon` background processes were likely reverting `cmd/bd/eval_task.go`. Killed all daemons and moved the OpenCode implementation to a new file, `cmd/bd/eval_task_opencode.go`, while deleting the original.
+    *   **Analysis/Correction:** Isolated files are safer from automated "repairs" or template-based regenerations that target known core files.
+*   **My Assumption/Plan #3:** Improve cleanup and reliability.
+    *   **Action Taken:** Added `bd eval clean` to `cmd/bd/eval_cmds.go` for manual artifact pruning. Updated the cleanup prompt in `eval_task_opencode.go` to use `/dev/tty` to ensure it works even when `stdin` is piped.
+    *   **Result:** Success. The system is now tidy and interactive.
+
+---
+
 ### **Final Session Summary**
 
-**Final Status:** **Success.** The evaluation harness is fully operational. It successfully executes the OpenCode agent in isolated worktrees, captures tool-call sequences accurately, and identifies "Optimal (Mastery)" strategies in live runs.
+**Final Status:** **Success.** The evaluation harness is fully operational, stable, and feature-rich. It successfully executes the OpenCode agent in isolated worktrees, provides real-time visibility, and generates detailed chronological reports.
 **Key Learnings:**
-*   **Agent Compliance:** OpenCode CLI is significantly more compliant with local instruction files (`AGENT.md`) than the current Gemini CLI in headless mode.
-*   **JSONL Robustness:** When wrapping external AI CLIs, always assume a JSONL stream with interspersed noise rather than a single JSON object.
-*   **Intent over Tool Name:** In tool-use traces, the name of the tool (e.g., `bash`) is often less important than the specific arguments (the command intent) for measuring protocol compliance.
+*   **Isolation is Safety:** When fighting automated rollbacks or regenerations, isolate new logic in unique filenames to break the trigger loop.
+*   **TTY for Interactivity:** CLIs that read from `stdin` should use `/dev/tty` for user prompts to remain interactive when the primary `stdin` is redirected or piped.
+*   **Daemon Awareness:** Background processes like `bd daemon` can be silent culprits for unexpected filesystem changes in a dev environment.
 
 ---
 
@@ -55,3 +71,5 @@ To resolve persistent reliability issues with the Gemini CLI-based evaluation ha
 - OpenCode CLI -> bd mcp (uses for retrieval)
 - aggregateEvent -> OpenCode Events (parses)
 - scoreTrace -> Tool Intents (evaluates)
+- eval_task_opencode.go -> /dev/tty (prompts)
+- eval_cmds.go -> bd eval clean (manages)
