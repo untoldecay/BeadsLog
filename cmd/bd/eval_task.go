@@ -238,7 +238,6 @@ func runEvalSession(wtPath, task, traceId string, explicit bool) {
 	cmd := exec.Command(geminiPath,
 		"-p", task,
 		"-y",
-		"--model", "gemini-2.0-flash-exp",
 	)
 	cmd.Dir = wtPath
 	cmd.Env = env
