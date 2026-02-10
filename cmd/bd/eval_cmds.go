@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/audit"
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/eval"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
@@ -94,36 +94,8 @@ var evalCleanCmd = &cobra.Command{
 	Use:   "clean",
 	Short: "Prune orphan eval worktrees and temporary directories",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Pruning eval artifacts...\n")
-		
-		out, err := exec.Command("git", "worktree", "list").Output()
-		if err != nil {
-			fmt.Printf("Error listing worktrees: %v\n", err)
-			return
-		}
-
-		lines := strings.Split(string(out), "\n")
-		count := 0
-		for _, line := range lines {
-			if strings.Contains(line, "beads-eval-") || strings.Contains(line, "eval-test-") {
-				parts := strings.Fields(line)
-				if len(parts) > 0 {
-					path := parts[0]
-					fmt.Printf("  Removing worktree: %s... ", path)
-					if err := exec.Command("git", "worktree", "remove", "--force", path).Run(); err != nil {
-						fmt.Printf("Failed (%v)\n", err)
-					} else {
-						fmt.Println("Done")
-						count++
-					}
-					parent := filepath.Dir(path)
-					if strings.Contains(filepath.Base(parent), "beads-eval-") {
-						_ = os.RemoveAll(parent)
-					}
-				}
-			}
-		}
-
+		fmt.Printf("Pruning eval artifacts for this project...\n")
+		count := eval.PruneProjectOrphans()
 		if count == 0 {
 			fmt.Println("No orphan eval worktrees found.")
 		} else {

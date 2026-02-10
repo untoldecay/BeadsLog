@@ -133,4 +133,5 @@ _sandbox/Test-*/
 .gemini/
 
 # Test repository in sandbox
-_sandbox/new_test_repo/
+_sandbox/new_test_repo/eval/
+_rules/_evals/results/

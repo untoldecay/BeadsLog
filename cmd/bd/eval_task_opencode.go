@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/audit"
+	"github.com/untoldecay/BeadsLog/internal/eval"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
@@ -65,11 +66,11 @@ func runOpenCodeEval() {
 	fmt.Printf("\n%s %s\n", "🧪", "BeadsLog Eval Mode - OpenCode A/B/C Testing")
 	fmt.Println(strings.Repeat("-", 60))
 
-	projHash := getProjectHash()
+	projHash := eval.GetProjectHash()
 
 	// 0. PRE-FLIGHT JANITOR
 	fmt.Print("Cleaning up stale artifacts from previous runs... ")
-	pruneProjectOrphans(projHash)
+	eval.PruneProjectOrphans()
 	fmt.Println("Done")
 
 	// 0.5 STASH RECOVERY
@@ -130,7 +131,7 @@ func runOpenCodeEval() {
 			for name, path := range map[string]string{"Implicit": wtImplicit, "Explicit": wtExplicit, "Base": wtBase} {
 				if err := createEvalWorktree(path); err != nil {
 					fmt.Printf("  Failed to create %s worktree: %v\n", name, err)
-					cleanupEvalsABC(wtImplicit, wtExplicit, wtBase, tempDir)
+					eval.SafeCleanupABC(wtImplicit, wtExplicit, wtBase, tempDir)
 					return
 				}
 				fmt.Printf("  %s Sandbox: Ready\n", name)
@@ -187,7 +188,7 @@ func runOpenCodeEval() {
 
 			// Clean up current run
 			fmt.Print("Cleaning up sandboxes... ")
-			cleanupEvalsABC(wtImplicit, wtExplicit, wtBase, tempDir)
+			eval.SafeCleanupABC(wtImplicit, wtExplicit, wtBase, tempDir)
 			fmt.Println("Done")
 
 			if action == "quit" {
@@ -667,13 +668,6 @@ func createEvalWorktree(path string) error {
 	return nil
 }
 
-func cleanupEvalsABC(wt1, wt2, wt3, tempDir string) {
-	if wt1 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt1).Run() }
-	if wt2 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt2).Run() }
-	if wt3 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt3).Run() }
-	if tempDir != "" { _ = os.RemoveAll(tempDir) }
-}
-
 func getEvalApiKey() string {
 	home, _ := os.UserHomeDir()
 	paths := []string{filepath.Join(home, ".gemini", "eval.env"), ".env"}
@@ -702,37 +696,6 @@ func createStash() (string, error) {
 }
 
 func restoreStash(ref string) { _ = exec.Command("git", "stash", "pop", ref).Run() }
-
-func getProjectHash() string {
-	cwd, _ := os.Getwd()
-	abs, _ := filepath.Abs(cwd)
-	h := 0
-	for _, char := range abs {
-		h = 31*h + int(char)
-	}
-	if h < 0 { h = -h }
-	return fmt.Sprintf("%x", h)
-}
-
-func pruneProjectOrphans(projHash string) {
-	out, err := exec.Command("git", "worktree", "list", "--porcelain").Output()
-	if err != nil { return }
-	lines := strings.Split(string(out), "\n")
-	marker := "beads-eval-" + projHash + "-"
-	for _, line := range lines {
-		if strings.HasPrefix(line, "worktree ") {
-			path := strings.TrimPrefix(line, "worktree ")
-			if strings.Contains(path, marker) {
-				_ = exec.Command("git", "worktree", "remove", "--force", path).Run()
-				parent := filepath.Dir(path)
-				if strings.Contains(filepath.Base(parent), marker) {
-					_ = os.RemoveAll(parent)
-				}
-			}
-		}
-	}
-	_ = exec.Command("git", "worktree", "prune").Run()
-}
 
 func handleLeftoverStashes() {
 	out, err := exec.Command("git", "stash", "list").Output()

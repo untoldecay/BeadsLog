@@ -10,16 +10,20 @@ Eval Mode attaches a unique **Session ID** to every command executed by an agent
 
 ### 🔄 The Eval Lifecycle
 
-1.  **Start:** `bd eval start [scenario_id]`
-    - Activates high-fidelity tracing.
+1.  **Test:** `bd eval task`
+    - Automated A/B/C testing in isolated sandboxes.
+    - Compares Implicit, Explicit, and Base (Unix-only) protocols.
+    - Features real-time trace visibility and auto-stashing of local work.
+2.  **Start:** `bd eval start [scenario_id]`
+    - Activates high-fidelity tracing for manual agent runs.
     - Sets the "Intent" or "Scenario" for grouping.
-2.  **Iterate:** Run tasks with your agent.
-3.  **Rotate:** `bd eval next`
+3.  **Iterate:** Run tasks with your agent.
+4.  **Rotate:** `bd eval next`
     - Ends the current run and starts a new one (rotates the Session ID).
     - Perfect for A/B testing different models or prompts for the same task.
-4.  **Report:** `bd eval report [N]`
+5.  **Report:** `bd eval report [N]`
     - Generates a comparative matrix of the last N sessions, grouped by task similarity.
-5.  **Stop:** `bd eval stop`
+6.  **Stop:** `bd eval stop`
     - Disables tracing and cleans up session state.
 
 ## 📋 Methodology & Scoring
@@ -76,6 +80,25 @@ TASK GROUP: "Authentication Logic Fix" (Matched 2 runs)
 | `bd eval next [name]` | Start a fresh run for the same (or new) scenario |
 | `bd eval report [N]` | Generate comparative table for last N sessions |
 | `bd eval stop` | Disable eval mode |
+| `bd eval clean` | Safe project-aware cleanup of orphan worktrees |
+| `bd eval task` | Interactive A/B/C testing in isolated sandboxes |
+
+## 🧪 Interactive Sandbox Testing (`bd eval task`)
+
+The `task` command is the flagship evaluation harness for protocol research. It automates the creation of three identical sandboxes to test a single task against different agent configurations:
+
+- **Implicit:** Standard protocol instructions in `AGENT.md`.
+- **Explicit:** Forced compliance instructions ("Map First, Verify Later").
+- **Base:** Restricted baseline using only standard Unix tools.
+
+### 🛡️ Self-Healing & Safety
+
+To ensure that automated evaluations don't interfere with your development work or other parallel projects:
+
+1.  **Project Namespacing:** All temporary worktrees and directories are tagged with a unique hash of your project path. This prevents `bd eval clean` from accidentally deleting artifacts from other BeadsLog-managed repositories.
+2.  **Auto-Stashing:** Your current uncommitted changes are automatically stashed before a test begins and restored once you quit the interactive menu.
+3.  **Stash Recovery UI:** If a test crashes, BeadsLog detects the leftover `bd eval auto-stash` on the next run and prompts you to Restore, Clear, or Ignore it.
+4.  **Worktree Isolation:** Sandboxes use `git worktree` with detached HEADs and forced index resets to ensure complete filesystem isolation from your main branch.
 
 ## 🔒 Privacy & Security
 
