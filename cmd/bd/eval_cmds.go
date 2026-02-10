@@ -163,27 +163,38 @@ var evalReportCmd = &cobra.Command{
 		for _, g := range groups {
 			fmt.Printf("\nTASK GROUP: %q (Matched %d runs)\n", g.Name, len(g.Sessions))
 			
-			totalTokens := 0
+			// Find base run (Base/Blind) to serve as reference
+			baseTokens := 0
 			for _, s := range g.Sessions {
-				totalTokens += s.TotalTokens
+				if strings.Contains(strings.ToLower(s.ScenarioID), "restriction") || strings.Contains(strings.ToLower(s.ScenarioID), "base") {
+					baseTokens = s.TotalTokens
+					break
+				}
 			}
-			avgTokens := float64(totalTokens) / float64(len(g.Sessions))
-			if avgTokens == 0 { avgTokens = 1 }
+			if baseTokens == 0 { baseTokens = 1 } 
 
 			runs := make([]ui.EvalRun, len(g.Sessions))
 			for i, s := range g.Sessions {
-				strategy, logic, weight, emoji := detectRefinedStrategyFull(s.Tools)
+				strategy, logic, bonus, emoji := detectRefinedStrategyFull(s.Tools)
 				
 				duration := "0s"
 				if s.EndTime.After(s.StartTime) {
 					duration = s.EndTime.Sub(s.StartTime).Round(time.Second).String()
 				}
 
-				costFactor := avgTokens / float64(s.TotalTokens)
-				if s.TotalTokens == 0 { costFactor = 0 } 
-				efficiencyScore := weight * costFactor
+				isBase := strings.Contains(strings.ToLower(s.ScenarioID), "restriction")
 				
-				effStr := fmt.Sprintf("%.1fx %s", efficiencyScore, emoji)
+				var effStr string
+				if isBase {
+					effStr = "1.0x ⚪"
+					logic = "-"
+					strategy = "Base"
+				} else {
+					costFactor := float64(baseTokens) / float64(s.TotalTokens)
+					if s.TotalTokens == 0 { costFactor = 0 } 
+					efficiencyScore := bonus * costFactor
+					effStr = fmt.Sprintf("%.1fx %s", efficiencyScore, emoji)
+				}
 
 				run := ui.EvalRun{
 					ID:        s.ID,
@@ -194,7 +205,10 @@ var evalReportCmd = &cobra.Command{
 					Efficiency: effStr,
 				}
 
-				if strings.Contains(strategy, "Optimal") {
+				if isBase {
+					run.Pass = "REF"
+					run.Score = 0
+				} else if strings.Contains(strategy, "Optimal") {
 					run.Pass = "PASS"
 					run.Score = 100
 				} else if strings.Contains(strategy, "Shallow") {
@@ -221,29 +235,41 @@ func detectRefinedStrategyFull(tools []string) (string, string, float64, string)
 		return "Unknown", "No tools used", 0.0, "🔴"
 	}
 
-	hasVerify := false
-	hasMap := false
-	firstMapIndex := -1
-	firstVerifyIndex := -1
-
+	intents := make([]string, len(tools))
 	for i, t := range tools {
-		t = strings.ToLower(t)
-		isMap := strings.Contains(t, "devlog") || strings.Contains(t, "onboard") || strings.Contains(t, "bd status")
-		isVerify := strings.Contains(t, "read_file") || strings.Contains(t, "grep") || strings.Contains(t, "cat") || strings.Contains(t, "glob") || strings.Contains(t, "ls")
-
-		if isMap {
-			hasMap = true
-			if firstMapIndex == -1 { firstMapIndex = i }
-		}
-		if isVerify {
-			hasVerify = true
-			if firstVerifyIndex == -1 { firstVerifyIndex = i }
+		tLower := strings.ToLower(t)
+		if strings.Contains(tLower, "bd status") || strings.Contains(tLower, "bd onboard") || strings.Contains(tLower, "bd devlog sync") {
+			intents[i] = "bd_hydration"
+		} else if strings.Contains(tLower, "devlog graph") || strings.Contains(tLower, "devlog search") || strings.Contains(tLower, "devlog resume") || strings.Contains(tLower, "devlog entities") {
+			intents[i] = "bd_mapping"
+		} else if strings.Contains(tLower, "read_file") || strings.Contains(tLower, "grep") || strings.Contains(tLower, "glob") || strings.Contains(tLower, "ls") || strings.Contains(tLower, "cat") || strings.Contains(tLower, "find") {
+			intents[i] = "verification"
+		} else {
+			intents[i] = "other"
 		}
 	}
 
-	if hasMap {
-		if firstVerifyIndex == -1 || firstMapIndex < firstVerifyIndex {
-			if hasVerify {
+	hasHydration := sliceContainsStrict(intents, "bd_hydration")
+	hasMapping := sliceContainsStrict(intents, "bd_mapping")
+	hasVerification := sliceContainsStrict(intents, "verification")
+
+	// Find first occurrences
+	firstHydration, firstMapping, firstVerify := -1, -1, -1
+	for i, t := range intents {
+		if t == "bd_hydration" && firstHydration == -1 { firstHydration = i }
+		if t == "bd_mapping" && firstMapping == -1 { firstMapping = i }
+		if t == "verification" && firstVerify == -1 { firstVerify = i }
+	}
+
+	// Base Case
+	if !hasHydration && !hasMapping {
+		return "Base", "Pure Brute-Force", 0.1, "🔴"
+	}
+
+	// Optimal: Hydration -> Mapping -> Verification
+	if hasHydration && hasMapping {
+		if firstVerify == -1 || firstMapping < firstVerify {
+			if hasVerification {
 				return "Optimal", "Map FIRST + Verify LATER", 1.5, "🟢🟢🟢"
 			}
 			return "Shallow", "Map ONLY (Risk)", 0.8, "🟠"
@@ -251,7 +277,12 @@ func detectRefinedStrategyFull(tools []string) (string, string, float64, string)
 		return "Disordered", "Verify BEFORE Map", 0.5, "🔴🟠"
 	}
 
-	return "Blind", "Pure Brute-Force", 0.1, "🔴"
+	// Disordered: Missing Hydration
+	if hasMapping && !hasHydration {
+		return "Disordered", "Map WITHOUT Hydration", 0.5, "🔴"
+	}
+
+	return "Disordered", "Verify BEFORE Map", 0.5, "🔴🟠"
 }
 
 type evalSession struct {

@@ -23,7 +23,7 @@ var evalTaskCmd = &cobra.Command{
 It compares three runs:
 1. Implicit: Standard protocol enforcement via AGENT.md.
 2. Explicit: Direct instructions to follow the 'Map First, Verify Later' pattern.
-3. Blind: Forbids all 'bd' commands to establish a baseline for inefficiency.`,
+3. Base: Forbids all 'bd' commands to establish a baseline for inefficiency.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runOpenCodeEval()
 	},
@@ -57,13 +57,23 @@ type Scoring struct {
 	Strategy   string
 	LogicDesc  string
 	Status     string
-	Weight     float64
+	Bonus      float64
 	Emoji      string
 }
 
 func runOpenCodeEval() {
 	fmt.Printf("\n%s %s\n", "🧪", "BeadsLog Eval Mode - OpenCode A/B/C Testing")
 	fmt.Println(strings.Repeat("-", 60))
+
+	projHash := getProjectHash()
+
+	// 0. PRE-FLIGHT JANITOR
+	fmt.Print("Cleaning up stale artifacts from previous runs... ")
+	pruneProjectOrphans(projHash)
+	fmt.Println("Done")
+
+	// 0.5 STASH RECOVERY
+	handleLeftoverStashes()
 
 	// 1. AUTOMATIC STASH
 	fmt.Print("Stashing your current work... ")
@@ -104,7 +114,7 @@ func runOpenCodeEval() {
 			timestamp := fmt.Sprintf("%d", time.Now().Unix())
 
 			// 3. CREATE SANDBOX ROOTS
-			tempDir, err := os.MkdirTemp("", "beads-eval-*")
+			tempDir, err := os.MkdirTemp("", "beads-eval-"+projHash+"-*")
 			if err != nil {
 				fmt.Printf("Failed to create temp dir: %v\n", err)
 				return
@@ -113,14 +123,14 @@ func runOpenCodeEval() {
 
 			wtImplicit := filepath.Join(tempDir, "implicit")
 			wtExplicit := filepath.Join(tempDir, "explicit")
-			wtBlind := filepath.Join(tempDir, "blind")
+			wtBase := filepath.Join(tempDir, "base")
 
 			fmt.Printf("\nCreating isolated sandboxes in %s...\n", tempDir)
 
-			for name, path := range map[string]string{"Implicit": wtImplicit, "Explicit": wtExplicit, "Blind": wtBlind} {
+			for name, path := range map[string]string{"Implicit": wtImplicit, "Explicit": wtExplicit, "Base": wtBase} {
 				if err := createEvalWorktree(path); err != nil {
 					fmt.Printf("  Failed to create %s worktree: %v\n", name, err)
-					cleanupEvalsABC(wtImplicit, wtExplicit, wtBlind, tempDir)
+					cleanupEvalsABC(wtImplicit, wtExplicit, wtBase, tempDir)
 					return
 				}
 				fmt.Printf("  %s Sandbox: Ready\n", name)
@@ -138,21 +148,21 @@ func runOpenCodeEval() {
 			explicitTask := fmt.Sprintf("%s\n\n(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)", task)
 			explicitResult := runOpenCodeTest(wtExplicit, explicitTask, traceIdExplicit, true)
 
-			// Run 3: Blind (No BD)
-			traceIdBlind := "eval-" + timestamp + "-blind"
-			blindTask := fmt.Sprintf("%s\n\n(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)", task)
-			blindResult := runOpenCodeTest(wtBlind, blindTask, traceIdBlind, false)
+			// Run 3: Base (No BD)
+			traceIdBase := "eval-" + timestamp + "-base"
+			baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)", task)
+			baseResult := runOpenCodeTest(wtBase, baseTask, traceIdBase, false)
 
 			// 5. REPORT
 			fmt.Printf("\nGenerating comparative report...\n")
-			report := generateABCReport(task, implicitResult, explicitResult, blindResult)
+			report := generateABCReport(task, implicitResult, explicitResult, baseResult)
 			fmt.Println(report)
 			
 			// Show paths to logs
 			fmt.Printf("\n✨ Logs from this run are available at:\n")
 			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdImplicit)
 			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdExplicit)
-			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdBlind)
+			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdBase)
 
 			// 6. INTERACTIVE MENU
 			var action string
@@ -177,7 +187,7 @@ func runOpenCodeEval() {
 
 			// Clean up current run
 			fmt.Print("Cleaning up sandboxes... ")
-			cleanupEvalsABC(wtImplicit, wtExplicit, wtBlind, tempDir)
+			cleanupEvalsABC(wtImplicit, wtExplicit, wtBase, tempDir)
 			fmt.Println("Done")
 
 			if action == "quit" {
@@ -453,13 +463,16 @@ func getEventToolArgs(event map[string]interface{}) string {
 	return ""
 }
 
-func generateABCReport(task string, implicit, explicit, blind OpenCodeTrace) string {
+func generateABCReport(task string, implicit, explicit, base OpenCodeTrace) string {
 	implicitScore := scoreTrace(implicit.ToolCalls)
 	explicitScore := scoreTrace(explicit.ToolCalls)
-	blindScore := scoreTrace(blind.ToolCalls)
+	
+	// Base is reference
+	baseTokens := base.Tokens.Total
+	if baseTokens == 0 { baseTokens = 1 }
 
-	avgTokens := (implicit.Tokens.Total + explicit.Tokens.Total + blind.Tokens.Total) / 3
-	if avgTokens == 0 { avgTokens = 1 }
+	implicitEff := calculateEfficiency(implicitScore.Bonus, implicit.Tokens.Total, baseTokens)
+	explicitEff := calculateEfficiency(explicitScore.Bonus, explicit.Tokens.Total, baseTokens)
 
 	report := fmt.Sprintf(`
 %s
@@ -472,31 +485,31 @@ TASK: "%s"
 ├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
 │ Explicit         │ %-28s │ %-6d │ %s │ %.1fx %s │
 ├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
-│ Blind            │ %-28s │ %-6d │ %s │ %.1fx %s │
+│ Base             │ -                            │ %-6d │ REF  │ 1.0x ⚪   │
 ╰──────────────────┴──────────────────────────────┴────────┴──────┴──────────╯
 
-🎯 Protocol Effectiveness: %.1fx better than blind
+🎯 Protocol Effectiveness: %.1fx better than base
 (See docs/EVAL.md for scoring rubric)
 
 `,
 		ui.RenderAccent("📊 A/B/C Comparison Report"),
 		task,
-		implicitScore.LogicDesc, implicit.Tokens.Total, implicitScore.Status, calculateEfficiencyHarness(implicitScore, implicit.Tokens.Total, avgTokens), implicitScore.Emoji,
-		explicitScore.LogicDesc, explicit.Tokens.Total, explicitScore.Status, calculateEfficiencyHarness(explicitScore, explicit.Tokens.Total, avgTokens), explicitScore.Emoji,
-		blindScore.LogicDesc, blind.Tokens.Total, blindScore.Status, calculateEfficiencyHarness(blindScore, blind.Tokens.Total, avgTokens), blindScore.Emoji,
-		float64(blind.Tokens.Total)/float64(implicit.Tokens.Total),
+		implicitScore.LogicDesc, implicit.Tokens.Total, implicitScore.Status, implicitEff, implicitScore.Emoji,
+		explicitScore.LogicDesc, explicit.Tokens.Total, explicitScore.Status, explicitEff, explicitScore.Emoji,
+		baseTokens,
+		float64(baseTokens)/float64(implicit.Tokens.Total),
 	)
 
 	report += fmt.Sprintf("\n%s\n%s", ui.RenderAccent("🕒 Chronological Tool Traces:"), renderToolCalls("Implicit", implicit.ToolCalls))
 	report += renderToolCalls("Explicit", explicit.ToolCalls)
-	report += renderToolCalls("Blind", blind.ToolCalls)
+	report += renderToolCalls("Base", base.ToolCalls)
 
 	return report
 }
 
-func calculateEfficiencyHarness(s Scoring, tokens, avg int) float64 {
+func calculateEfficiency(bonus float64, tokens, base int) float64 {
 	if tokens == 0 { return 0.0 }
-	return s.Weight * (float64(avg) / float64(tokens))
+	return bonus * (float64(base) / float64(tokens))
 }
 
 func renderToolCalls(label string, calls []ToolCall) string {
@@ -533,115 +546,81 @@ func scoreTrace(toolCalls []ToolCall) Scoring {
 	for i, tc := range toolCalls {
 		if tc.Name == "bash" {
 			cmd := strings.ToLower(tc.Args)
-			if strings.Contains(cmd, "bd status") {
-				intents[i] = "bd_status"
-			} else if strings.Contains(cmd, "devlog graph") {
-				intents[i] = "bd_devlog_graph"
-			} else if strings.Contains(cmd, "devlog search") {
-				intents[i] = "bd_devlog_search"
-			} else if strings.Contains(cmd, "devlog resume") {
-				intents[i] = "bd_devlog_resume"
-			} else if strings.Contains(cmd, "grep") || strings.Contains(cmd, "ls") || strings.Contains(cmd, "cat") {
-				intents[i] = "grep/ls"
+			if strings.Contains(cmd, "bd status") || strings.Contains(cmd, "bd onboard") || strings.Contains(cmd, "bd devlog sync") {
+				intents[i] = "bd_hydration"
+			} else if strings.Contains(cmd, "devlog graph") || strings.Contains(cmd, "devlog search") || strings.Contains(cmd, "devlog resume") || strings.Contains(cmd, "devlog entities") {
+				intents[i] = "bd_mapping"
+			} else if strings.Contains(cmd, "grep") || strings.Contains(cmd, "ls") || strings.Contains(cmd, "cat") || strings.Contains(cmd, "find") {
+				intents[i] = "verification"
 			} else {
 				intents[i] = "bash_generic"
 			}
+		} else if strings.Contains(tc.Name, "read_file") || strings.Contains(tc.Name, "grep") || strings.Contains(tc.Name, "glob") {
+			intents[i] = "verification"
 		} else {
 			intents[i] = tc.Name
 		}
 	}
 
-	mapTools := []string{"bd_devlog_graph", "bd_devlog_search", "bd_devlog_resume", "bd_status"}
-	verifyTools := []string{"read_file", "grep/ls", "search_file_content", "glob"}
+	hasHydration := sliceContainsStrict(intents, "bd_hydration")
+	hasMapping := sliceContainsStrict(intents, "bd_mapping")
+	hasVerification := sliceContainsStrict(intents, "verification")
 
-	if mapFirst(intents, mapTools, verifyTools) {
-		return Scoring{"Optimal", "Map FIRST + Verify LATER", "PASS", 1.5, "🟢🟢🟢"}
-	} else if disordered(intents, mapTools, verifyTools) {
-		return Scoring{"Disordered", "Verify BEFORE Map", "FAIL", 0.5, "🔴🟠"}
-	} else if shallowRetrieval(intents, mapTools) {
-		return Scoring{"Shallow", "Map ONLY (Risk)", "PASS", 0.8, "🟠"}
+	firstHydration, firstMapping, firstVerify := -1, -1, -1
+	for i, t := range intents {
+		if t == "bd_hydration" && firstHydration == -1 { firstHydration = i }
+		if t == "bd_mapping" && firstMapping == -1 { firstMapping = i }
+		if t == "verification" && firstVerify == -1 { firstVerify = i }
 	}
-	return Scoring{"Blind", "Pure Brute-Force", "FAIL", 0.1, "🔴"}
-}
 
-func mapFirst(tools, mapTools, verifyTools []string) bool {
-	firstMap, firstVerify := -1, -1
-	for i, t := range tools {
-		if sliceContains(mapTools, t) && firstMap == -1 { firstMap = i }
-		if sliceContains(verifyTools, t) && firstVerify == -1 { firstVerify = i }
+	if !hasHydration && !hasMapping {
+		return Scoring{"Base", "Pure Brute-Force", "FAIL", 0.1, "🔴"}
 	}
-	if firstMap != -1 {
-		if firstVerify == -1 { return true }
-		return firstMap < firstVerify
-	}
-	return false
-}
 
-func shallowRetrieval(tools, mapTools []string) bool {
-	for _, t := range tools {
-		if sliceContains(mapTools, t) { return true }
-	}
-	return false
-}
-
-func disordered(tools, mapTools, verifyTools []string) bool {
-	firstMap, firstVerify := -1, -1
-	for i, t := range tools {
-		if sliceContains(mapTools, t) && firstMap == -1 { firstMap = i }
-		if sliceContains(verifyTools, t) && firstVerify == -1 { firstVerify = i }
-	}
-	return firstVerify != -1 && firstMap != -1 && firstVerify < firstMap
-}
-
-func sliceContains(list []string, item string) bool {
-	for _, s := range list {
-		if strings.Contains(item, s) { return true }
-	}
-	return false
-}
-
-func first3Tools(calls []ToolCall) []string {
-	names := make([]string, 0, 3)
-	for i := range calls {
-		if i >= 3 { break }
-		name := calls[i].Name
-		if name == "bash" {
-			cmd := calls[i].Args
-			if len(cmd) > 20 { cmd = cmd[:17] + "..." }
-			name = cmd
+	if hasHydration && hasMapping {
+		if firstVerify == -1 || firstMapping < firstVerify {
+			if hasVerification {
+				return Scoring{"Optimal", "Map FIRST + Verify LATER", "PASS", 1.5, "🟢🟢🟢"}
+			}
+			return Scoring{"Shallow", "Map ONLY (Risk)", "PASS", 0.8, "🟠"}
 		}
-		names = append(names, name)
+		return Scoring{"Disordered", "Verify BEFORE Map", "FAIL", 0.5, "🔴🟠"}
 	}
-	if len(names) == 0 { return []string{"(no tools)"} }
-	return names
+
+	if hasMapping && !hasHydration {
+		return Scoring{"Disordered", "Map WITHOUT Hydration", "FAIL", 0.5, "🔴"}
+	}
+
+	return Scoring{"Disordered", "Verify BEFORE Map", "FAIL", 0.5, "🔴🟠"}
+}
+
+func sliceContainsStrict(list []string, item string) bool {
+	for _, s := range list {
+		if s == item { return true }
+	}
+	return false
 }
 
 func createEvalWorktree(path string) error {
 	exe, err := os.Executable()
 	if err != nil { return err }
 	
-	// FIX: Use detached HEAD to avoid branch conflicts
 	if err := exec.Command("git", "worktree", "add", "-d", path, "HEAD").Run(); err != nil {
 		return err
 	}
 	
-	// FIX: Force fresh index and working tree to prevent silent reverts
-	// 1. Clear index
 	cmdRm := exec.Command("git", "rm", "--cached", "-r", ".")
 	cmdRm.Dir = path
 	_ = cmdRm.Run()
 
-	// 2. Read tree from HEAD
 	cmdRead := exec.Command("git", "read-tree", "HEAD")
 	cmdRead.Dir = path
 	_ = cmdRead.Run()
 
-	// 3. Checkout fresh files
 	cmdCheckout := exec.Command("git", "checkout-index", "-a", "--force")
 	cmdCheckout.Dir = path
 	_ = cmdCheckout.Run()
 
-	// 4. Disable fileMode to prevent permission-based diffs
 	cmdConfig := exec.Command("git", "config", "core.fileMode", "false")
 	cmdConfig.Dir = path
 	_ = cmdConfig.Run()
@@ -674,7 +653,6 @@ func createEvalWorktree(path string) error {
 	_ = readyCmd.Run()
 
 	absExe, _ := filepath.Abs(exe)
-	// Simplified opencode.json
 	defaultConfig := `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -725,17 +703,94 @@ func createStash() (string, error) {
 
 func restoreStash(ref string) { _ = exec.Command("git", "stash", "pop", ref).Run() }
 
+func getProjectHash() string {
+	cwd, _ := os.Getwd()
+	abs, _ := filepath.Abs(cwd)
+	h := 0
+	for _, char := range abs {
+		h = 31*h + int(char)
+	}
+	if h < 0 { h = -h }
+	return fmt.Sprintf("%x", h)
+}
+
+func pruneProjectOrphans(projHash string) {
+	out, err := exec.Command("git", "worktree", "list", "--porcelain").Output()
+	if err != nil { return }
+	lines := strings.Split(string(out), "\n")
+	marker := "beads-eval-" + projHash + "-"
+	for _, line := range lines {
+		if strings.HasPrefix(line, "worktree ") {
+			path := strings.TrimPrefix(line, "worktree ")
+			if strings.Contains(path, marker) {
+				_ = exec.Command("git", "worktree", "remove", "--force", path).Run()
+				parent := filepath.Dir(path)
+				if strings.Contains(filepath.Base(parent), marker) {
+					_ = os.RemoveAll(parent)
+				}
+			}
+		}
+	}
+	_ = exec.Command("git", "worktree", "prune").Run()
+}
+
+func handleLeftoverStashes() {
+	out, err := exec.Command("git", "stash", "list").Output()
+	if err != nil || len(out) == 0 { return }
+	lines := strings.Split(string(out), "\n")
+	var leftovers []string
+	for _, line := range lines {
+		if strings.Contains(line, "bd eval auto-stash") {
+			leftovers = append(leftovers, line)
+		}
+	}
+	if len(leftovers) == 0 { return }
+	fmt.Printf("\n⚠️  Found %d unrecovered stash(es) from previous evaluation runs:\n", len(leftovers))
+	for _, l := range leftovers { fmt.Printf("  %s\n", l) }
+	var action string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("What would you like to do with these stashes?").
+				Options(
+					huh.NewOption("Restore (Pop) the most recent one", "pop"),
+					huh.NewOption("Delete (Clear) ALL eval stashes", "clear"),
+					huh.NewOption("Ignore and proceed", "ignore"),
+				).
+				Value(&action),
+		),
+	)
+	if err := form.Run(); err != nil { return }
+	switch action {
+	case "pop":
+		for i, line := range lines {
+			if strings.Contains(line, "bd eval auto-stash") {
+				ref := fmt.Sprintf("stash@{%d}", i)
+				fmt.Printf("Restoring %s... ", ref)
+				if err := exec.Command("git", "stash", "pop", ref).Run(); err != nil {
+					fmt.Printf("Conflict or Error: %v\n", err)
+				} else { fmt.Println("Done") }
+				break
+			}
+		}
+	case "clear":
+		fmt.Print("Clearing eval stashes... ")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.Contains(lines[i], "bd eval auto-stash") {
+				_ = exec.Command("git", "stash", "drop", fmt.Sprintf("stash@{%d}", i)).Run()
+			}
+		}
+		fmt.Println("Done")
+	}
+}
+
 func archiveTrace(traceId, task string, trace OpenCodeTrace) {
-	// Reconstruct tool calls with arguments for strategy detection
 	var toolTrace []string
 	for _, tc := range trace.ToolCalls {
 		name := tc.Name
-		if name == "bash" {
-			name = fmt.Sprintf("bash(%s)", tc.Args)
-		}
+		if name == "bash" { name = fmt.Sprintf("bash(%s)", tc.Args) }
 		toolTrace = append(toolTrace, name)
 	}
-
 	entry := audit.Entry{
 		Kind:          "eval_run",
 		EvalSessionID: traceId,
@@ -747,14 +802,11 @@ func archiveTrace(traceId, task string, trace OpenCodeTrace) {
 			"tool_calls": toolTrace,
 		},
 	}
-
 	historyFile := filepath.Join("eval", "history.jsonl")
 	_ = os.MkdirAll(filepath.Dir(historyFile), 0755)
-	
 	f, err := os.OpenFile(historyFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil { return }
 	defer f.Close()
-
 	data, _ := json.Marshal(entry)
 	f.Write(data)
 	f.Write([]byte("\n"))
