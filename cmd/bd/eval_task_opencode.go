@@ -19,9 +19,11 @@ import (
 var evalTaskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Interactive eval: sandbox -> test -> analyze -> cleanup",
-	Long: `Runs an A/B evaluation of the agent protocol in isolated sandboxes using OpenCode CLI.
-It creates two git worktrees (Implicit vs Explicit), runs the agent, extracts structured
-tool traces, generates a comparative report, and cleans up.`,
+	Long: `Runs an A/B/C evaluation of the agent protocol in isolated sandboxes using OpenCode CLI.
+It compares three runs:
+1. Implicit: Standard protocol enforcement via AGENT.md.
+2. Explicit: Direct instructions to follow the 'Map First, Verify Later' pattern.
+3. Blind: Forbids all 'bd' commands to establish a baseline for inefficiency.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runOpenCodeEval()
 	},
@@ -53,13 +55,14 @@ type ToolCall struct {
 
 type Scoring struct {
 	Strategy   string
+	LogicDesc  string
 	Status     string
-	Efficiency float64
+	Weight     float64
 	Emoji      string
 }
 
 func runOpenCodeEval() {
-	fmt.Printf("\n%s %s\n", "🧪", "BeadsLog Eval Mode - OpenCode A/B Testing")
+	fmt.Printf("\n%s %s\n", "🧪", "BeadsLog Eval Mode - OpenCode A/B/C Testing")
 	fmt.Println(strings.Repeat("-", 60))
 
 	// 1. AUTOMATIC STASH
@@ -100,7 +103,7 @@ func runOpenCodeEval() {
 		for {
 			timestamp := fmt.Sprintf("%d", time.Now().Unix())
 
-			// 3. CREATE SANDBOX ROOT
+			// 3. CREATE SANDBOX ROOTS
 			tempDir, err := os.MkdirTemp("", "beads-eval-*")
 			if err != nil {
 				fmt.Printf("Failed to create temp dir: %v\n", err)
@@ -110,42 +113,46 @@ func runOpenCodeEval() {
 
 			wtImplicit := filepath.Join(tempDir, "implicit")
 			wtExplicit := filepath.Join(tempDir, "explicit")
+			wtBlind := filepath.Join(tempDir, "blind")
 
 			fmt.Printf("\nCreating isolated sandboxes in %s...\n", tempDir)
 
-			if err := createEvalWorktree(wtImplicit); err != nil {
-				fmt.Printf("  Failed to create implicit worktree: %v\n", err)
-				cleanupEvals(wtImplicit, wtExplicit, tempDir)
-				return
+			for name, path := range map[string]string{"Implicit": wtImplicit, "Explicit": wtExplicit, "Blind": wtBlind} {
+				if err := createEvalWorktree(path); err != nil {
+					fmt.Printf("  Failed to create %s worktree: %v\n", name, err)
+					cleanupEvalsABC(wtImplicit, wtExplicit, wtBlind, tempDir)
+					return
+				}
+				fmt.Printf("  %s Sandbox: Ready\n", name)
 			}
-			fmt.Printf("  Implicit Sandbox: Ready\n")
-
-			if err := createEvalWorktree(wtExplicit); err != nil {
-				fmt.Printf("  Failed to create explicit worktree: %v\n", err)
-				cleanupEvals(wtImplicit, wtExplicit, tempDir)
-				return
-			}
-			fmt.Printf("  Explicit Sandbox: Ready\n")
 
 			// 4. RUN TESTS
 			fmt.Printf("\nRunning agent tests...\n")
 
+			// Run 1: Implicit
 			traceIdImplicit := "eval-" + timestamp + "-implicit"
 			implicitResult := runOpenCodeTest(wtImplicit, task, traceIdImplicit, false)
 
+			// Run 2: Explicit
 			traceIdExplicit := "eval-" + timestamp + "-explicit"
-			explicitTask := fmt.Sprintf("%s\n\n(MANDATORY: Use 'bd devlog' tools for retrieval first)", task)
+			explicitTask := fmt.Sprintf("%s\n\n(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)", task)
 			explicitResult := runOpenCodeTest(wtExplicit, explicitTask, traceIdExplicit, true)
+
+			// Run 3: Blind (No BD)
+			traceIdBlind := "eval-" + timestamp + "-blind"
+			blindTask := fmt.Sprintf("%s\n\n(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)", task)
+			blindResult := runOpenCodeTest(wtBlind, blindTask, traceIdBlind, false)
 
 			// 5. REPORT
 			fmt.Printf("\nGenerating comparative report...\n")
-			report := generateABReport(task, implicitResult, explicitResult)
+			report := generateABCReport(task, implicitResult, explicitResult, blindResult)
 			fmt.Println(report)
 			
 			// Show paths to logs
 			fmt.Printf("\n✨ Logs from this run are available at:\n")
 			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdImplicit)
 			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdExplicit)
+			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdBlind)
 
 			// 6. INTERACTIVE MENU
 			var action string
@@ -170,7 +177,7 @@ func runOpenCodeEval() {
 
 			// Clean up current run
 			fmt.Print("Cleaning up sandboxes... ")
-			cleanupEvals(wtImplicit, wtExplicit, tempDir)
+			cleanupEvalsABC(wtImplicit, wtExplicit, wtBlind, tempDir)
 			fmt.Println("Done")
 
 			if action == "quit" {
@@ -323,8 +330,8 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 		_ = os.WriteFile(exportFile, data, 0644)
 	}
 
-	// IMPORT to Main Audit Log (interactions.jsonl)
-	extractAuditLog(wtDir, traceId, task)
+	// ARCHIVE to History (for 'bd eval report')
+	archiveTrace(traceId, task, trace)
 
 	return trace
 }
@@ -446,48 +453,50 @@ func getEventToolArgs(event map[string]interface{}) string {
 	return ""
 }
 
-func generateABReport(task string, implicit, explicit OpenCodeTrace) string {
+func generateABCReport(task string, implicit, explicit, blind OpenCodeTrace) string {
 	implicitScore := scoreTrace(implicit.ToolCalls)
 	explicitScore := scoreTrace(explicit.ToolCalls)
+	blindScore := scoreTrace(blind.ToolCalls)
 
-	improvement := 0.0
-	if explicitScore.Efficiency > 0 {
-		improvement = implicitScore.Efficiency / explicitScore.Efficiency
-	}
+	avgTokens := (implicit.Tokens.Total + explicit.Tokens.Total + blind.Tokens.Total) / 3
+	if avgTokens == 0 { avgTokens = 1 }
 
 	report := fmt.Sprintf(`
 %s
 TASK: "%s"
 
-╭──────────────────┬────────────┬──────────────────────────────────┬────────┬──────┬──────────╮
-│ Run              │ Strategy   │ First Tools                      │ Tokens │ Stat │ Eff.     │
-├──────────────────┼────────────┼──────────────────────────────────┼────────┼──────┼──────────┤
-│ Implicit         │ %-10s │ %-32s │ %-6d │ %s │ %.1fx %s │
-├──────────────────┼────────────┼──────────────────────────────────┼────────┼──────┼──────────┤
-│ Explicit         │ %-10s │ %-32s │ %-6d │ %s │ %.1fx %s │
-╰──────────────────┴────────────┴──────────────────────────────────┴────────┴──────┴──────────╯
+╭──────────────────┬──────────────────────────────┬────────┬──────┬──────────╮
+│ Run              │ Logic                        │ Tokens │ Stat │ Eff.     │
+├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
+│ Implicit         │ %-28s │ %-6d │ %s │ %.1fx %s │
+├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
+│ Explicit         │ %-28s │ %-6d │ %s │ %.1fx %s │
+├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
+│ Blind            │ %-28s │ %-6d │ %s │ %.1fx %s │
+╰──────────────────┴──────────────────────────────┴────────┴──────┴──────────╯
 
-🎯 Protocol Effectiveness: %.1fx better than explicit
+🎯 Protocol Effectiveness: %.1fx better than blind
 (See docs/EVAL.md for scoring rubric)
 
 `,
-		ui.RenderAccent("📊 A/B Comparison Report"),
+		ui.RenderAccent("📊 A/B/C Comparison Report"),
 		task,
-		implicitScore.Strategy, strings.Join(first3Tools(implicit.ToolCalls), " → "),
-		implicit.Tokens.Total,
-		implicitScore.Status,
-		implicitScore.Efficiency, implicitScore.Emoji,
-		explicitScore.Strategy, strings.Join(first3Tools(explicit.ToolCalls), " → "),
-		explicit.Tokens.Total,
-		explicitScore.Status,
-		explicitScore.Efficiency, explicitScore.Emoji,
-		improvement,
+		implicitScore.LogicDesc, implicit.Tokens.Total, implicitScore.Status, calculateEfficiencyHarness(implicitScore, implicit.Tokens.Total, avgTokens), implicitScore.Emoji,
+		explicitScore.LogicDesc, explicit.Tokens.Total, explicitScore.Status, calculateEfficiencyHarness(explicitScore, explicit.Tokens.Total, avgTokens), explicitScore.Emoji,
+		blindScore.LogicDesc, blind.Tokens.Total, blindScore.Status, calculateEfficiencyHarness(blindScore, blind.Tokens.Total, avgTokens), blindScore.Emoji,
+		float64(blind.Tokens.Total)/float64(implicit.Tokens.Total),
 	)
 
 	report += fmt.Sprintf("\n%s\n%s", ui.RenderAccent("🕒 Chronological Tool Traces:"), renderToolCalls("Implicit", implicit.ToolCalls))
 	report += renderToolCalls("Explicit", explicit.ToolCalls)
+	report += renderToolCalls("Blind", blind.ToolCalls)
 
 	return report
+}
+
+func calculateEfficiencyHarness(s Scoring, tokens, avg int) float64 {
+	if tokens == 0 { return 0.0 }
+	return s.Weight * (float64(avg) / float64(tokens))
 }
 
 func renderToolCalls(label string, calls []ToolCall) string {
@@ -517,7 +526,7 @@ func formatToolName(c ToolCall) string {
 
 func scoreTrace(toolCalls []ToolCall) Scoring {
 	if len(toolCalls) == 0 {
-		return Scoring{"Blind", "FAIL", 0.1, "🔴"}
+		return Scoring{"Blind", "Pure Brute-Force", "FAIL", 0.1, "🔴"}
 	}
 
 	intents := make([]string, len(toolCalls))
@@ -546,13 +555,13 @@ func scoreTrace(toolCalls []ToolCall) Scoring {
 	verifyTools := []string{"read_file", "grep/ls", "search_file_content", "glob"}
 
 	if mapFirst(intents, mapTools, verifyTools) {
-		return Scoring{"Optimal", "PASS", 2.5, "🟢🟢"}
+		return Scoring{"Optimal", "Map FIRST + Verify LATER", "PASS", 1.5, "🟢🟢🟢"}
 	} else if disordered(intents, mapTools, verifyTools) {
-		return Scoring{"Disordered", "FAIL", 0.5, "🔴🟠"}
+		return Scoring{"Disordered", "Verify BEFORE Map", "FAIL", 0.5, "🔴🟠"}
 	} else if shallowRetrieval(intents, mapTools) {
-		return Scoring{"Shallow", "PASS", 1.0, "🟠"}
+		return Scoring{"Shallow", "Map ONLY (Risk)", "PASS", 0.8, "🟠"}
 	}
-	return Scoring{"Blind", "FAIL", 0.1, "🔴"}
+	return Scoring{"Blind", "Pure Brute-Force", "FAIL", 0.1, "🔴"}
 }
 
 func mapFirst(tools, mapTools, verifyTools []string) bool {
@@ -680,9 +689,10 @@ func createEvalWorktree(path string) error {
 	return nil
 }
 
-func cleanupEvals(wt1, wt2, tempDir string) {
+func cleanupEvalsABC(wt1, wt2, wt3, tempDir string) {
 	if wt1 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt1).Run() }
 	if wt2 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt2).Run() }
+	if wt3 != "" { _ = exec.Command("git", "worktree", "remove", "--force", wt3).Run() }
 	if tempDir != "" { _ = os.RemoveAll(tempDir) }
 }
 
@@ -715,40 +725,37 @@ func createStash() (string, error) {
 
 func restoreStash(ref string) { _ = exec.Command("git", "stash", "pop", ref).Run() }
 
-func extractAuditLog(wtPath, traceId, task string) {
-	sandboxAuditPath := filepath.Join(wtPath, ".beads", "interactions.jsonl")
-	if _, err := os.Stat(sandboxAuditPath); os.IsNotExist(err) {
-		return 
+func archiveTrace(traceId, task string, trace OpenCodeTrace) {
+	// Reconstruct tool calls with arguments for strategy detection
+	var toolTrace []string
+	for _, tc := range trace.ToolCalls {
+		name := tc.Name
+		if name == "bash" {
+			name = fmt.Sprintf("bash(%s)", tc.Args)
+		}
+		toolTrace = append(toolTrace, name)
 	}
 
-	f, err := os.Open(sandboxAuditPath)
+	entry := audit.Entry{
+		Kind:          "eval_run",
+		EvalSessionID: traceId,
+		CreatedAt:     time.Now().UTC(),
+		Prompt:        task,
+		Response:      trace.Response,
+		Extra: map[string]any{
+			"tokens":     trace.Tokens,
+			"tool_calls": toolTrace,
+		},
+	}
+
+	historyFile := filepath.Join("eval", "history.jsonl")
+	_ = os.MkdirAll(filepath.Dir(historyFile), 0755)
+	
+	f, err := os.OpenFile(historyFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil { return }
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		var entry map[string]interface{}
-		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-			continue
-		}
-		
-		entry["eval_session_id"] = "eval-" + traceId
-		if _, ok := entry["extra"]; !ok {
-			entry["extra"] = make(map[string]interface{})
-		}
-		if extra, ok := entry["extra"].(map[string]interface{}); ok {
-			extra["scenario_id"] = task
-			entry["extra"] = extra
-		}
-
-		if data, err := json.Marshal(entry); err == nil {
-			auditFile, _ := audit.Path()
-			fMain, err := os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if err == nil {
-				fMain.Write(data)
-				fMain.Write([]byte("\n"))
-				fMain.Close()
-			}
-		}
-	}
+	data, _ := json.Marshal(entry)
+	f.Write(data)
+	f.Write([]byte("\n"))
 }
