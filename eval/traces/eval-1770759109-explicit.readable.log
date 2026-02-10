@@ -1,0 +1,49 @@
+I will start by checking the status of the environment and then use the `bd devlog` tools to find information about search strategies.
+🛠️  [TOOL] bash(bd status)
+
+🛠️  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "search strategies")
+I'll resume the last session context and then search for "search strategies" within the devlog.I'll broaden my search to just "search" and list all entities to identify relevant components.
+🛠️  [TOOL] bash(bd devlog search "search" && bd devlog entities)
+I'll sync the devlog to ensure I have the latest information and then list the open issues to see if any are related to search.
+🛠️  [TOOL] bash(bd devlog sync && bd list --status open)
+Now that the devlog is synced, I'll search for "search strategies" and "search" again, and also use glob to find files that might contain search logic.
+🛠️  [TOOL] bash(bd devlog search "search strategies" && bd devlog search "search")
+I'll examine the relationships for `confront-search` and `auto-search` using `bd devlog graph`, and read the `internal/queries/search.go` file to understand the search implementation.
+🛠️  [TOOL] bash(bd devlog graph "confront-search" && bd devlog graph "auto-search" && bd devlog graph "searchcmd")
+I'll read `internal/queries/search.go` to understand the search implementation and search for "search strategy" in the codebase to identify any explicit strategies.
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/explicit/internal/queries/search.go"})
+I'll use `bd devlog show` to inspect sessions `sess-27259e` and `sess-414e8d` for any additional search strategies.
+🛠️  [TOOL] bash(bd devlog show sess-27259e && bd devlog show sess-414e8d)
+
+🛠️  [TOOL] glob({"pattern":"**/heuristics.go"})
+I'll search for the heuristics file to understand how the "Retrieval-First," "Brute-Force," and "Hybrid" strategies are defined, and I'll also check `internal/queries/search.go` for technical search strategies.I'll check `cmd/bd/eval_cmds.go` and search for the scoring engine implementation or imports to find where the "Retrieval-First," "Brute-Force," and "Hybrid" strategies are defined.
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/explicit/cmd/bd/eval_cmds.go"})
+
+🛠️  [TOOL] grep({"pattern":"Retrieval-First|Brute-Force|Hybrid|Optimal|Shallow|Disordered"})
+I'll grep for "Retrieval-First," "Brute-Force," and "Hybrid" to find where they are defined, possibly in `internal/eval/strategy.go` or another file.Search strategies in this project are categorized into **Technical Search Engines** (how the code finds data) and **Agent Methodologies** (how agents use tools).
+
+### 1. Technical Search Strategies (Database Logic)
+Implemented primarily in `internal/queries/search.go` and `internal/queries/fuzzy.go`:
+
+*   **Hybrid Search**: The primary engine combining SQLite FTS5 (BM25) ranking with Entity Graph Expansion.
+*   **BM25 Text Search**: Full-text search on session narratives and titles using the SQLite BM25 algorithm.
+*   **Entity Search & Expansion**: Matches terms against entities and expands results to include all sessions linked to those entities via the `session_entities` graph.
+*   **Strict Mode**: Limits search to direct BM25 matches on sessions, disabling expansion logic.
+*   **Text-Only Mode**: Disables entity lookups entirely, focusing solely on text relevance.
+*   **Fuzzy/Levenshtein Matching**: Used for "Did you mean?" suggestions and clustering sessions by prompt similarity in evaluation reports.
+*   **Auto-Search**: A fallback mechanism that automatically re-triggers a search with a fuzzy-corrected term if the initial query returns zero results.
+*   **Prefix Matching**: Automatically appends `*` to simple query terms to enable partial matching.
+
+### 2. Agent Methodologies (Workflow Strategies)
+Used by the `bd eval` suite to classify agent behavior and efficiency:
+
+*   **Optimal (Mastery)**: **Retrieval-First.** Agent uses `bd` mapping tools (graph, search) FIRST to locate context, then verifies with classic tools (read, grep) LATER.
+*   **Shallow**: Agent uses mapping tools but fails to verify findings with code-level tools, creating a hallucination risk.
+*   **Disordered**: Agent uses classic verification tools BEFORE mapping tools, breaking the "Map the Landscape" protocol.
+*   **Base / Blind (Pure Brute-Force)**: Agent ignores all `bd` retrieval tools and relies entirely on high-token `grep` and `find` operations.
+*   **Hybrid Workflow**: A mix of both, usually scored based on the sequence and token efficiency.
+
+### 3. Efficiency Metrics
+*   **Weighted Efficiency**: A composite score calculating `Strategy Weight (Optimal=1.5x) × Relative Token Efficiency` to reward high-quality, low-cost behavior.
+
+quit

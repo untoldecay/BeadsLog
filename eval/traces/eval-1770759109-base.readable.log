@@ -1,0 +1,51 @@
+
+🛠️  [TOOL] glob({"pattern":"**/*search*"})
+
+🛠️  [TOOL] grep({"pattern":"search strategy|SearchStrategy"})
+
+🛠️  [TOOL] grep({"pattern":"strategy|Strategy"})
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/queries/search.go"})
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/queries/fuzzy.go"})
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/cmd/bd/search.go"})
+
+🛠️  [TOOL] grep({"pattern":"func.*SearchIssues"})
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/storage/sqlite/queries.go","limit":200,"offset":1700})
+Based on the codebase analysis using standard Unix tools, here are all the search strategies implemented in the project:
+
+### 1. Issue Search Strategies (`bd search`)
+These strategies are primarily used for finding and filtering tracking issues within the SQLite store:
+*   **Keyword Search:** Global substring matching across `title`, `description`, and `id` using SQL `LIKE`.
+*   **Field-Specific Matching:** Targeted `LIKE` queries for `title`, `description`, and `notes`.
+*   **Status Filtering:** Exact match filtering or exclusion (e.g., defaulting to non-closed issues).
+*   **Priority Range Search:** Filtering by exact priority or inclusive ranges (`priority-min`, `priority-max`).
+*   **Label Logic:**
+    *   **AND Strategy:** Requiring that an issue has *all* specified labels.
+    *   **OR Strategy:** Requiring that an issue has *at least one* of the specified labels.
+*   **Date Range Filtering:** Chronological filtering based on `created_at`, `updated_at`, or `closed_at` timestamps.
+*   **Relational Search:** Filtering issues by `parent_id` or identifying hierarchical dependencies.
+*   **Metadata Filtering:** specialized searches for `Pinned`, `Ephemeral/Wisp`, or `Template` issues.
+*   **Negative Filtering:** Identifying issues with missing data (e.g., `No Assignee`, `No Labels`, `Empty Description`).
+
+### 2. Session & Entity Search Strategies (Hybrid Search)
+Used for deeper discovery within the devlog and entity graph:
+*   **BM25 Text Search:** SQLite FTS5 relevance-based matching on session content (best for natural language queries).
+*   **Entity Search & Expansion:** Identifying entities mentioned in search terms and expanding results to include related sessions via the entity graph.
+*   **FTS Prefix Match:** Fast prefix lookups (e.g., `mod*` matching `Modal`) for autocompletion.
+*   **SQL LIKE Fallback:** A substring matching strategy used when FTS prefix matching fails to yield enough results.
+*   **Typo Correction (Levenshtein):** A strategy using Levenshtein distance (max distance 2) to find intended entity matches for misspelled queries.
+*   **Fuzzy Matching:** Character-skip matching (e.g., `ccm` matching `CreateColumnModal`) to handle complex entity names.
+
+### 3. Template & Reference Resolution
+*   **Direct ID Resolution:** Identifying templates or issues by their unique identifiers.
+*   **Title-Based Proto Search:** Resolving template prototypes by searching for matching titles.
+*   **Hierarchical Discovery:** Finding children or dependents through ID pattern recognition or dependency links.
+
+### 4. Implementation Design Strategies
+*   **"Fast-First, Smart-Later":** A strategy used in devlog extraction to prioritize rapid processing before applying complex analysis.
+*   **Adaptive Scaling:** A strategy for ID generation and collision avoidance that scales based on the volume of data.
+
+quit

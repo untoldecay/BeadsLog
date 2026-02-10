@@ -232,11 +232,8 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 	)
 	cmd.Dir = wtDir
 
-	// Auth + workspace
-	env := os.Environ()
-	env = append(env, "GOOGLE_GENERATIVE_AI_API_KEY="+apiKey)
-	env = append(env, "BEADS_DIR="+beadsDir)
-	cmd.Env = env
+	// Auth + workspace + HOME isolation
+	cmd.Env = getSandboxEnv(wtDir, apiKey, beadsDir)
 
 	// Use pipe to capture stdout for streaming parse
 	cmdReader, err := cmd.StdoutPipe()
@@ -645,12 +642,12 @@ func createEvalWorktree(path string) error {
 
 	initCmd := exec.Command(exe, "init", "--quiet", "--force")
 	initCmd.Dir = path
-	initCmd.Env = append(os.Environ(), "BEADS_DIR="+beadsDir)
+	initCmd.Env = getSandboxEnv(path, "", beadsDir)
 	_ = initCmd.Run()
 
 	readyCmd := exec.Command(exe, "ready")
 	readyCmd.Dir = path
-	readyCmd.Env = append(os.Environ(), "BEADS_DIR="+beadsDir)
+	readyCmd.Env = getSandboxEnv(path, "", beadsDir)
 	_ = readyCmd.Run()
 
 	absExe, _ := filepath.Abs(exe)
@@ -682,6 +679,19 @@ func getEvalApiKey() string {
 		}
 	}
 	return os.Getenv("GEMINI_API_KEY")
+}
+
+func getSandboxEnv(homeDir string, apiKey string, beadsDir string) []string {
+	env := os.Environ()
+	// Override HOME to sandbox root to isolate global config/registry
+	env = append(env, "HOME="+homeDir)
+	if apiKey != "" {
+		env = append(env, "GOOGLE_GENERATIVE_AI_API_KEY="+apiKey)
+	}
+	if beadsDir != "" {
+		env = append(env, "BEADS_DIR="+beadsDir)
+	}
+	return env
 }
 
 func createStash() (string, error) {

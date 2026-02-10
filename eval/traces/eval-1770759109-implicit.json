@@ -1,0 +1,70 @@
+{
+  "tool_calls": [
+    {
+      "name": "bash",
+      "args": "bd status",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog resume --last 1",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog search \"search strategies\"",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog search \"search\"",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog sync \u0026\u0026 ls -R",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/implicit/internal/queries/search.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/implicit/internal/queries/fuzzy.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/implicit/_rules/_analysis/2026-01-16_confront-search-optimisation.md\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/implicit/internal/utils/string_fuzzy.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/implicit/internal/utils/string_distance.go\"}",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog --help",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog search --help",
+      "result": ""
+    }
+  ],
+  "response": "The BeadsLog project employs several search strategies to provide relevant results for CLI and agent-based workflows:\n\n1.  **Hybrid Search (Default):** Combines BM25 text search with entity graph expansion. It first ranks sessions by text relevance and then pulls in related sessions based on mentioned entities.\n2.  **BM25 Text Search:** Utilizes SQLite FTS5 for relevance ranking based on term frequency and document length. It supports boolean operators (`AND`, `NOT`), phrase matching, and automatic prefix matching (`term*`) for simple words.\n3.  **Entity Expansion:** A 1-hop graph traversal strategy that finds sessions linked to entities discovered in the initial text search phase.\n4.  **Fuzzy Match:** Used by `bd devlog graph` and `bd devlog impact`. It performs case-insensitive, order-preserving character matching (e.g., `mod` matches `managecolumnsmodal`).\n5.  **SQL LIKE Fallback:** Naive substring matching (`%term%`) used as a fallback when FTS queries return no results or fail.\n6.  **Levenshtein Distance (Typo Correction):** Used for \"Did you mean?\" suggestions when an entity lookup fails (maximum distance of 2).\n7.  **Strict Mode:** A flag (`--strict`) that disables all fuzzy logic, prefix appending, and entity expansion, requiring exact keyword matches.\n8.  **Text-Only Mode:** A flag (`--text-only`) that limits search to pure BM25 relevance, disabling the entity graph expansion phase.\n",
+  "tokens_used": {
+    "input": 141115,
+    "output": 1035,
+    "total": 142150
+  }
+}

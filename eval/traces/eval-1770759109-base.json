@@ -1,0 +1,50 @@
+{
+  "tool_calls": [
+    {
+      "name": "glob",
+      "args": "{\"pattern\":\"**/*search*\"}",
+      "result": ""
+    },
+    {
+      "name": "grep",
+      "args": "{\"pattern\":\"search strategy|SearchStrategy\"}",
+      "result": ""
+    },
+    {
+      "name": "grep",
+      "args": "{\"pattern\":\"strategy|Strategy\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/queries/search.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/queries/fuzzy.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/cmd/bd/search.go\"}",
+      "result": ""
+    },
+    {
+      "name": "grep",
+      "args": "{\"pattern\":\"func.*SearchIssues\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2225460539/base/internal/storage/sqlite/queries.go\",\"limit\":200,\"offset\":1700}",
+      "result": ""
+    }
+  ],
+  "response": "Based on the codebase analysis using standard Unix tools, here are all the search strategies implemented in the project:\n\n### 1. Issue Search Strategies (`bd search`)\nThese strategies are primarily used for finding and filtering tracking issues within the SQLite store:\n*   **Keyword Search:** Global substring matching across `title`, `description`, and `id` using SQL `LIKE`.\n*   **Field-Specific Matching:** Targeted `LIKE` queries for `title`, `description`, and `notes`.\n*   **Status Filtering:** Exact match filtering or exclusion (e.g., defaulting to non-closed issues).\n*   **Priority Range Search:** Filtering by exact priority or inclusive ranges (`priority-min`, `priority-max`).\n*   **Label Logic:**\n    *   **AND Strategy:** Requiring that an issue has *all* specified labels.\n    *   **OR Strategy:** Requiring that an issue has *at least one* of the specified labels.\n*   **Date Range Filtering:** Chronological filtering based on `created_at`, `updated_at`, or `closed_at` timestamps.\n*   **Relational Search:** Filtering issues by `parent_id` or identifying hierarchical dependencies.\n*   **Metadata Filtering:** specialized searches for `Pinned`, `Ephemeral/Wisp`, or `Template` issues.\n*   **Negative Filtering:** Identifying issues with missing data (e.g., `No Assignee`, `No Labels`, `Empty Description`).\n\n### 2. Session \u0026 Entity Search Strategies (Hybrid Search)\nUsed for deeper discovery within the devlog and entity graph:\n*   **BM25 Text Search:** SQLite FTS5 relevance-based matching on session content (best for natural language queries).\n*   **Entity Search \u0026 Expansion:** Identifying entities mentioned in search terms and expanding results to include related sessions via the entity graph.\n*   **FTS Prefix Match:** Fast prefix lookups (e.g., `mod*` matching `Modal`) for autocompletion.\n*   **SQL LIKE Fallback:** A substring matching strategy used when FTS prefix matching fails to yield enough results.\n*   **Typo Correction (Levenshtein):** A strategy using Levenshtein distance (max distance 2) to find intended entity matches for misspelled queries.\n*   **Fuzzy Matching:** Character-skip matching (e.g., `ccm` matching `CreateColumnModal`) to handle complex entity names.\n\n### 3. Template \u0026 Reference Resolution\n*   **Direct ID Resolution:** Identifying templates or issues by their unique identifiers.\n*   **Title-Based Proto Search:** Resolving template prototypes by searching for matching titles.\n*   **Hierarchical Discovery:** Finding children or dependents through ID pattern recognition or dependency links.\n\n### 4. Implementation Design Strategies\n*   **\"Fast-First, Smart-Later\":** A strategy used in devlog extraction to prioritize rapid processing before applying complex analysis.\n*   **Adaptive Scaling:** A strategy for ID generation and collision avoidance that scales based on the volume of data.\n\nquit\n",
+  "tokens_used": {
+    "input": 88606,
+    "output": 1079,
+    "total": 89685
+  }
+}

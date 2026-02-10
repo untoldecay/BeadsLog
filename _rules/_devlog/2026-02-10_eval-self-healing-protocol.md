@@ -25,6 +25,9 @@ Developed an interactive detection system for leftover `bd eval auto-stash` entr
 #### **4. Parallel Safety**
 Temporary sandbox directories are now named `beads-eval-<proj_hash>-<ts>`. This prevents a `bd eval task` run in Project A from accidentally "healing" (deleting) an active eval sandbox in Project B.
 
+#### **5. Environment Isolation (Global Registry Protection)**
+Overrode `HOME` for all sandbox operations to prevent `bd init` and `bd daemon` from registering temporary sandbox projects in the user's global `~/.beads/registry.json`. Registry and global config now live within the sandbox and are deleted during cleanup.
+
 ---
 
 ### **Verification**
