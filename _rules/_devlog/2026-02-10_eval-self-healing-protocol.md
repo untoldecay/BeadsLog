@@ -36,3 +36,12 @@ Successfully validated the protocol by simulating a timeout/crash (via `Ctrl+C` 
 - runOpenCodeEval -> getProjectHash (isolation)
 - runOpenCodeEval -> pruneProjectOrphans (sanitization)
 - runOpenCodeEval -> handleLeftoverStashes (recovery)
+
+### **Refinement: Logic-Based Metrics & Base Reference**
+Updated the A/B/C harness to use a static **Base** reference (formerly "Blind") for efficiency calculations.
+-   **Base Run**: Hardcoded to `1.0x` efficiency (Reference).
+-   **Logic Phases**: Defined strict sequence: `Hydration` -> `Mapping` -> `Verification`.
+-   **Efficiency Formula**: `(Tokens(Base) / Tokens(Run)) * StrategyBonus`.
+    -   Optimal Strategy Bonus: 1.5x
+    -   Shallow Strategy Bonus: 0.8x
+    -   Disordered Strategy Bonus: 0.5x
