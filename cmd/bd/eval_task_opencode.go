@@ -359,7 +359,18 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 				}
 				msg = fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display)
 			case "tool_result":
-				msg = "✅ [DONE]\n"
+				result := ""
+				if part, ok := event["part"].(map[string]interface{}); ok {
+					if r, ok := part["output"].(string); ok { result = r }
+				}
+				if result != "" {
+					if len(result) > 500 {
+						result = result[:497] + "..."
+					}
+					msg = fmt.Sprintf("✅ [RESULT] %s\n", result)
+				} else {
+					msg = "✅ [DONE]\n"
+				}
 			}
 
 			if msg != "" {
@@ -427,11 +438,16 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 	case "tool_result":
 		if len(trace.ToolCalls) > 0 {
 			result := ""
+			// Check both 'part' and 'result' top-level keys
 			if part, ok := event["part"].(map[string]interface{}); ok {
 				if r, ok := part["output"].(string); ok {
 					result = r
+				} else if r, ok := part["result"].(string); ok {
+					result = r
 				}
 			} else if r, ok := event["result"].(string); ok {
+				result = r
+			} else if r, ok := event["output"].(string); ok {
 				result = r
 			}
 			trace.ToolCalls[len(trace.ToolCalls)-1].Result = result
@@ -562,9 +578,9 @@ TASK: "%s"
 ╭──────────────────┬──────────────────────────────┬────────┬──────┬──────────╮
 │ Run              │ Logic                        │ Tokens │ Stat │ Eff.     │
 ├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
-│ Implicit         │ %-28s │ %-6d │ %s │ %.1fx %s │
+│ Implicit         │ %-28s │ %-6d │ %s │ %-8s │
 ├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
-│ Explicit         │ %-28s │ %-6d │ %s │ %.1fx %s │
+│ Explicit         │ %-28s │ %-6d │ %s │ %-8s │
 ├──────────────────┼──────────────────────────────┼────────┼──────┼──────────┤
 │ Base             │ -                            │ %-6d │ REF  │ 1.0x ⚪   │
 ╰──────────────────┴──────────────────────────────┴────────┴──────┴──────────╯
@@ -575,8 +591,8 @@ TASK: "%s"
 `,
 		ui.RenderAccent("📊 A/B/C Comparison Report"),
 		task,
-		implicitScore.LogicDesc, implicit.Tokens.Total, implicitScore.Status, implicitEff, implicitScore.Emoji,
-		explicitScore.LogicDesc, explicit.Tokens.Total, explicitScore.Status, explicitEff, explicitScore.Emoji,
+		implicitScore.LogicDesc, implicit.Tokens.Total, implicitScore.Status, fmt.Sprintf("%.1fx %s", implicitEff, implicitScore.Emoji),
+		explicitScore.LogicDesc, explicit.Tokens.Total, explicitScore.Status, fmt.Sprintf("%.1fx %s", explicitEff, explicitScore.Emoji),
 		baseTokens,
 		float64(baseTokens)/float64(implicit.Tokens.Total),
 	)
