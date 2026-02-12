@@ -11,9 +11,9 @@ Eval Mode attaches a unique **Session ID** to every command executed by an agent
 ### 🔄 The Eval Lifecycle
 
 1.  **Test:** `bd eval task`
-    - Automated A/B/C testing in isolated sandboxes.
-    - Compares Implicit, Explicit, and Base (Unix-only) protocols.
-    - Features real-time trace visibility and auto-stashing of local work.
+    - High-speed A/B/C testing using parallel execution (>5x speedup).
+    - Compares Implicit, Explicit, and Base (restricted) protocols.
+    - Features a real-time Bubble Tea progress UI and automated pre-hydration.
 2.  **Start:** `bd eval start [scenario_id]`
     - Activates high-fidelity tracing for manual agent runs.
     - Sets the "Intent" or "Scenario" for grouping.
@@ -96,9 +96,10 @@ The `task` command is the flagship evaluation harness for protocol research. It 
 To ensure that automated evaluations don't interfere with your development work or other parallel projects:
 
 1.  **Project Namespacing:** All temporary worktrees and directories are tagged with a unique hash of your project path. This prevents `bd eval clean` from accidentally deleting artifacts from other BeadsLog-managed repositories.
-2.  **Auto-Stashing:** Your current uncommitted changes are automatically stashed before a test begins and restored once you quit the interactive menu.
-3.  **Stash Recovery UI:** If a test crashes, BeadsLog detects the leftover `bd eval auto-stash` on the next run and prompts you to Restore, Clear, or Ignore it.
-4.  **Worktree Isolation:** Sandboxes use `git worktree` with detached HEADs and forced index resets to ensure complete filesystem isolation from your main branch.
+2.  **Invisible Snapshots:** Instead of traditional stashing, the harness creates an "invisible" git snapshot of your work (via `commit-tree`) on a temporary backup branch. This ensures your local workspace is never cleared or disrupted.
+3.  **Stash Recovery UI:** If a test crashes, BeadsLog detects any leftover `bd eval auto-stash` or backup branches on the next run and prompts you to Restore, Clear, or Ignore it.
+4.  **Total Isolation:** Sandboxes use fresh `git init` repositories instead of shared worktrees. This prevents uncommitted sandbox changes from leaking back to the main index.
+5.  **Pre-Hydration:** The harness automatically runs `bd onboard` during setup, ensuring retrieval tools work immediately without manual agent intervention.
 
 ## 🔒 Privacy & Security
 

@@ -40,6 +40,16 @@ To optimize the evaluation harness (`bd eval task`) by implementing parallel exe
 
 ---
 
+### **Phase 4: Documentation Synchronisation**
+
+**Initial Problem:** `docs/EVAL.md` was outdated and still referenced "Worktree Isolation" and "Auto-Stashing".
+
+*   **My Assumption/Plan #1:** Update the documentation to reflect the shift to `git init` (Total Isolation) and `commit-tree` (Invisible Snapshots).
+    *   **Action Taken:** Updated `docs/EVAL.md` with new sections for Parallel Execution, Pre-Hydration, Total Isolation, and Invisible Snapshots.
+    *   **Result:** Documentation now accurately describes the high-performance, concurrent evaluation architecture.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** **Complete.** The evaluation harness is now significantly faster (>5x speed multiplier) and provides a much better developer experience with live progress monitoring.
