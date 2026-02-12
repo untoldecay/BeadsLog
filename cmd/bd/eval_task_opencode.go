@@ -8,9 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/audit"
 	"github.com/untoldecay/BeadsLog/internal/eval"
@@ -62,6 +66,105 @@ type Scoring struct {
 	Status     string
 	Bonus      float64
 	Emoji      string
+}
+
+// UI Models and Messages
+type EvalRun struct {
+	Name     string
+	Status   string // "Running", "Done", "Failed"
+	Duration time.Duration
+	LastTool string
+}
+
+type EvalUpdateMsg struct {
+	Index    int
+	Status   string
+	LastTool string
+	Result   OpenCodeTrace
+}
+
+type progressModel struct {
+	runs    []*EvalRun
+	spinner spinner.Model
+	done    bool
+	quitting bool
+}
+
+func (m progressModel) Init() tea.Cmd {
+	return m.spinner.Tick
+}
+
+func (m progressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			m.quitting = true
+			return m, tea.Quit
+		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	case EvalUpdateMsg:
+		m.runs[msg.Index].Status = msg.Status
+		m.runs[msg.Index].LastTool = msg.LastTool
+		
+		allDone := true
+		for _, r := range m.runs {
+			if r.Status == "Running" {
+				allDone = false
+				break
+			}
+		}
+		if allDone {
+			m.done = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m progressModel) View() string {
+	if m.quitting {
+		return ""
+	}
+
+	var b strings.Builder
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")).Padding(0, 1)
+	b.WriteString(headerStyle.Render("📊 Live Evaluation Progress"))
+	b.WriteString("\n\n")
+
+	for _, r := range m.runs {
+		var status string
+		if r.Status == "Running" {
+			status = m.spinner.View() + " Running"
+		} else if r.Status == "Done" {
+			status = "✅ Done"
+		} else {
+			status = "❌ Failed"
+		}
+
+		tool := r.LastTool
+		if tool == "" {
+			tool = "-"
+		}
+		if len(tool) > 30 {
+			tool = tool[:27] + "..."
+		}
+
+		row := fmt.Sprintf(" %-10s │ %-10s │ %-30s", r.Name, status, tool)
+		b.WriteString(row + "\n")
+	}
+
+	if m.done {
+		b.WriteString("\n✅ All evaluations complete!\n")
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(1).
+		Width(60).
+		Render(b.String())
 }
 
 func getToolCategoryIcon(name, args string) string {
@@ -141,35 +244,73 @@ func runOpenCodeEval() {
 					eval.SafeCleanupABC(wtImplicit, wtExplicit, wtBase, tempDir)
 					return
 				}
-				fmt.Printf("  %s Sandbox: Ready (via %s)\n", name, backupBranch)
+				fmt.Printf("  %s Sandbox: Ready\n", name)
 			}
 
-			// 4. RUN TESTS
-			traceIdImplicit := "eval-" + runTimestamp + "-implicit"
-			implicitResult := runOpenCodeTest(wtImplicit, task, traceIdImplicit, false)
+			// 4. RUN TESTS IN PARALLEL
+			fmt.Printf("\n🚀 Launching parallel evaluations...\n")
+			
+			runs := []*EvalRun{
+				{Name: "Implicit", Status: "Running"},
+				{Name: "Explicit", Status: "Running"},
+				{Name: "Base", Status: "Running"},
+			}
+			
+			s := spinner.New()
+			s.Spinner = spinner.Dot
+			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+			
+			m := progressModel{
+				runs:    runs,
+				spinner: s,
+			}
+			
+			p := tea.NewProgram(m)
+			
+			results := make([]OpenCodeTrace, 3)
+			var wg sync.WaitGroup
+			
+			// Implicit
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				traceId := "eval-" + runTimestamp + "-implicit"
+				results[0] = runOpenCodeTestParallel(wtImplicit, task, traceId, 0, p)
+			}()
 
-			time.Sleep(2 * time.Second) // Settle time
+			// Explicit
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				traceId := "eval-" + runTimestamp + "-explicit"
+				explicitTask := fmt.Sprintf("%s\n\n(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)", task)
+				results[1] = runOpenCodeTestParallel(wtExplicit, explicitTask, traceId, 1, p)
+			}()
 
-			traceIdExplicit := "eval-" + runTimestamp + "-explicit"
-			explicitTask := fmt.Sprintf("%s\n\n(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)", task)
-			explicitResult := runOpenCodeTest(wtExplicit, explicitTask, traceIdExplicit, true)
+			// Base
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				traceId := "eval-" + runTimestamp + "-base"
+				baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: The 'bd' and 'beads' tools are currently unavailable in this environment. Please complete the task using only standard Unix tools like grep, find, ls, and direct file reading. Do your best with the available tools.)", task)
+				results[2] = runOpenCodeTestParallel(wtBase, baseTask, traceId, 2, p)
+			}()
 
-			time.Sleep(2 * time.Second) // Settle time
-
-			traceIdBase := "eval-" + runTimestamp + "-base"
-			baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: The 'bd' and 'beads' tools are currently unavailable in this environment. Please complete the task using only standard Unix tools like grep, find, ls, and direct file reading. Do your best with the available tools.)", task)
-			baseResult := runOpenCodeTest(wtBase, baseTask, traceIdBase, false)
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running progress UI: %v\n", err)
+			}
+			wg.Wait()
 
 			// 5. REPORT
 			fmt.Printf("\nGenerating comparative report...\n")
-			report := generateABCReport(task, implicitResult, explicitResult, baseResult)
+			report := generateABCReport(task, results[0], results[1], results[2])
 			fmt.Println(report)
 			
 			// Show paths to logs
 			fmt.Printf("\n✨ Logs from this run are available at:\n")
-			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdImplicit)
-			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdExplicit)
-			fmt.Printf("  - _rules/_evals/results/%s.log\n", traceIdBase)
+			fmt.Printf("  - _rules/_evals/results/eval-%s-implicit.log\n", runTimestamp)
+			fmt.Printf("  - _rules/_evals/results/eval-%s-explicit.log\n", runTimestamp)
+			fmt.Printf("  - _rules/_evals/results/eval-%s-base.log\n", runTimestamp)
 
 			// 6. INTERACTIVE MENU
 			var action string
@@ -262,38 +403,43 @@ func createBackupBranch(name string) error {
 	return nil
 }
 
-func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
-	fmt.Printf("  Executing %s... ", filepath.Base(wtDir))
-
+func runOpenCodeTestParallel(wtDir, task, traceId string, index int, p *tea.Program) OpenCodeTrace {
 	opencodePath, err := exec.LookPath("opencode")
 	if err != nil {
-		fmt.Println("Failed (opencode CLI missing)")
+		p.Send(EvalUpdateMsg{Index: index, Status: "Failed", LastTool: "CLI Missing"})
 		return OpenCodeTrace{}
 	}
 
 	apiKey := getEvalApiKey()
 	if apiKey == "" {
-		fmt.Println("Failed (GEMINI_API_KEY missing)")
+		p.Send(EvalUpdateMsg{Index: index, Status: "Failed", LastTool: "No API Key"})
 		return OpenCodeTrace{}
 	}
 
 	beadsDir := filepath.Join(wtDir, ".beads")
 
-	// OpenCode CLI headless run
-	cmd := exec.Command(opencodePath, "run",
-		"--format", "json",
-		"--model", "google/gemini-flash-latest",
-		task,
-	)
-	cmd.Dir = wtDir
-
-	// Auth + workspace + HOME isolation
-	cmd.Env = getSandboxEnv(wtDir, apiKey, beadsDir)
-
+		// OpenCode CLI headless run
+		cmd := exec.Command(opencodePath, "run",
+			"--format", "json",
+			"--model", "google/gemini-flash-latest",
+			task,
+		)
+		cmd.Dir = wtDir
+	
+		// Auth + workspace + HOME isolation + FEATURE STRIPPING
+		cmd.Env = getSandboxEnv(wtDir, apiKey, beadsDir)
+		cmd.Env = append(cmd.Env, 
+			"OPENCODE_DISABLE_STORAGE=1",
+			"OPENCODE_LOG_LEVEL=error",
+			"OPENCODE_EXPERIMENTAL_FILEWATCHER=0",
+			"OPENCODE_NO_MDNS=1",
+			"OPENCODE_OUTPUT_TOKEN_MAX=2048",
+			"GOOGLE_GENERATIVE_AI_API_KEY="+apiKey,
+		)
 	// Use pipe to capture stdout for streaming parse
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Printf("Failed to create pipe: %v\n", err)
+		p.Send(EvalUpdateMsg{Index: index, Status: "Failed", LastTool: "Pipe Fail"})
 		return OpenCodeTrace{}
 	}
 	// stderr to file for debugging
@@ -301,7 +447,7 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 	cmd.Stderr = errFile
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("Failed start: %v\n", err)
+		p.Send(EvalUpdateMsg{Index: index, Status: "Failed", LastTool: "Start Fail"})
 		return OpenCodeTrace{}
 	}
 
@@ -317,10 +463,7 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 	readableLogFile.WriteString(fmt.Sprintf("QUERY: %s\n", task))
 	readableLogFile.WriteString(strings.Repeat("=", 60) + "\n\n")
 
-	fmt.Printf("\n--- [%s] START ---\n", traceId)
-
 	var trace OpenCodeTrace
-	var streamContent []string
 	
 	scanner := bufio.NewScanner(cmdReader)
 	for scanner.Scan() {
@@ -337,15 +480,14 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 
 			// REAL-TIME VISIBILITY
 			eventType, _ := event["type"].(string)
-			var msg string
 			switch eventType {
 			case "reasoning", "thought":
 				if text, ok := getEventText(event); ok && text != "" {
-					msg = fmt.Sprintf("\n💭 [THINKING] %s\n", text)
+					readableLogFile.WriteString(fmt.Sprintf("\n💭 [THINKING] %s\n", text))
 				}
 			case "text":
 				if text, ok := getEventText(event); ok && text != "" {
-					msg = text
+					readableLogFile.WriteString(text)
 				}
 			case "tool_use":
 				tool, _ := getEventTool(event)
@@ -357,11 +499,11 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 				} else if args != "" {
 					display = fmt.Sprintf("%s(%s)", tool, args)
 				}
-				msg = fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display)
+				p.Send(EvalUpdateMsg{Index: index, Status: "Running", LastTool: icon + " " + display})
+				readableLogFile.WriteString(fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display))
 			case "tool_result":
-				msg = "✅ [DONE]\n"
+				readableLogFile.WriteString("✅ [DONE]\n")
 				result := ""
-				// Use the getEventText helper logic or manual extract
 				if r, ok := event["result"].(string); ok {
 					result = r
 				} else if part, ok := event["part"].(map[string]interface{}); ok {
@@ -377,26 +519,7 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 					if len(displayResult) > 500 {
 						displayResult = displayResult[:497] + "..."
 					}
-					msg = fmt.Sprintf("✅ [RESULT] %s\n", displayResult)
-				}
-			}
-
-			if msg != "" {
-				readableLogFile.WriteString(msg)
-				streamContent = append(streamContent, strings.Split(msg, "\n")...)
-				
-				// Keep only last 10 lines for display
-				displayLines := streamContent
-				if len(displayLines) > 10 {
-					displayLines = displayLines[len(displayLines)-10:]
-				}
-				
-				// Clear current block and print viewport-like output
-				// We use ANSI codes to go up 11 lines and clear
-				fmt.Print("\033[11A\033[J") 
-				fmt.Printf("--- [%s] LIVE STREAM (LAST 10 LINES) ---\n", traceId)
-				for _, l := range displayLines {
-					fmt.Println(l)
+					readableLogFile.WriteString(fmt.Sprintf("✅ [RESULT] %s\n", displayResult))
 				}
 			}
 		}
@@ -404,8 +527,6 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 
 	cmd.Wait()
 	errFile.Close()
-	fmt.Printf("\n--- [%s] END ---\n", traceId)
-	fmt.Print("Done\n")
 
 	// Save structured trace
 	traceFile := filepath.Join("eval", "traces", traceId+".json")
@@ -423,6 +544,8 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 
 	// ARCHIVE to History (for 'bd eval report')
 	archiveTrace(traceId, task, trace)
+
+	p.Send(EvalUpdateMsg{Index: index, Status: "Done", LastTool: "Completed"})
 
 	return trace
 }
@@ -789,6 +912,13 @@ func createEvalWorktree(path, sourceBranch string) error {
 	readyCmd.Dir = path
 	readyCmd.Env = getSandboxEnv(path, "", beadsDir)
 	_ = readyCmd.Run()
+
+	// 5. PRE-HYDRATE (Onboard) so the agent starts with a populated graph
+	// We use --quiet to avoid hanging
+	onboardCmd := exec.Command(exe, "onboard", "--quiet")
+	onboardCmd.Dir = path
+	onboardCmd.Env = getSandboxEnv(path, "", beadsDir)
+	_ = onboardCmd.Run()
 
 	absExe, _ := filepath.Abs(exe)
 	// Disable OpenCode git features to prevent auto-revert

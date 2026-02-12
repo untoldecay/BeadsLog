@@ -3,7 +3,6 @@ package eval
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -22,52 +21,38 @@ func GetProjectHash() string {
 	return fmt.Sprintf("%x", h)
 }
 
-// PruneProjectOrphans removes stale eval worktrees belonging to this project
+// PruneProjectOrphans removes stale eval directories belonging to this project
 func PruneProjectOrphans() int {
 	projHash := GetProjectHash()
 	marker := "beads-eval-" + projHash + "-"
 	
-	out, err := exec.Command("git", "worktree", "list", "--porcelain").Output()
+	tempBase := os.TempDir()
+	entries, err := os.ReadDir(tempBase)
 	if err != nil {
 		return 0
 	}
 
 	count := 0
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "worktree ") {
-			path := strings.TrimPrefix(line, "worktree ")
-			// Only remove if it belongs to this project's namespace
-			if strings.Contains(path, marker) {
-				if err := exec.Command("git", "worktree", "remove", "--force", path).Run(); err == nil {
-					count++
-					// Also try to remove the parent temp directory if it's an eval dir
-					parent := filepath.Dir(path)
-					if strings.Contains(filepath.Base(parent), marker) {
-						_ = os.RemoveAll(parent)
-					}
-				}
+	for _, entry := range entries {
+		if entry.IsDir() && strings.Contains(entry.Name(), marker) {
+			path := filepath.Join(tempBase, entry.Name())
+			if err := os.RemoveAll(path); err == nil {
+				count++
 			}
 		}
 	}
 	
-	_ = exec.Command("git", "worktree", "prune").Run()
 	return count
 }
 
-// SafeCleanupABC cleans up specific worktrees and their parent directory
+// SafeCleanupABC cleans up specific sandbox directories and their parent
 func SafeCleanupABC(wt1, wt2, wt3, tempDir string) {
 	projHash := GetProjectHash()
 	marker := "beads-eval-" + projHash + "-"
 
-	for _, wt := range []string{wt1, wt2, wt3} {
-		if wt != "" && strings.Contains(wt, marker) {
-			_ = exec.Command("git", "worktree", "remove", "--force", wt).Run()
-		}
-	}
-	
+	// Since we use git init in a parent tempDir, 
+	// removing tempDir is sufficient if it matches the marker.
 	if tempDir != "" && strings.Contains(tempDir, marker) {
 		_ = os.RemoveAll(tempDir)
 	}
-	_ = exec.Command("git", "worktree", "prune").Run()
 }
