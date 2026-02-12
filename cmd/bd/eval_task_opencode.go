@@ -501,26 +501,21 @@ func runOpenCodeTestParallel(wtDir, task, traceId string, index int, p *tea.Prog
 				}
 				p.Send(EvalUpdateMsg{Index: index, Status: "Running", LastTool: icon + " " + display})
 				readableLogFile.WriteString(fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display))
+
+				// Extract result from state if available
+				if part, ok := event["part"].(map[string]interface{}); ok {
+					if state, ok := part["state"].(map[string]interface{}); ok {
+						if output, ok := state["output"].(string); ok && output != "" {
+							displayResult := output
+							if len(displayResult) > 5000 {
+								displayResult = displayResult[:4997] + "..."
+							}
+							readableLogFile.WriteString(fmt.Sprintf("✅ [RESULT] %s\n", displayResult))
+						}
+					}
+				}
 			case "tool_result":
 				readableLogFile.WriteString("✅ [DONE]\n")
-				result := ""
-				if r, ok := event["result"].(string); ok {
-					result = r
-				} else if part, ok := event["part"].(map[string]interface{}); ok {
-					if r, ok := part["output"].(string); ok {
-						result = r
-					} else if r, ok := part["result"].(string); ok {
-						result = r
-					}
-				}
-				
-				if result != "" {
-					displayResult := result
-					if len(displayResult) > 500 {
-						displayResult = displayResult[:497] + "..."
-					}
-					readableLogFile.WriteString(fmt.Sprintf("✅ [RESULT] %s\n", displayResult))
-				}
 			}
 		}
 	}
@@ -561,9 +556,19 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 		toolName, _ := getEventTool(event)
 		argsStr := getEventToolArgs(event)
 
+		result := ""
+		if part, ok := event["part"].(map[string]interface{}); ok {
+			if state, ok := part["state"].(map[string]interface{}); ok {
+				if output, ok := state["output"].(string); ok {
+					result = output
+				}
+			}
+		}
+
 		trace.ToolCalls = append(trace.ToolCalls, ToolCall{
-			Name: toolName,
-			Args: argsStr,
+			Name:   toolName,
+			Args:   argsStr,
+			Result: result,
 		})
 
 	case "tool_result":

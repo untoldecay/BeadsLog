@@ -128,3 +128,4 @@ This index provides a concise record of all development work for easy scanning a
 | [enhance] Silent Sandbox Hydration | Automated 'bd onboard' during sandbox setup to pre-populate the knowledge graph. | 2026-02-12 | [2026-02-12_eval-parallel-optimization.md](2026-02-12_eval-parallel-optimization.md) |
 | [rationalize] Project-Aware Cleanup | Updated cleanup logic to handle isolated git repo sandboxes and remove stale artifacts. | 2026-02-12 | [2026-02-12_eval-parallel-optimization.md](2026-02-12_eval-parallel-optimization.md) |
 | [enhance] Eval Documentation | Updated EVAL.md to reflect parallelization, pre-hydration, and total isolation. | 2026-02-12 | [2026-02-12_eval-parallel-optimization.md](2026-02-12_eval-parallel-optimization.md) |
+| [fix] Eval Tool Result Capture | Corrected parser to extract tool outputs from OpenCode JSON stream for high-fidelity logs. | 2026-02-12 | [2026-02-12_eval-parallel-optimization.md](2026-02-12_eval-parallel-optimization.md) |

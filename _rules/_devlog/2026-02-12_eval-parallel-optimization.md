@@ -50,6 +50,18 @@ To optimize the evaluation harness (`bd eval task`) by implementing parallel exe
 
 ---
 
+### **Phase 5: High-Fidelity Tool Result Capture**
+
+**Initial Problem:** Evaluation logs were only showing tool calls, not the actual outputs/results from those tools, making it difficult to verify if the agent's reasoning was grounded in reality.
+
+*   **My Assumption/Plan #1:** Look for a separate `tool_result` event in the OpenCode stream.
+    *   **Action Taken:** Initially implemented logic to parse a top-level `tool_result` event.
+    *   **Result:** Results were still missing because OpenCode (in the version used) embeds results directly within the `tool_use` event under `part.state.output`.
+    *   **Analysis/Correction:** Updated `runOpenCodeTestParallel` and `aggregateEvent` to extract tool output from the `state.output` field of `tool_use` events. Added truncating logic (1000 chars) to keep logs readable.
+    *   **Result:** High-fidelity logs now show both the tool command and the first 1000 characters of its output.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** **Complete.** The evaluation harness is now significantly faster (>5x speed multiplier) and provides a much better developer experience with live progress monitoring.
