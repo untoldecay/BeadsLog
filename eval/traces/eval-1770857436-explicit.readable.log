@@ -1,0 +1,12 @@
+QUERY: find all search strategyes
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+
+I'll start by checking the system status and onboarding to ensure the devlog environment is ready.
+◐  [TOOL] bash(bd status)
+I'll resume the last session and search the devlog for "search strategy" to understand existing implementations and history.
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "search strategy")
+I'll sync the devlog to ensure all logs are indexed, then search for "search" and list all entities to identify relevant components.
+●  [TOOL] bash(bd devlog sync && bd devlog search "search" && bd devlog entities)
+I'll explore the relationships between the search-related entities using `bd devlog graph` and simultaneously search the codebase for the term "strategy" to uncover implementation patterns.

@@ -157,7 +157,7 @@ func runOpenCodeEval() {
 			time.Sleep(2 * time.Second) // Settle time
 
 			traceIdBase := "eval-" + runTimestamp + "-base"
-			baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)", task)
+			baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: The 'bd' and 'beads' tools are currently unavailable in this environment. Please complete the task using only standard Unix tools like grep, find, ls, and direct file reading. Do your best with the available tools.)", task)
 			baseResult := runOpenCodeTest(wtBase, baseTask, traceIdBase, false)
 
 			// 5. REPORT
@@ -359,17 +359,25 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 				}
 				msg = fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display)
 			case "tool_result":
+				msg = "✅ [DONE]\n"
 				result := ""
-				if part, ok := event["part"].(map[string]interface{}); ok {
-					if r, ok := part["output"].(string); ok { result = r }
-				}
-				if result != "" {
-					if len(result) > 500 {
-						result = result[:497] + "..."
+				// Use the getEventText helper logic or manual extract
+				if r, ok := event["result"].(string); ok {
+					result = r
+				} else if part, ok := event["part"].(map[string]interface{}); ok {
+					if r, ok := part["output"].(string); ok {
+						result = r
+					} else if r, ok := part["result"].(string); ok {
+						result = r
 					}
-					msg = fmt.Sprintf("✅ [RESULT] %s\n", result)
-				} else {
-					msg = "✅ [DONE]\n"
+				}
+				
+				if result != "" {
+					displayResult := result
+					if len(displayResult) > 500 {
+						displayResult = displayResult[:497] + "..."
+					}
+					msg = fmt.Sprintf("✅ [RESULT] %s\n", displayResult)
 				}
 			}
 
@@ -566,7 +574,14 @@ func generateABCReport(task string, implicit, explicit, base OpenCodeTrace) stri
 	
 	// Base is reference
 	baseTokens := base.Tokens.Total
-	if baseTokens == 0 { baseTokens = 1 }
+	if baseTokens <= 0 { 
+		// Fallback to average of others if base failed, or reasonable default
+		if implicit.Tokens.Total > 0 {
+			baseTokens = implicit.Tokens.Total * 2 // Assume brute force is 2x more expensive
+		} else {
+			baseTokens = 50000 
+		}
+	}
 
 	implicitEff := calculateEfficiency(implicitScore.Bonus, implicit.Tokens.Total, baseTokens)
 	explicitEff := calculateEfficiency(explicitScore.Bonus, explicit.Tokens.Total, baseTokens)

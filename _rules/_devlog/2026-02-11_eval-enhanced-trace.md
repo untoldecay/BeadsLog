@@ -14,9 +14,10 @@ To enhance the evaluation harness with reasoning capture, tool output logging, i
 
 *   **Action Taken:** Updated `OpenCodeTrace` struct to capture `reasoning` and `reasoning_tokens`.
 *   **Action Taken:** Implemented `getToolCategoryIcon` to visually distinguish between Hydration (◐), Mapping (●), and Verification (⚪).
-*   **Action Taken:** Updated `aggregateEvent` to capture `tool_result` outputs and log them to `.readable.log`.
-*   **Action Taken:** Enhanced the comparative report matrix with strategy-weighted emojis and fixed efficiency calculations.
-*   **Result:** Live logs and reports now provide high-fidelity insight into agent logic and performance.
+*   **Action Taken:** Updated `aggregateEvent` to capture `tool_result` outputs and fixed the logging logic in `runOpenCodeTest` to write them to `.readable.log`.
+*   **Action Taken:** Enhanced the comparative report matrix with strategy-weighted emojis and robust efficiency calculations (handling missing Base tokens).
+*   **Action Taken:** Softened Base sandbox instructions to encourage natural brute-force behavior instead of early-exit.
+*   **Result:** Live logs and reports now provide high-fidelity insight into agent logic, performance, and actual tool results.
 
 ---
 

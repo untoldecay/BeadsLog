@@ -1,0 +1,40 @@
+QUERY: find all search strategyes
+============================================================
+
+I'll start by checking the project status and loading the latest context to help find the search strategies.
+
+[tool_call: bash for 'bd status']
+◐  [TOOL] bash(bd status)
+I'll resume the devlog to load the most recent session context.
+
+[tool_call: bash for 'bd devlog resume --last 1']
+⚪  [TOOL] bash(bd devlog resume --last 1)
+I'll search for "search strategy" in both the devlog and the codebase to identify all implemented strategies.
+
+[tool_call: bash for 'bd devlog search "search strategy"']
+[tool_call: grep for pattern 'search strategy|SearchStrategy']
+●  [TOOL] bash(bd devlog search "search strategy")
+
+⚪  [TOOL] grep({"pattern":"search strategy|SearchStrategy"})
+
+⚪  [TOOL] glob({"pattern":"internal/queries/*.go"})
+
+⚪  [TOOL] glob({"pattern":"internal/eval/*.go"})
+I'll verify the search strategies by reading the key implementation files and exploring the devlog graph for "confront-search" and other relevant entities.
+
+[tool_call: glob for pattern 'internal/queries/*.go']
+[tool_call: glob for pattern 'internal/eval/*.go']
+[tool_call: bash for 'bd devlog entities']
+[tool_call: bash for 'bd devlog graph "confront-search"']
+●  [TOOL] bash(bd devlog entities && bd devlog graph "confront-search")
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-210401873/implicit/internal/queries/search.go"})
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-210401873/implicit/internal/queries/fuzzy.go"})
+I'll sync the devlog to populate the local graph and then examine the technical strategies in the queries files, while also searching for the definitions of "Retrieval-First", "Brute-Force", and "Hybrid".
+
+[tool_call: bash for 'bd devlog sync']
+[tool_call: read for absolute_path '/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-210401873/implicit/internal/queries/search.go']
+[tool_call: read for absolute_path '/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-210401873/implicit/internal/queries/fuzzy.go']
+[tool_call: grep for pattern 'Retrieval-First|Brute-Force|Hybrid']
+◐  [TOOL] bash(bd devlog sync)
