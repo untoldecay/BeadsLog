@@ -1,0 +1,2 @@
+[91m[1mError: [0mConfiguration is invalid at /private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4044341286/base/opencode.json
+↳ Unrecognized key: "git" 

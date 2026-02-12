@@ -36,15 +36,17 @@ func init() {
 
 // TokenUsage tracks token consumption
 type TokenUsage struct {
-	Input  int `json:"input"`
-	Output int `json:"output"`
-	Total  int `json:"total"`
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
 }
 
 // OpenCodeTrace represents the aggregated trace from OpenCode CLI
 type OpenCodeTrace struct {
 	ToolCalls []ToolCall `json:"tool_calls"`
 	Response  string     `json:"response"`
+	Reasoning string     `json:"reasoning"`
 	Tokens    TokenUsage `json:"tokens_used"`
 }
 
@@ -62,6 +64,24 @@ type Scoring struct {
 	Emoji      string
 }
 
+func getToolCategoryIcon(name, args string) string {
+	name = strings.ToLower(name)
+	args = strings.ToLower(args)
+
+	// ● BD Search/Mapping: bd devlog graph, bd devlog search, bd devlog entities
+	if strings.Contains(args, "devlog graph") || strings.Contains(args, "devlog search") || strings.Contains(args, "devlog entities") {
+		return "●"
+	}
+
+	// ◐ BD Hydration: bd onboard, bd status, bd devlog sync
+	if strings.Contains(args, "bd onboard") || strings.Contains(args, "bd status") || strings.Contains(args, "bd devlog sync") {
+		return "◐"
+	}
+
+	// ⚪ Vanilla: grep, read_file, ls, glob, bash (generic)
+	return "⚪"
+}
+
 func runOpenCodeEval() {
 	fmt.Printf("\n%s %s\n", "🧪", "BeadsLog Eval Mode - OpenCode A/B/C Testing")
 	fmt.Println(strings.Repeat("-", 60))
@@ -73,30 +93,16 @@ func runOpenCodeEval() {
 	eval.PruneProjectOrphans()
 	fmt.Println("Done")
 
-	// 0.5 STASH RECOVERY
-	handleLeftoverStashes()
+	// 1. BACKUP CURRENT WORK (Invisible Snapshot)
+	timestamp := time.Now().Format("20060102-150405")
+	backupBranch := fmt.Sprintf("eval-backup-%s", timestamp)
 
-	// 1. AUTOMATIC STASH
-	fmt.Print("Stashing your current work... ")
-	stashRef, err := createStash()
-	if err != nil {
+	fmt.Printf("Creating invisible snapshot on branch %s... ", backupBranch)
+	if err := createBackupBranch(backupBranch); err != nil {
 		fmt.Printf("Failed: %v\n", err)
 		return
 	}
-	if stashRef == "" {
-		fmt.Println("Done (Nothing to stash)")
-	} else {
-		fmt.Printf("Done (Ref: %s)\n", stashRef)
-	}
-
-	// Restore stash on exit
-	defer func() {
-		if stashRef != "" {
-			fmt.Print("Restoring your work... ")
-			restoreStash(stashRef)
-			fmt.Println("Done")
-		}
-	}()
+	fmt.Println("Done (Workspace remains as-is)")
 
 	// OUTER LOOP: New Task
 	for {
@@ -107,12 +113,12 @@ func runOpenCodeEval() {
 
 		if task == "" {
 			fmt.Println("Empty task, aborting")
-			return
+			break
 		}
 
 		// INNER LOOP: Restart Task
 		for {
-			timestamp := fmt.Sprintf("%d", time.Now().Unix())
+			runTimestamp := fmt.Sprintf("%d", time.Now().Unix())
 
 			// 3. CREATE SANDBOX ROOTS
 			tempDir, err := os.MkdirTemp("", "beads-eval-"+projHash+"-*")
@@ -129,28 +135,28 @@ func runOpenCodeEval() {
 			fmt.Printf("\nCreating isolated sandboxes in %s...\n", tempDir)
 
 			for name, path := range map[string]string{"Implicit": wtImplicit, "Explicit": wtExplicit, "Base": wtBase} {
-				if err := createEvalWorktree(path); err != nil {
+				// Initialize sandbox from the BACKUP branch so it has latest code
+				if err := createEvalWorktree(path, backupBranch); err != nil {
 					fmt.Printf("  Failed to create %s worktree: %v\n", name, err)
 					eval.SafeCleanupABC(wtImplicit, wtExplicit, wtBase, tempDir)
 					return
 				}
-				fmt.Printf("  %s Sandbox: Ready\n", name)
+				fmt.Printf("  %s Sandbox: Ready (via %s)\n", name, backupBranch)
 			}
 
 			// 4. RUN TESTS
-			fmt.Printf("\nRunning agent tests...\n")
-
-			// Run 1: Implicit
-			traceIdImplicit := "eval-" + timestamp + "-implicit"
+			traceIdImplicit := "eval-" + runTimestamp + "-implicit"
 			implicitResult := runOpenCodeTest(wtImplicit, task, traceIdImplicit, false)
 
-			// Run 2: Explicit
-			traceIdExplicit := "eval-" + timestamp + "-explicit"
+			time.Sleep(2 * time.Second) // Settle time
+
+			traceIdExplicit := "eval-" + runTimestamp + "-explicit"
 			explicitTask := fmt.Sprintf("%s\n\n(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)", task)
 			explicitResult := runOpenCodeTest(wtExplicit, explicitTask, traceIdExplicit, true)
 
-			// Run 3: Base (No BD)
-			traceIdBase := "eval-" + timestamp + "-base"
+			time.Sleep(2 * time.Second) // Settle time
+
+			traceIdBase := "eval-" + runTimestamp + "-base"
 			baseTask := fmt.Sprintf("%s\n\n(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)", task)
 			baseResult := runOpenCodeTest(wtBase, baseTask, traceIdBase, false)
 
@@ -173,7 +179,8 @@ func runOpenCodeEval() {
 					huh.NewSelect[string]().
 						Title("Test is now done.").
 						Options(
-							huh.NewOption("Quit (Clean up & Restore)", "quit"),
+							huh.NewOption("Quit (Delete backup branch)", "quit_clean"),
+							huh.NewOption("Quit (KEEP backup branch for rescue)", "quit_keep"),
 							huh.NewOption("Restart test (Retry same task)", "restart"),
 							huh.NewOption("Start a new test (New task)", "new"),
 						).
@@ -183,7 +190,7 @@ func runOpenCodeEval() {
 
 			err = form.Run()
 			if err != nil {
-				action = "quit" // Handle ctrl+c
+				action = "quit_clean" // Handle ctrl+c
 			}
 
 			// Clean up current run
@@ -191,20 +198,68 @@ func runOpenCodeEval() {
 			eval.SafeCleanupABC(wtImplicit, wtExplicit, wtBase, tempDir)
 			fmt.Println("Done")
 
-			if action == "quit" {
-				fmt.Println("\n✅ Eval task complete.")
+			if action == "quit_clean" || action == "quit_keep" {
+				if action == "quit_clean" {
+					fmt.Printf("\nDeleting backup branch %s... ", backupBranch)
+					_ = exec.Command("git", "branch", "-D", backupBranch).Run()
+					fmt.Println("Done.")
+				} else {
+					fmt.Printf("\nKeeping backup branch %s for rescue.\n", backupBranch)
+					fmt.Printf("  Rescue command: git reset --hard %s\n", backupBranch)
+				}
+				fmt.Println("✅ Eval task complete.")
 				return
 			}
 			
 			if action == "new" {
-				break // Break inner loop, continue outer loop (New Task)
+				break 
 			}
 			
 			if action == "restart" {
-				continue // Continue inner loop (Same Task)
+				continue 
 			}
 		}
 	}
+}
+
+func getEvalCurrentBranch() string {
+	out, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	return strings.TrimSpace(string(out))
+}
+
+func createBackupBranch(name string) error {
+	// 1. Stage everything temporarily to capture dirty state
+	_ = exec.Command("git", "add", ".").Run()
+
+	// 2. Write tree object from index
+	out, err := exec.Command("git", "write-tree").Output()
+	if err != nil {
+		_ = exec.Command("git", "reset").Run() // Cleanup index on fail
+		return fmt.Errorf("git write-tree: %w", err)
+	}
+	treeID := strings.TrimSpace(string(out))
+
+	// 3. Create commit object (parent is HEAD)
+	headOut, _ := exec.Command("git", "rev-parse", "HEAD").Output()
+	headID := strings.TrimSpace(string(headOut))
+
+	commitOut, err := exec.Command("git", "commit-tree", treeID, "-p", headID, "-m", "chore(eval): safety snapshot for task evaluation").Output()
+	if err != nil {
+		_ = exec.Command("git", "reset").Run()
+		return fmt.Errorf("git commit-tree: %w", err)
+	}
+	commitID := strings.TrimSpace(string(commitOut))
+
+	// 4. Create the branch pointing to this commit
+	if err := exec.Command("git", "branch", name, commitID).Run(); err != nil {
+		_ = exec.Command("git", "reset").Run()
+		return fmt.Errorf("git branch creation: %w", err)
+	}
+
+	// 5. Reset index back to normal (workspace stays dirty)
+	_ = exec.Command("git", "reset").Run()
+	
+	return nil
 }
 
 func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
@@ -258,6 +313,10 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 	readableLogFile, _ := os.Create(filepath.Join("eval", "traces", traceId+".readable.log"))
 	defer readableLogFile.Close()
 
+	// Prepend original query to log
+	readableLogFile.WriteString(fmt.Sprintf("QUERY: %s\n", task))
+	readableLogFile.WriteString(strings.Repeat("=", 60) + "\n\n")
+
 	fmt.Printf("\n--- [%s] START ---\n", traceId)
 
 	var trace OpenCodeTrace
@@ -280,6 +339,10 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 			eventType, _ := event["type"].(string)
 			var msg string
 			switch eventType {
+			case "reasoning", "thought":
+				if text, ok := getEventText(event); ok && text != "" {
+					msg = fmt.Sprintf("\n💭 [THINKING] %s\n", text)
+				}
 			case "text":
 				if text, ok := getEventText(event); ok && text != "" {
 					msg = text
@@ -287,13 +350,14 @@ func runOpenCodeTest(wtDir, task, traceId string, explicit bool) OpenCodeTrace {
 			case "tool_use":
 				tool, _ := getEventTool(event)
 				args := getEventToolArgs(event)
+				icon := getToolCategoryIcon(tool, args)
 				display := tool
 				if tool == "bash" {
 					display = fmt.Sprintf("bash(%s)", args)
 				} else if args != "" {
 					display = fmt.Sprintf("%s(%s)", tool, args)
 				}
-				msg = fmt.Sprintf("\n🛠️  [TOOL] %s\n", display)
+				msg = fmt.Sprintf("\n%s  [TOOL] %s\n", icon, display)
 			case "tool_result":
 				msg = "✅ [DONE]\n"
 			}
@@ -378,6 +442,11 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 			trace.Response += text + "\n"
 		}
 
+	case "reasoning", "thought":
+		if text, ok := getEventText(event); ok {
+			trace.Reasoning += text + "\n"
+		}
+
 	case "usage":
 		// METHOD 4: Capture tokens from stream
 		if val, ok := event["input_tokens"].(float64); ok {
@@ -395,8 +464,16 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 				trace.Tokens.Output += int(val)
 			}
 		}
+
+		if val, ok := event["reasoning_tokens"].(float64); ok {
+			trace.Tokens.Reasoning += int(val)
+		} else if part, ok := event["part"].(map[string]interface{}); ok {
+			if val, ok := part["reasoning_tokens"].(float64); ok {
+				trace.Tokens.Reasoning += int(val)
+			}
+		}
 		
-		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output
+		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output + trace.Tokens.Reasoning
 
 	case "tokens":
 		// Alternative key used in Method 4 guide
@@ -406,7 +483,10 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 		if output, ok := event["output"].(float64); ok {
 			trace.Tokens.Output += int(output)
 		}
-		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output
+		if reasoning, ok := event["reasoning"].(float64); ok {
+			trace.Tokens.Reasoning += int(reasoning)
+		}
+		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output + trace.Tokens.Reasoning
 
 	case "step_finish":
 		// Captured from real OpenCode logs
@@ -418,9 +498,12 @@ func aggregateEvent(trace *OpenCodeTrace, event map[string]interface{}) {
 				if output, ok := tokens["output"].(float64); ok {
 					trace.Tokens.Output += int(output)
 				}
+				if reasoning, ok := tokens["reasoning"].(float64); ok {
+					trace.Tokens.Reasoning += int(reasoning)
+				}
 			}
 		}
-		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output
+		trace.Tokens.Total = trace.Tokens.Input + trace.Tokens.Output + trace.Tokens.Reasoning
 	}
 }
 
@@ -517,8 +600,9 @@ func renderToolCalls(label string, calls []ToolCall) string {
 
 	out := fmt.Sprintf("\n[%s]:\n", label)
 	for i, c := range calls {
+		icon := getToolCategoryIcon(c.Name, c.Args)
 		name := formatToolName(c)
-		out += fmt.Sprintf("  %d. %s\n", i+1, name)
+		out += fmt.Sprintf("  %d. %s %s\n", i+1, icon, name)
 	}
 	return out
 }
@@ -599,14 +683,34 @@ func sliceContainsStrict(list []string, item string) bool {
 	return false
 }
 
-func createEvalWorktree(path string) error {
+func createEvalWorktree(path, sourceBranch string) error {
 	exe, err := os.Executable()
 	if err != nil { return err }
-	
-	if err := exec.Command("git", "worktree", "add", "-d", path, "HEAD").Run(); err != nil {
+
+	// 1. Fresh temp git repo (NO worktree sharing)
+	_ = os.RemoveAll(path)
+	if err := os.MkdirAll(path, 0755); err != nil {
 		return err
 	}
-	
+	if err := exec.Command("git", "init", "--template=", path).Run(); err != nil {
+		return err
+	}
+
+	// 2. Hard reset to sourceBranch (no history)
+	mainRepo, _ := os.Getwd()
+	cmdRemote := exec.Command("git", "remote", "add", "origin", mainRepo)
+	cmdRemote.Dir = path
+	_ = cmdRemote.Run()
+
+	cmdFetch := exec.Command("git", "fetch", "origin", sourceBranch)
+	cmdFetch.Dir = path
+	_ = cmdFetch.Run()
+
+	cmdCheckout := exec.Command("git", "checkout", "--force", "-B", "eval-head", "FETCH_HEAD")
+	cmdCheckout.Dir = path
+	_ = cmdCheckout.Run()
+
+	// 3. Clean index + working tree
 	cmdRm := exec.Command("git", "rm", "--cached", "-r", ".")
 	cmdRm.Dir = path
 	_ = cmdRm.Run()
@@ -615,13 +719,18 @@ func createEvalWorktree(path string) error {
 	cmdRead.Dir = path
 	_ = cmdRead.Run()
 
-	cmdCheckout := exec.Command("git", "checkout-index", "-a", "--force")
-	cmdCheckout.Dir = path
-	_ = cmdCheckout.Run()
+	cmdCheckoutIndex := exec.Command("git", "checkout-index", "-a", "--force")
+	cmdCheckoutIndex.Dir = path
+	_ = cmdCheckoutIndex.Run()
 
+	// 4. Disable Git autorevert & Hooks
 	cmdConfig := exec.Command("git", "config", "core.fileMode", "false")
 	cmdConfig.Dir = path
 	_ = cmdConfig.Run()
+	
+	cmdConfigHooks := exec.Command("git", "config", "core.hooksPath", "/dev/null")
+	cmdConfigHooks.Dir = path
+	_ = cmdConfigHooks.Run()
 
 	_ = os.RemoveAll(filepath.Join(path, "_sandbox"))
 	agentPath := filepath.Join(path, "AGENTS.md")
@@ -651,6 +760,7 @@ func createEvalWorktree(path string) error {
 	_ = readyCmd.Run()
 
 	absExe, _ := filepath.Abs(exe)
+	// Disable OpenCode git features to prevent auto-revert
 	defaultConfig := `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -685,6 +795,11 @@ func getSandboxEnv(homeDir string, apiKey string, beadsDir string) []string {
 	env := os.Environ()
 	// Override HOME to sandbox root to isolate global config/registry
 	env = append(env, "HOME="+homeDir)
+	
+	// Prevent OpenCode from walking up to parent .git or config
+	env = append(env, "OPENCODE_NO_PARENT_CONFIG=1")
+	env = append(env, "OPENCODE_DISABLE_GIT=1")
+	
 	if apiKey != "" {
 		env = append(env, "GOOGLE_GENERATIVE_AI_API_KEY="+apiKey)
 	}
@@ -692,69 +807,6 @@ func getSandboxEnv(homeDir string, apiKey string, beadsDir string) []string {
 		env = append(env, "BEADS_DIR="+beadsDir)
 	}
 	return env
-}
-
-func createStash() (string, error) {
-	statusCmd := exec.Command("git", "status", "--porcelain")
-	out, _ := statusCmd.Output()
-	if len(strings.TrimSpace(string(out))) == 0 { return "", nil }
-	cmd := exec.Command("git", "stash", "push", "-m", "bd eval auto-stash")
-	if err := cmd.Run(); err != nil { return "", err }
-	listCmd := exec.Command("git", "stash", "list", "--format=%h", "-n", "1")
-	hash, err := listCmd.Output()
-	return strings.TrimSpace(string(hash)), err
-}
-
-func restoreStash(ref string) { _ = exec.Command("git", "stash", "pop", ref).Run() }
-
-func handleLeftoverStashes() {
-	out, err := exec.Command("git", "stash", "list").Output()
-	if err != nil || len(out) == 0 { return }
-	lines := strings.Split(string(out), "\n")
-	var leftovers []string
-	for _, line := range lines {
-		if strings.Contains(line, "bd eval auto-stash") {
-			leftovers = append(leftovers, line)
-		}
-	}
-	if len(leftovers) == 0 { return }
-	fmt.Printf("\n⚠️  Found %d unrecovered stash(es) from previous evaluation runs:\n", len(leftovers))
-	for _, l := range leftovers { fmt.Printf("  %s\n", l) }
-	var action string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("What would you like to do with these stashes?").
-				Options(
-					huh.NewOption("Restore (Pop) the most recent one", "pop"),
-					huh.NewOption("Delete (Clear) ALL eval stashes", "clear"),
-					huh.NewOption("Ignore and proceed", "ignore"),
-				).
-				Value(&action),
-		),
-	)
-	if err := form.Run(); err != nil { return }
-	switch action {
-	case "pop":
-		for i, line := range lines {
-			if strings.Contains(line, "bd eval auto-stash") {
-				ref := fmt.Sprintf("stash@{%d}", i)
-				fmt.Printf("Restoring %s... ", ref)
-				if err := exec.Command("git", "stash", "pop", ref).Run(); err != nil {
-					fmt.Printf("Conflict or Error: %v\n", err)
-				} else { fmt.Println("Done") }
-				break
-			}
-		}
-	case "clear":
-		fmt.Print("Clearing eval stashes... ")
-		for i := len(lines) - 1; i >= 0; i-- {
-			if strings.Contains(lines[i], "bd eval auto-stash") {
-				_ = exec.Command("git", "stash", "drop", fmt.Sprintf("stash@{%d}", i)).Run()
-			}
-		}
-		fmt.Println("Done")
-	}
 }
 
 func archiveTrace(traceId, task string, trace OpenCodeTrace) {
@@ -773,6 +825,7 @@ func archiveTrace(traceId, task string, trace OpenCodeTrace) {
 		Extra: map[string]any{
 			"tokens":     trace.Tokens,
 			"tool_calls": toolTrace,
+			"reasoning":  trace.Reasoning,
 		},
 	}
 	historyFile := filepath.Join("eval", "history.jsonl")

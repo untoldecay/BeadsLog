@@ -1,0 +1,13 @@
+QUERY: find all eval calculation strategies inside porject hisotry
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+
+I will start by checking the project status and loading the recent context to search for "eval calculation strategies" in the project history.
+
+[tool_call: bash for 'bd status']
+◐  [TOOL] bash(bd status)
+I'll resume the last session and search the devlog for "eval calculation strategies" and related entities.
+
+[tool_call: bash for 'bd devlog resume --last 1 && bd devlog search "eval calculation strategies" && bd devlog graph "eval"']
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "eval calculation strategies" && bd devlog graph "eval")

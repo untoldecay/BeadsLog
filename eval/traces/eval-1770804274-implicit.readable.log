@@ -1,0 +1,20 @@
+
+🛠️  [TOOL] bash(bd status)
+
+🛠️  [TOOL] bash(bd devlog resume --last 1)
+
+🛠️  [TOOL] bash(bd devlog search "search strategies")
+
+🛠️  [TOOL] bash(bd devlog entities)
+
+🛠️  [TOOL] bash(bd devlog sync)
+
+🛠️  [TOOL] bash(bd devlog entities)
+
+🛠️  [TOOL] bash(bd devlog search "search")
+
+🛠️  [TOOL] bash(bd devlog graph "searchcmd")
+
+🛠️  [TOOL] glob({"pattern":"**/*search*.go"})
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2684694492/implicit/internal/queries/search.go"})

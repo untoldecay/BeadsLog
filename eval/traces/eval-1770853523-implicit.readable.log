@@ -1,0 +1,21 @@
+QUERY: find all eval calculation strategies inside porject hisotry
+============================================================
+
+
+◐  [TOOL] bash(bd status || bd onboard)
+I will search the project history for eval calculation strategies using the `bd` tools.
+
+First, I'll check the environment status and initialize if necessary.I'll resume the last devlog context and then search for "eval calculation strategies" in the project history.
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "eval calculation strategy")
+The search for "eval calculation strategy" returned no results. I'll sync the devlog and then try broader searches for "eval" and "calculation" to find relevant information.
+●  [TOOL] bash(bd devlog sync && bd devlog search "eval" && bd devlog search "calculation" && bd devlog entities | grep -i "eval")
+I'll examine the sessions that matched both "eval" and "calculation" (`sess-d6d2cc` and `sess-d951aa`) and look into the `bd eval task` entity to understand the implementation strategies.
+●  [TOOL] bash(bd devlog show sess-d6d2cc && bd devlog show sess-d951aa && bd devlog graph "bd eval task")
+I've identified key components of the evaluation strategies, including the efficiency formula, strategy bonuses, and token weights. To gather more comprehensive details, I'll search for "A/B/C" and "Vercel-inspired strategy" and locate the `scenarios.json` and `eval.go` files to examine the underlying logic.
+●  [TOOL] bash(bd devlog search "Vercel-inspired" && bd devlog search "A/B/C" && glob --pattern "**/{scenarios.json,eval.go,score.py}")
+
+⚪  [TOOL] glob({"pattern":"**/{scenarios.json,eval.go,score.py,eval_task_opencode.go}"})
+I'll use the `Glob` tool to find the relevant files and `grep` to search for "Vercel" and "A/B/C" within the codebase, as my previous attempts were unsuccessful.
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3951687699/implicit/_rules/_evals/eval.go"})
+I'll examine the "eval calculation strategies" by reading the contents of `_rules/_evals/eval.go` and `_rules/_evals/score.py`.I've summarized the evaluation calculation strategies, including token weights, efficiency metrics, strategy bonuses, and scoring logic. To complete my understanding of the A/B/C harness and categories, I'll examine the `scenarios.json` file.
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3951687699/implicit/_rules/_evals/scenarios.json"})

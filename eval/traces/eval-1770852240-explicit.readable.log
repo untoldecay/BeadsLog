@@ -1,0 +1,5 @@
+QUERY: map all search strategies, explain how we could make them better to get more explorability
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+

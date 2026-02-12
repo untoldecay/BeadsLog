@@ -1,0 +1,19 @@
+
+🛠️  [TOOL] bash(bd status)
+I'll start by checking the environment status and resuming the session to provide context-specific search strategies.
+
+[tool_call: bash for 'bd status'][tool_call: bash for 'bd devlog resume --last 1 && bd devlog search "search strategies"']
+🛠️  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "search strategies")
+
+🛠️  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-98136252/implicit/_rules/_orchestration/PROJECT_CONTEXT.md"})
+[tool_call: read for absolute_path '/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-98136252/implicit/_rules/_orchestration/PROJECT_CONTEXT.md']Search strategies in Beads prioritize **retrieval-led reasoning** over generic inference.
+
+### Core Search Strategies
+*   **Hybrid Text Search:** Use `bd devlog search "<query>"` to find past sessions, solutions, or errors.
+*   **Structural/Graph Search:** Use `bd devlog graph "<entity>"` to visualize dependency trees and `bd devlog impact "<entity>"` to identify downstream dependents.
+*   **Contextual Resumption:** Use `bd devlog resume --last 1` to load immediate history or `bd devlog resume "<topic>"` to recover specific task state.
+
+### How to Enhance Them
+*   **Entity Extraction:** Define specific software components (modal, hook, endpoint) in descriptions to populate the graph for more accurate `impact` analysis.
+*   **Recursive Discovery:** Combine `search` with `graph` to navigate from a text match to its architectural neighbors.
+*   **Manual Ingestion:** Run `bd devlog sync` frequently to ensure the local SQLite cache accurately reflects the latest `.beads/issues.jsonl` state.

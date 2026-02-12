@@ -1,0 +1,25 @@
+{
+  "tool_calls": [
+    {
+      "name": "bash",
+      "args": "bd status",
+      "result": ""
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog resume --last 1 \u0026\u0026 bd devlog search \"search strategies\"",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-98136252/implicit/_rules/_orchestration/PROJECT_CONTEXT.md\"}",
+      "result": ""
+    }
+  ],
+  "response": "I'll start by checking the environment status and resuming the session to provide context-specific search strategies.\n\n[tool_call: bash for 'bd status']\n[tool_call: bash for 'bd devlog resume --last 1 \u0026\u0026 bd devlog search \"search strategies\"']\n[tool_call: read for absolute_path '/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-98136252/implicit/_rules/_orchestration/PROJECT_CONTEXT.md']\nSearch strategies in Beads prioritize **retrieval-led reasoning** over generic inference.\n\n### Core Search Strategies\n*   **Hybrid Text Search:** Use `bd devlog search \"\u003cquery\u003e\"` to find past sessions, solutions, or errors.\n*   **Structural/Graph Search:** Use `bd devlog graph \"\u003centity\u003e\"` to visualize dependency trees and `bd devlog impact \"\u003centity\u003e\"` to identify downstream dependents.\n*   **Contextual Resumption:** Use `bd devlog resume --last 1` to load immediate history or `bd devlog resume \"\u003ctopic\u003e\"` to recover specific task state.\n\n### How to Enhance Them\n*   **Entity Extraction:** Define specific software components (modal, hook, endpoint) in descriptions to populate the graph for more accurate `impact` analysis.\n*   **Recursive Discovery:** Combine `search` with `graph` to navigate from a text match to its architectural neighbors.\n*   **Manual Ingestion:** Run `bd devlog sync` frequently to ensure the local SQLite cache accurately reflects the latest `.beads/issues.jsonl` state.\n",
+  "tokens_used": {
+    "input": 58893,
+    "output": 534,
+    "total": 59427
+  }
+}

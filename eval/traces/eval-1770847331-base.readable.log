@@ -1,0 +1,33 @@
+Effective search strategies are essential for navigating and understanding codebases. Using standard Unix tools, you can perform powerful searches by combining basic commands.
+
+### 1. Filename Search (`find`)
+Locating files by name or pattern is the first step in exploring a project.
+*   **Strategy:** Search for files with specific extensions or naming patterns.
+*   **Command:** `find . -name "*.js"`
+*   **Enhancement:** Use `-iname` for case-insensitive searches or `-path` to match against the full directory path. To exclude directories like `.git` or `node_modules`, use:
+    `find . -path "./node_modules" -prune -o -name "*.ts" -print`
+
+### 2. Content Search (`grep`)
+Finding specific strings or patterns within files.
+*   **Strategy:** Recursive search for a keyword.
+*   **Command:** `grep -r "functionName" .`
+*   **Enhancement:**
+    *   **Line Numbers:** `grep -rn` shows exactly where the match is.
+    *   **Case Insensitivity:** `grep -ri` ignores case.
+    *   **Context:** `grep -C 3` shows 3 lines of context around the match, helping you understand usage.
+    *   **Filtering:** Use `--include="*.py"` to search only specific file types.
+
+### 3. Combining Tools (`find` + `xargs` + `grep`)
+When you need to search content only within specific files found by criteria.
+*   **Strategy:** Find all config files and search for "API_KEY".
+*   **Command:** `find . -name "config.json" | xargs grep "API_KEY"`
+*   **Enhancement:** Use `find -print0` and `xargs -0` to handle filenames with spaces safely.
+
+### 4. Advanced Enhancements
+*   **Ripgrep (`rg`):** A modern alternative to `grep` that is significantly faster and respects your `.gitignore` by default.
+    *   `rg "TODO"` (Searches current directory, excluding ignored files).
+*   **Regular Expressions:** Use `grep -E` (or `egrep`) for extended regex patterns.
+    *   `grep -E "const|let" src/index.js` (Matches either 'const' or 'let').
+*   **Counting Matches:** Use `grep -c` to see how many times a pattern appears per file, or pipe to `wc -l` for a total count.
+
+By mastering these tools and their flags, you can quickly map out dependencies, find definitions, and identify refactoring targets without specialized IDE indexing.

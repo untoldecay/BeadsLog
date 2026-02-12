@@ -1,0 +1,60 @@
+QUERY: search all search strategies implementation ideas we had in the project history
+============================================================
+
+
+◐  [TOOL] bash(bd status)
+
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "search strategies implementation ideas")
+
+●  [TOOL] bash(bd devlog search "search strategy" && bd devlog search "search implementation" && bd devlog entities)
+
+●  [TOOL] bash(bd devlog sync && bd list --status closed --limit 20 && bd devlog search "search")
+
+●  [TOOL] bash(bd devlog graph confront-search && bd devlog graph searchcmd)
+
+●  [TOOL] bash(bd devlog search "strategy" && bd devlog impact hybridsearch)
+
+⚪  [TOOL] bash(bd devlog show sess-414e8d && bd devlog show sess-59aa07 && bd devlog show sess-d6d2cc)
+
+⚪  [TOOL] bash(bd devlog show sess-8a87b8 && bd devlog show sess-a61a1b && ls internal/queries/search.go)
+
+⚪  [TOOL] bash(ls _rules/_analysis/ && read _rules/_analysis/2026-01-16_confront-search-optimisation.md)
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2298189335/implicit/_rules/_analysis/2026-01-16_confront-search-optimisation.md"})
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2298189335/implicit/_rules/_analysis/2026-01-17_search_graph_consolidation.md"})
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2298189335/implicit/_rules/_analysis/2026-01-18_search_context_discovery.md"})
+Based on the project history and architectural analysis files found in `_rules/_analysis/`, here are the search strategy implementation ideas that have been proposed and implemented:
+
+### 1. Hybrid Search Architecture (BM25 + Graph)
+The core strategy moved away from naive substring matching to a **Multi-Phase Hybrid Engine**:
+*   **Phase 1: BM25 Relevance (SQLite FTS5):** Uses Full-Text Search with BM25 ranking to ensure sessions where terms are central rank higher than those with incidental mentions. It uses the `porter` stemming algorithm so that "modals" matches "modal".
+*   **Phase 2: Entity Graph Expansion:** Once a session or entity is found, the engine automatically "hops" to related entities in the architectural graph (1-hop neighbors).
+*   **Phase 3: Context Injection:** Results are boosted if they reference entities that are "architecturally close" to the search term, even if the session doesn't contain the exact keyword.
+
+### 2. 4-Tier Suggestion Flow
+To prevent "dead-end" searches (zero results), a tiered fallback system was implemented:
+1.  **Exact Match + Graph:** The "Happy Path" returning direct hits and neighbors.
+2.  **Typo Detection (Levenshtein):** If no hits, it calculates the edit distance (threshold $\le$ 3) to suggest corrections (e.g., `nginix` $\to$ `nginx`) and can auto-search the closest match.
+3.  **Fuzzy/Substring Discovery:** Surfaces related entities that partially match (e.g., searching `modal` surfaces `ManageColumnsModal` and `AddColumnModal`).
+4.  **Smart Fallback:** For multi-word queries that fail, it splits terms to find compound matches (e.g., `database timeout` $\to$ `postgres` + `connection-timeout`).
+
+### 3. UX & Agent-First Strategies
+*   **Grouped Visual Output:** Commands like `graph` and `impact` use visual separators (`=== Entity ===`) to handle cases where a fuzzy search matches multiple distinct root entities, preventing "tree mesh."
+*   **"Did you mean?" Feedback Loop:** Standardized fallback for zero-result queries to provide actionable next steps for agents.
+*   **Top N + Warning:** Optimized for CLI/Agent context by returning a capped list (default 25) with a "More results available" warning rather than traditional interactive pagination.
+*   **Standardized Controls:** Implementation of `--strict` (disable fuzzy), `--text-only` (skip graph expansion), and `--expand` flags.
+
+### 4. Evaluation & Efficiency Metrics
+In the context of the evaluation harness (`bd eval`), search strategies are ranked by their logic phases:
+*   **Logic Phases:** `Hydration` $\to$ `Mapping` $\to$ `Verification`.
+*   **Strategy Bonuses:**
+    *   **Optimal (1.5x):** Retrieval-led, mapping the graph before implementation.
+    *   **Shallow (0.8x):** Keyword-only search without architectural context.
+    *   **Disordered (0.5x):** Brute-force `grep` or jumping to implementation without searching.
+
+### Relevant Technical Artifacts:
+*   `internal/queries/search.go`: The Go implementation of the hybrid query.
+*   `_rules/_analysis/2026-01-16_confront-search-optimisation.md`: The original BM25 proposal.
+*   `_rules/_analysis/2026-01-18_search_context_discovery.md`: The 4-tier suggestion PRD.

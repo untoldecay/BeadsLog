@@ -1,0 +1,5 @@
+QUERY: map all search strategies, explain how we could make them better to get more explorability
+
+(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)
+============================================================
+

@@ -1,0 +1,5 @@
+QUERY: list all search strategies\nquit_clean
+
+(RESTRICTION: Do NOT use any 'bd' or 'beads' commands. Rely only on standard Unix tools like grep, find, ls, etc.)
+============================================================
+
