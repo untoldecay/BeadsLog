@@ -62,6 +62,16 @@ To optimize the evaluation harness (`bd eval task`) by implementing parallel exe
 
 ---
 
+### **Phase 6: High-Fidelity Result Expansion**
+
+**Initial Problem:** Large tool outputs (like full file reads or long search results) were being cropped at 1000 characters, losing critical context.
+
+*   **My Assumption/Plan #1:** Increase the truncation limit to 5000 characters.
+    *   **Action Taken:** Updated the `tool_use` case in `runOpenCodeTestParallel` to allow up to 5000 characters of result output. Verified this with a `read_file` of `docs/EVAL.md` and a successful `bd devlog search`.
+    *   **Result:** Detailed logs now capture nearly the entire output of most common tools, providing much higher fidelity for A/B/C comparisons.
+
+---
+
 ### **Final Session Summary**
 
 **Final Status:** **Complete.** The evaluation harness is now significantly faster (>5x speed multiplier) and provides a much better developer experience with live progress monitoring.
