@@ -1,0 +1,30 @@
+QUERY: Find TokenUsage
+============================================================
+
+
+◐  [TOOL] bash(bd status && bd devlog resume --last 1)
+
+●  [TOOL] bash(bd devlog search "TokenUsage")
+
+⚪  [TOOL] grep({"pattern":"TokenUsage"})
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2912173827/implicit/cmd/bd/eval_task_opencode.go"})
+
+⚪  [TOOL] grep({"include":"*.go","pattern":"type TokenUsage struct"})
+
+⚪  [TOOL] bash(grep -r "TokenUsage" . --exclude-dir=.local --exclude-dir=.git --exclude-dir=eval/traces)
+
+◐  [TOOL] bash(bd sync && bd devlog sync && git status)
+`TokenUsage` is defined as a `struct` in `cmd/bd/eval_task_opencode.go` (lines 42-47):
+
+```go
+// TokenUsage tracks token consumption
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```
+
+It is primarily used within the `OpenCodeTrace` struct in the same file to track token metrics from the OpenCode CLI.

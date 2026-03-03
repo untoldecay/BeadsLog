@@ -1,0 +1,31 @@
+QUERY: Find TokenUsage
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+
+I will start by checking the status of the Beads environment and then search for `TokenUsage` using the devlog tools.
+◐  [TOOL] bash(bd status && bd devlog resume --last 1)
+I'll search for `TokenUsage` in the devlog and the graph to understand its context and history.
+●  [TOOL] bash(bd devlog search "TokenUsage" && bd devlog graph "TokenUsage")
+Since the devlog search and graph query didn't return any results for `TokenUsage`, I'll now use `grep` to find its occurrences in the codebase.
+⚪  [TOOL] grep({"pattern":"TokenUsage"})
+The `grep` results suggest `TokenUsage` might be defined in `cmd/bd/eval_task_opencode.go`. I'll verify if that file exists and search for the definition there and in other files within `cmd/bd/`.
+⚪  [TOOL] bash(ls cmd/bd/eval_task_opencode.go)
+I'll read the file to locate the `TokenUsage` definition.
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2912173827/explicit/cmd/bd/eval_task_opencode.go"})
+I've located the `TokenUsage` definition and its usage in `cmd/bd/eval_task_opencode.go`. I'll now double-check for any other definitions, although previous searches primarily indicated this location and log files.
+⚪  [TOOL] grep({"pattern":"type TokenUsage struct"})
+I've confirmed that `TokenUsage` is a Go `struct` defined in `cmd/bd/eval_task_opencode.go`, used for tracking token consumption in evaluation runs. I'll now summarize my findings.`TokenUsage` is defined as a Go `struct` in `cmd/bd/eval_task_opencode.go`:
+
+```go
+// cmd/bd/eval_task_opencode.go:41
+// TokenUsage tracks token consumption
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```
+
+It is primarily used within the `OpenCodeTrace` struct and the `aggregateEvent` function to monitor and report token usage across evaluation sandboxes.

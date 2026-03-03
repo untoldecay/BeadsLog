@@ -1,0 +1,5 @@
+QUERY: Find where TokenUsage is defined
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+

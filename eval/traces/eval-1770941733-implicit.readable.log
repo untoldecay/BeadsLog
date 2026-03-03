@@ -1,0 +1,304 @@
+QUERY: Find definition of Scoring
+============================================================
+
+
+◐  [TOOL] bash(bd status)
+✅ [RESULT] 
+📊 Issue Database Status
+
+Summary:
+  Total Issues:           87
+  Open:                   6
+  In Progress:            0
+  Blocked:                0
+  Closed:                 81
+  Ready to Work:          6
+
+Extended:
+  Deleted:                35 (tombstones)
+  Avg Lead Time:          6.6 hours
+
+For more details, use 'bd list' to see individual issues.
+
+
+
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "Scoring")
+✅ [RESULT] Resuming last 1 session(s):
+
+🔍 Search: "Scoring"                                            
+                                                                
+  ⚠️  No sessions found.                                        
+                                                                
+  Consider broadening your search or checking for related terms.
+
+💡 Tip: Not finding what you expect? Run bd devlog sync to ingest latest logs, or use --help for search filters.
+
+
+⚪  [TOOL] grep({"pattern":"Scoring"})
+✅ [RESULT] Found 46 matches
+/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/log/2026-02-13T001548.log:
+  Line 1: INFO  2026-02-13T00:15:48 +502ms service=default version=1.1.56 args=["run","--format","json","--model","google/gemini-flash-latest","Find definition of Scoring"] opencode
+  Line 134: INFO  2026-02-13T00:15:50 +106ms service=session.summary title=Definition of Scoring title
+  Line 197: INFO  2026-02-13T00:15:58 +0ms service=permission permission=bash pattern=bd devlog search "Scoring" ruleset=[{"permission":"*","pattern":"*","action":"allow"},{"permission":"doom_loop","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/tool-output/*","action":"allow"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.claude/skills/handoff/*","action":"allow"},{"permission":"external_directory","pattern":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.claude/skills/handoff/*","action":"allow"},{"permission":"question","pattern":"*","action":"deny"},{"permission":"plan_enter","pattern":"*","action":"deny"},{"permission":"plan_exit","pattern":"*","action":"deny"},{"permission":"read","pattern":"*","action":"allow"},{"permission":"read","pattern":"*.env","action":"ask"},{"permission":"read","pattern":"*.env.*","action":"ask"},{"permission":"read","pattern":"*.env.example","action":"allow"},{"permission":"question","pattern":"*","action":"allow"},{"permission":"plan_enter","pattern":"*","action":"allow"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/tool-output/*","action":"allow"},{"permission":"question","pattern":"*","action":"deny"},{"permission":"plan_enter","pattern":"*","action":"deny"},{"permission":"plan_exit","pattern":"*","action":"deny"}] evaluate
+  Line 198: INFO  2026-02-13T00:15:58 +0ms service=permission permission=bash pattern=bd devlog search "Scoring" action={"permission":"*","pattern":"*","action":"allow"} evaluated
+  Line 248: INFO  2026-02-13T00:16:13 +1430ms service=permission permission=grep pattern=Scoring ruleset=[{"permission":"*","pattern":"*","action":"allow"},{"permission":"doom_loop","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/tool-output/*","action":"allow"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.claude/skills/handoff/*","action":"allow"},{"permission":"external_directory","pattern":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.claude/skills/handoff/*","action":"allow"},{"permission":"question","pattern":"*","action":"deny"},{"permission":"plan_enter","pattern":"*","action":"deny"},{"permission":"plan_exit","pattern":"*","action":"deny"},{"permission":"read","pattern":"*","action":"allow"},{"permission":"read","pattern":"*.env","action":"ask"},{"permission":"read","pattern":"*.env.*","action":"ask"},{"permission":"read","pattern":"*.env.example","action":"allow"},{"permission":"question","pattern":"*","action":"allow"},{"permission":"plan_enter","pattern":"*","action":"allow"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/tool-output/*","action":"allow"},{"permission":"question","pattern":"*","action":"deny"},{"permission":"plan_enter","pattern":"*","action":"deny"},{"permission":"plan_exit","pattern":"*","action":"deny"}] evaluate
+  Line 249: INFO  2026-02-13T00:16:13 +0ms service=permission permission=grep pattern=Scoring action={"permission":"*","pattern":"*","action":"allow"} evaluated
+
+/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/.local/share/opencode/storage/part/msg_c545ab648001dy6HhS7dkz5lAm/prt_c545ac9e0001ulD33gMDO0P7Uk.json:
+  Line 11:       "command": "bd devlog resume --last 1 && bd devlog search \"Scoring\"",
+  Line 12:       "description": "Resuming last session context and searching for 'Scoring' in the devlog."
+  Line 14:     "output": "Resuming last 1 session(s):\n\n🔍 Search: \"Scoring\"                                            \n                                                                \n  ⚠️  No sessions found.                                        \n          ...
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/cmd/bd/eval_task_opencode.go","limit":100,"offset":60})
+✅ [RESULT] <file>
+00061| }
+00062| 
+00063| type Scoring struct {
+00064| 	Strategy   string
+00065| 	LogicDesc  string
+00066| 	Status     string
+00067| 	Bonus      float64
+00068| 	Emoji      string
+00069| }
+00070| 
+00071| // UI Models and Messages
+00072| type EvalRun struct {
+00073| 	Name     string
+00074| 	Status   string // "Running", "Done", "Failed"
+00075| 	Duration time.Duration
+00076| 	LastTool string
+00077| }
+00078| 
+00079| type EvalUpdateMsg struct {
+00080| 	Index    int
+00081| 	Status   string
+00082| 	LastTool string
+00083| 	Result   OpenCodeTrace
+00084| }
+00085| 
+00086| type progressModel struct {
+00087| 	runs    []*EvalRun
+00088| 	spinner spinner.Model
+00089| 	done    bool
+00090| 	quitting bool
+00091| }
+00092| 
+00093| func (m progressModel) Init() tea.Cmd {
+00094| 	return m.spinner.Tick
+00095| }
+00096| 
+00097| func (m progressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+00098| 	switch msg := msg.(type) {
+00099| 	case tea.KeyMsg:
+00100| 		if msg.String() == "q" || msg.String() == "ctrl+c" {
+00101| 			m.quitting = true
+00102| 			return m, tea.Quit
+00103| 		}
+00104| 	case spinner.TickMsg:
+00105| 		var cmd tea.Cmd
+00106| 		m.spinner, cmd = m.spinner.Update(msg)
+00107| 		return m, cmd
+00108| 	case EvalUpdateMsg:
+00109| 		m.runs[msg.Index].Status = msg.Status
+00110| 		m.runs[msg.Index].LastTool = msg.LastTool
+00111| 		
+00112| 		allDone := true
+00113| 		for _, r := range m.runs {
+00114| 			if r.Status == "Running" {
+00115| 				allDone = false
+00116| 				break
+00117| 			}
+00118| 		}
+00119| 		if allDone {
+00120| 			m.done = true
+00121| 			return m, tea.Quit
+00122| 		}
+00123| 	}
+00124| 	return m, nil
+00125| }
+00126| 
+00127| func (m progressModel) View() string {
+00128| 	if m.quitting {
+00129| 		return ""
+00130| 	}
+00131| 
+00132| 	var b strings.Builder
+00133| 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")).Padding(0, 1)
+00134| 	b.WriteString(headerStyle.Render("📊 Live Evaluation Progress"))
+00135| 	b.WriteString("\n\n")
+00136| 
+00137| 	for _, r := range m.runs {
+00138| 		var status string
+00139| 		if r.Status == "Running" {
+00140| 			status = m.spinner.View() + " Running"
+00141| 		} else if r.Status == "Done" {
+00142| 			status = "✅ Done"
+00143| 		} else {
+00144| 			status = "❌ Failed"
+00145| 		}
+00146| 
+00147| 		tool := r.LastTool
+00148| 		if tool == "" {
+00149| 			tool = "-"
+00150| 		}
+00151| 		if len(tool) > 30 {
+00152| 			tool = tool[:27] + "..."
+00153| 		}
+00154| 
+00155| 		row := fmt.Sprintf(" %-10s │ %-10s │ %-30s", r.Name, status, tool)
+00156| 		b.WriteString(row + "\n")
+00157| 	}
+00158| 
+00159| 	if m.done {
+00160| 		b.WriteString("\n✅ All evaluations complete!\n")
+
+(File has more lines. Use 'offset' parameter to read beyond line 160)
+</file>
+
+<system-reminder>
+Instructions from: /private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/cmd/bd/AGENTS.md
+# Agent Instructions
+
+This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+
+## Quick Reference
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --status in_progress  # Claim work
+bd close <id>         # Complete work
+bd sync               # Sync with git
+```
+
+## Landing the Plane (Session Completion)
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
+
+
+</system-reminder>
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-4176120503/implicit/docs/EVAL.md"})
+✅ [RESULT] <file>
+00001| # Agent Evaluation Mode
+00002| 
+00003| **Measure agent performance, protocol compliance, and token efficiency.**
+00004| 
+00005| BeadsLog features a specialized **Evaluation Mode** designed to analyze how effectively AI agents use the knowledge graph versus brute-force searching. This provides quantitative proof of the benefits of the "Always-On Protocol."
+00006| 
+00007| ## 🚀 How it Works
+00008| 
+00009| Eval Mode attaches a unique **Session ID** to every command executed by an agent. This allows the system to segment continuous logs into distinct "test runs" for side-by-side comparison.
+00010| 
+00011| ### 🔄 The Eval Lifecycle
+00012| 
+00013| 1.  **Test:** `bd eval task`
+00014|     - High-speed A/B/C testing using parallel execution (>5x speedup).
+00015|     - Compares Implicit, Explicit, and Base (restricted) protocols.
+00016|     - Features a real-time Bubble Tea progress UI and automated pre-hydration.
+00017| 2.  **Start:** `bd eval start [scenario_id]`
+00018|     - Activates high-fidelity tracing for manual agent runs.
+00019|     - Sets the "Intent" or "Scenario" for grouping.
+00020| 3.  **Iterate:** Run tasks with your agent.
+00021| 4.  **Rotate:** `bd eval next`
+00022|     - Ends the current run and starts a new one (rotates the Session ID).
+00023|     - Perfect for A/B testing different models or prompts for the same task.
+00024| 5.  **Report:** `bd eval report [N]`
+00025|     - Generates a comparative matrix of the last N sessions, grouped by task similarity.
+00026| 6.  **Stop:** `bd eval stop`
+00027|     - Disables tracing and cleans up session state.
+00028| 
+00029| ## 📋 Methodology & Scoring
+00030| 
+00031| The reporting engine groups sessions by **Task Intent** using fuzzy matching (Levenshtein distance) on prompts. It then calculates a **Weighted Efficiency Score** based on the following rubric:
+00032| 
+00033| ### 1. Protocol Adherence Rubric
+00034| 
+00035| | State | Logic | Emoji | weight |
+00036| | :--- | :--- | :--- | :--- |
+00037| | **Optimal (Mastery)** | `Map` tools used FIRST + `Verify` tools used LATER | 🟢🟢🟢 | **1.5x** |
+00038| | **Shallow** | `Map` tools used + NO `Verify` tools (hallucination risk) | 🟠 | **0.8x** |
+00039| | **Disordered** | `Verify` tools used BEFORE `Map` tools (sequence break) | 🔴🟠 | **0.5x** |
+00040| | **Blind** | NO `Map` tools used (pure brute-force) | 🔴 | **0.1x** |
+00041| 
+00042| ### 2. Efficiency Formula
+00043| 
+00044| Efficiency is calculated relative to the average token cost of all runs in the same task group:
+00045| 
+00046| `Efficiency = (Strategy Weight) * (Group Average Tokens / This Run Tokens)`
+00047| 
+00048| - **> 1.0x 🚀:** More efficient than the group average.
+00049| - **< 1.0x 📉:** Less efficient (wasted tokens or poor strategy).
+00050| 
+00051| ### 💰 Token Weighting
+00052| 
+00053| To estimate costs accurately, tools are assigned weights based on their context consumption:
+00054| - **Brute-Force (`grep`, `search_file_content`):** ~2,500 tokens (Heavy context).
+00055| - **Inspection (`read_file`):** ~1,200 tokens (Medium context).
+00056| - **Retrieval (`bd devlog search/graph`):** ~150 tokens (Light context).
+00057| 
+00058| ## 📊 Comparative Report Example
+00059| 
+00060| When you run `bd eval report 3`, you get a grouped matrix:
+00061| 
+00062| ```text
+00063| TASK GROUP: "Authentication Logic Fix" (Matched 2 runs)
+00064| ╭───────────────────┬───────────────────┬───────────────────┬──────────────────┬──────────────────┬──────────────────┬──────────────────╮
+00065| │ Run               │ Strategy          │ Tools Used        │ Tokens           │ Time             │ Status           │ Eff.             │
+00066| ├───────────────────┼───────────────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+00067| │         1         │  Optimal (Mastery)│  bd devlog graph  │       1350       │        12s       │       PASS       │     2.5x 🟢🟢🟢  │
+00068| │ (770496985-61285) │                   │     read_file     │                  │                  │    (100/100)     │                  │
+00069| ├───────────────────┼───────────────────┼───────────────────┼──────────────────┼──────────────...
+In this project, **Scoring** refers to the evaluation rubric used to measure AI agent performance, protocol compliance, and token efficiency. It is defined in two ways:
+
+### 1. Functional Definition (Methodology)
+As documented in `docs/EVAL.md`, scoring is based on a **Protocol Adherence Rubric** and an **Efficiency Formula**:
+
+| State | Logic | Emoji | Weight |
+| :--- | :--- | :--- | :--- |
+| **Optimal (Mastery)** | `Map` tools used FIRST + `Verify` tools used LATER | 🟢🟢🟢 | **1.5x** |
+| **Shallow** | `Map` tools used + NO `Verify` tools | 🟠 | **0.8x** |
+| **Disordered** | `Verify` tools used BEFORE `Map` tools | 🔴🟠 | **0.5x** |
+| **Blind** | NO `Map` tools used (pure brute-force) | 🔴 | **0.1x** |
+
+**Efficiency Formula:**
+`Efficiency = (Strategy Weight) * (Group Average Tokens / This Run Tokens)`
+
+---
+
+### 2. Code Definition (Data Structure)
+In the implementation (`cmd/bd/eval_task_opencode.go`), `Scoring` is defined as a Go struct:
+
+```go
+type Scoring struct {
+    Strategy   string  // e.g., "Optimal", "Blind"
+    LogicDesc  string  // e.g., "Map FIRST + Verify LATER"
+    Status     string  // "PASS" or "FAIL"
+    Bonus      float64 // Numerical weight/bonus
+    Emoji      string  // Visual indicator (🟢, 🟠, 🔴)
+}
+```
+
+This struct is primarily used by the `bd eval task` and `bd eval report` commands to categorize and display the performance of different agent runs.

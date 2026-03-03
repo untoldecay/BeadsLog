@@ -1,0 +1,50 @@
+QUERY: Find where TokenUsage is defined
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+
+I'll start by checking the status of the environment and then use the BEADSLOG tools to search for the definition of `TokenUsage`.
+◐  [TOOL] bash(bd status)
+
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "TokenUsage")
+I'll resume the last session and search the devlog for `TokenUsage` to identify its definition or usage history.
+●  [TOOL] bash(bd devlog graph "TokenUsage")
+I'll try searching for `TokenUsage` in the entity graph to see if it's a tracked component or dependency.I'll use `grep` to search the codebase for the definition of `TokenUsage`.
+⚪  [TOOL] grep({"pattern":"(class|interface|type|struct|enum)\\s+TokenUsage"})
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3283657434/explicit/cmd/bd/eval_task_opencode.go","limit":10,"offset":41})
+`TokenUsage` is defined as a `struct` in `cmd/bd/eval_task_opencode.go`.
+
+```go
+// cmd/bd/eval_task_opencode.go:42
+type TokenUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+```
+
+I'll read the file to verify the exact definition.I've located the definition of `TokenUsage` in `cmd/bd/eval_task_opencode.go`.
+
+```go
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```
+
+I'll perform one last check to see if it's defined elsewhere.
+⚪  [TOOL] grep({"pattern":"TokenUsage"})
+`TokenUsage` is defined as a Go `struct` in the file `cmd/bd/eval_task_opencode.go`.
+
+```go
+// cmd/bd/eval_task_opencode.go:42
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```

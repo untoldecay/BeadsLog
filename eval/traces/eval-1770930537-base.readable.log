@@ -1,0 +1,19 @@
+QUERY: Find where TokenUsage is defined
+
+(RESTRICTION: The 'bd' and 'beads' tools are currently unavailable in this environment. Please complete the task using only standard Unix tools like grep, find, ls, and direct file reading. Do your best with the available tools.)
+============================================================
+
+I will search for the definition of `TokenUsage` using `grep`.
+⚪  [TOOL] grep({"pattern":"(class|interface|type|struct|enum)\\s+TokenUsage\\b|export\\s+(const|type|interface|class)\\s+TokenUsage\\b"})
+I found the definition of `TokenUsage` in `/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3283657434/base/cmd/bd/eval_task_opencode.go`. I'll read the file to see the full struct definition.
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3283657434/base/cmd/bd/eval_task_opencode.go","limit":20,"offset":41})
+`TokenUsage` is defined as a struct in `/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-3283657434/base/cmd/bd/eval_task_opencode.go`:
+
+```go
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```

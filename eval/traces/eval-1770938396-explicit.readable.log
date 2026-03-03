@@ -1,0 +1,63 @@
+QUERY: Find TokenUsage
+
+(CRITICAL PROTOCOL: Use 'bd devlog' tools FIRST to map the landscape, then verify findings with classic tools like grep/cat if needed.)
+============================================================
+
+I'll start by checking the environment status and then use the devlog tools to search for `TokenUsage`.
+◐  [TOOL] bash(bd status)
+✅ [RESULT] 
+📊 Issue Database Status
+
+Summary:
+  Total Issues:           87
+  Open:                   6
+  In Progress:            0
+  Blocked:                0
+  Closed:                 81
+  Ready to Work:          6
+
+Extended:
+  Deleted:                35 (tombstones)
+  Avg Lead Time:          6.6 hours
+
+For more details, use 'bd list' to see individual issues.
+
+
+
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "TokenUsage")
+✅ [RESULT] Resuming last 1 session(s):
+
+🔍 Search: "TokenUsage"                                         
+                                                                
+  ⚠️  No sessions found.                                        
+                                                                
+  Consider broadening your search or checking for related terms.
+
+💡 Tip: Not finding what you expect? Run bd devlog sync to ingest latest logs, or use --help for search filters.
+
+
+●  [TOOL] bash(bd devlog entities | grep -i "Token")
+
+●  [TOOL] bash(bd devlog sync && bd devlog search "Token")
+✅ [RESULT] Missing log session, _rules/_devlog/2026-01-26_orphaned-test.md : open _rules/_devlog/2026-01-26_orphaned-test.md: no such file or directory
+Missing log session, _rules/_devlog/2026-01-27_background-test.md : open _rules/_devlog/2026-01-27_background-test.md: no such file or directory
+✅ Synced 101 sessions
+
+💡 Tip: Use -v for detailed sync logs or --help for options.
+🔍 Search: "Token"                                                              
+                                                                                
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                    💡 Related Entities (Matched via FTS)                     │
+├──────────────────────────────────────────�...
+
+●  [TOOL] bash(bd devlog graph "tokenusage" && bd devlog show "sess-72dc35")
+✅ [RESULT] Graph for 'tokenusage' (Matches: 1):
+
+Graph for 'tokenusage' (Matches: 1):
+
+╭─────────────────────────┬────────────────────────────────────────────────────╮
+│       Root Entity       │          Graph Analysis for "tokenusage"           │
+├─────────────────────────┼────────────────────────────────────────────────────┤
+│                         │ tokenusage (0)                                     │
+│ tokenusage              │                                                    │
+╰─────────────────────────┴────────────────────────────────�...

@@ -1,0 +1,22 @@
+{
+  "tool_calls": [
+    {
+      "name": "bash",
+      "args": "bd status",
+      "result": "\n📊 Issue Database Status\n\nSummary:\n  Total Issues:           87\n  Open:                   6\n  In Progress:            0\n  Blocked:                0\n  Closed:                 81\n  Ready to Work:          6\n\nExtended:\n  Deleted:                35 (tombstones)\n  Avg Lead Time:          6.6 hours\n\nFor more details, use 'bd list' to see individual issues.\n\n"
+    },
+    {
+      "name": "bash",
+      "args": "bd devlog resume --last 1 \u0026\u0026 bd devlog search \"TokenUsage\"",
+      "result": "Resuming last 1 session(s):\n\n🔍 Search: \"TokenUsage\"                                         \n                                                                \n  ⚠️  No sessions found.                                        \n                                                                \n  Consider broadening your search or checking for related terms.\n\n💡 Tip: Not finding what you expect? Run bd devlog sync to ingest latest logs, or use --help for search filters.\n"
+    }
+  ],
+  "response": "",
+  "reasoning": "",
+  "tokens_used": {
+    "input": 25898,
+    "output": 68,
+    "reasoning": 139,
+    "total": 26105
+  }
+}

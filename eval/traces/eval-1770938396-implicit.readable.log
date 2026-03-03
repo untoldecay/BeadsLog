@@ -1,0 +1,92 @@
+QUERY: Find TokenUsage
+============================================================
+
+
+◐  [TOOL] bash(bd status)
+✅ [RESULT] 
+📊 Issue Database Status
+
+Summary:
+  Total Issues:           87
+  Open:                   6
+  In Progress:            0
+  Blocked:                0
+  Closed:                 81
+  Ready to Work:          6
+
+Extended:
+  Deleted:                35 (tombstones)
+  Avg Lead Time:          6.6 hours
+
+For more details, use 'bd list' to see individual issues.
+
+
+I'll start by checking the project status and searching for "TokenUsage" in both the development logs and the codebase.
+
+[tool_call: bash command="bd status"]
+[tool_call: bash command="bd devlog search \"TokenUsage\""]
+[tool_call: grep pattern="TokenUsage"]
+●  [TOOL] bash(bd devlog search "TokenUsage")
+✅ [RESULT] 🔍 Search: "TokenUsage"                                         
+                                                                
+  ⚠️  No sessions found.                                        
+                                                                
+  Consider broadening your search or checking for related terms.
+
+💡 Tip: Not finding what you expect? Run bd devlog sync to ingest latest logs, or use --help for search filters.
+
+
+⚪  [TOOL] grep({"pattern":"TokenUsage"})
+✅ [RESULT] Found 100 matches
+/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-247104861/implicit/.local/share/opencode/log/2026-02-12T232015.log:
+  Line 1: INFO  2026-02-12T23:20:15 +1017ms service=default version=1.1.56 args=["run","--format","json","--model","google/gemini-flash-latest","Find TokenUsage"] opencode
+  Line 133: INFO  2026-02-12T23:20:16 +799ms service=session.summary title=Finding TokenUsage title
+  Line 147: INFO  2026-02-12T23:20:19 +113ms service=permission permission=bash pattern=bd devlog search "TokenUsage" ruleset=[{"permission":"*","pattern":"*","action":"allow"},{"permission":"doom_loop","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"*","action":"ask"},{"permission":"external_directory","pattern":"/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-247104861/implicit/.local/share/opencode/tool-output/*","action":"allow"},{"permission":"external_directory","pattern":"/var/folders/...
+
+⚪  [TOOL] read({"filePath":"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-247104861/implicit/cmd/bd/eval_task_opencode.go"})
+✅ [RESULT] <file>
+00001| package main
+00002| 
+00003| import (
+00004| 	"bufio"
+00005| 	"encoding/json"
+00006| 	"fmt"
+00007| 	"os"
+00008| 	"os/exec"
+00009| 	"path/filepath"
+00010| 	"strings"
+00011| 	"sync"
+00012| 	"time"
+00013| 
+00014| 	"github.com/charmbracelet/bubbles/spinner"
+00015| 	tea "github.com/charmbracelet/bubbletea"
+00016| 	"github.com/charmbracelet/huh"
+00017| 	"github.com/charmbracelet/lipgloss"
+00018| 	"github.com/spf13/cobra"
+00019| 	"github.com/untoldecay/BeadsLog/internal/audit"
+00020| 	"github.com/untoldecay/BeadsLog/internal/eval"
+00021| 	"github.com/untoldecay/BeadsLog/internal/ui"
+00022| )
+00023| 
+00024| var evalTaskCmd = &cobra.Command{
+00025| 	Use:   "task",
+00026| 	Short: "Interactive eval: sandbox -> test -> analyze -> cleanup",
+00027| 	Long: `Runs an A/B/C evaluation of the agent protocol in isolated sandboxes using OpenCode CLI.
+00028| It compares three runs:
+00029| 1. Implicit: Standard protocol enforcement via AGENT.md.
+00030| 2. Explicit: Direct instructions to foll...
+`TokenUsage` is a struct used to track token consumption during evaluation runs. I've located its definition in `cmd/bd/eval_task_opencode.go`.
+
+[tool_call: read filePath="/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-247104861/implicit/cmd/bd/eval_task_opencode.go"]`TokenUsage` is defined as a Go `struct` in `cmd/bd/eval_task_opencode.go` (lines 42-47):
+
+```go
+// TokenUsage tracks token consumption
+type TokenUsage struct {
+	Input     int `json:"input"`
+	Output    int `json:"output"`
+	Reasoning int `json:"reasoning"`
+	Total     int `json:"total"`
+}
+```
+
+It is used within the `OpenCodeTrace` struct (line 54) and the `aggregateEvent` function (lines 602-659) to track and aggregate token metrics from evaluation traces.

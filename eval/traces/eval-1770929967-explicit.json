@@ -1,0 +1,11 @@
+{
+  "tool_calls": null,
+  "response": "",
+  "reasoning": "",
+  "tokens_used": {
+    "input": 0,
+    "output": 0,
+    "reasoning": 0,
+    "total": 0
+  }
+}

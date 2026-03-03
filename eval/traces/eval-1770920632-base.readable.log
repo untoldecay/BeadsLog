@@ -1,0 +1,5 @@
+QUERY: list files
+
+(RESTRICTION: The 'bd' and 'beads' tools are currently unavailable in this environment. Please complete the task using only standard Unix tools like grep, find, ls, and direct file reading. Do your best with the available tools.)
+============================================================
+

@@ -1,0 +1,35 @@
+QUERY: Find TokenUsage definition
+============================================================
+
+
+◐  [TOOL] bash(bd status)
+✅ [RESULT] 
+📊 Issue Database Status
+
+Summary:
+  Total Issues:           87
+  Open:                   6
+  In Progress:            0
+  Blocked:                0
+  Closed:                 81
+  Ready to Work:          6
+
+Extended:
+  Deleted:                35 (tombstones)
+  Avg Lead Time:          6.6 hours
+
+For more details, use 'bd list' to see individual issues.
+
+
+
+●  [TOOL] bash(bd devlog resume --last 1 && bd devlog search "TokenUsage")
+✅ [RESULT] Resuming last 1 session(s):
+
+🔍 Search: "TokenUsage"                                         
+                                                                
+  ⚠️  No sessions found.                                        
+                                                                
+  Consider broadening your search or checking for related terms.
+
+💡 Tip: Not finding what you expect? Run bd devlog sync to ingest latest logs, or use --help for search filters.
+

@@ -1,0 +1,32 @@
+{
+  "tool_calls": [
+    {
+      "name": "grep",
+      "args": "{\"pattern\":\"TokenUsage\"}",
+      "result": ""
+    },
+    {
+      "name": "glob",
+      "args": "{\"pattern\":\"**/eval_task_opencode.go\"}",
+      "result": ""
+    },
+    {
+      "name": "read",
+      "args": "{\"filePath\":\"/private/var/folders/nx/6y9vk81n5r54thjv00mdqnv40000gn/T/beads-eval-1fee4fbf29a317c5-2912173827/base/cmd/bd/eval_task_opencode.go\"}",
+      "result": ""
+    },
+    {
+      "name": "grep",
+      "args": "{\"include\":\"*.go\",\"pattern\":\"type TokenUsage struct\"}",
+      "result": ""
+    }
+  ],
+  "response": "`TokenUsage` is defined as a Go `struct` in `cmd/bd/eval_task_opencode.go` at line 42. It is used to track token consumption:\n\n```go\n// TokenUsage tracks token consumption\ntype TokenUsage struct {\n\tInput     int `json:\"input\"`\n\tOutput    int `json:\"output\"`\n\tReasoning int `json:\"reasoning\"`\n\tTotal     int `json:\"total\"`\n}\n```\n\nIt is also included as a field in the `OpenCodeTrace` struct (line 54) to record the tokens used during an evaluation trace.\n",
+  "reasoning": "",
+  "tokens_used": {
+    "input": 71682,
+    "output": 288,
+    "reasoning": 873,
+    "total": 72843
+  }
+}
