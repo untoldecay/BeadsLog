@@ -51,6 +51,7 @@ bd devlog resume --last 1
 - [Use Cases](docs/USE_CASES.md) — Real-world scenarios for agents and teams.
 - [Devlog](docs/DEVLOG.md) — Understanding the "Bead" concept and the narrative format.
 - [Devlog Architecture](docs/DEVLOG_ARCHITECTURE.md) — How the background AI and crystallization engine works.
+- [Ollama Enrichment](docs/OLLAMA_ENRICHMENT.md) — Configuring Ollama for background semantic analysis.
 - [Issue Architecture](docs/ARCHITECTURE.md) — Standard Beads data model and sync mechanism.
 - [Hooks](docs/HOOKS.md) — Automating your workflow with Git integration.
 - [Visualization](docs/VISUALIZATION.md) — Exploring Search, Impact, and the Graph.

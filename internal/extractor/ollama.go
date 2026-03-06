@@ -48,6 +48,28 @@ func (o *OllamaExtractor) Available(ctx context.Context) bool {
 	return err == nil
 }
 
+// ListModels returns a list of installed Ollama models
+func (o *OllamaExtractor) ListModels(ctx context.Context) ([]string, error) {
+	resp, err := o.client.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var models []string
+	for _, m := range resp.Models {
+		models = append(models, m.Name)
+	}
+	return models, nil
+}
+
+// PullModel pulls a model from the Ollama library
+func (o *OllamaExtractor) PullModel(ctx context.Context, model string, progress func(api.ProgressResponse) error) error {
+	req := &api.PullRequest{
+		Model: model,
+	}
+	return o.client.Pull(ctx, req, progress)
+}
+
 type ollamaResponse struct {
 	Entities []struct {
 		Name json.RawMessage `json:"name"`

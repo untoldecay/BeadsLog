@@ -11,10 +11,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/charmbracelet/huh"
+	"github.com/ollama/ollama/api"
 	"github.com/untoldecay/BeadsLog/cmd/bd/doctor"
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/configfile"
+	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/git"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/syncbranch"
@@ -513,18 +515,16 @@ With --stealth: configures per-repository git settings for invisible beads usage
 				enforceDevlogStr = "true"
 				backgroundEnrichStr = "false"
 
+				selectedModel := "llama3.2:3b" // Default
+
 				var selectedToolNames []string
 
 				// Interactive setup if not quiet and stdin is a TTY
 				if !quiet && ui.IsTerminal() {
 					fmt.Println() // Space before questions
-					// Convert AgentToolCandidates to huh options with friendly labels
-					agentOptions := make([]huh.Option[string], len(AgentToolCandidates))
-					for i, tool := range AgentToolCandidates {
-						agentOptions[i] = huh.NewOption(tool.Name, tool.Name).Selected(true)
-					}
 
-					form := huh.NewForm(
+					// Step 1: Auto-Sync
+					syncForm := huh.NewForm(
 						huh.NewGroup(
 							huh.NewSelect[string]().
 								Title("Enable Auto-Sync?").
@@ -534,7 +534,16 @@ With --stealth: configures per-repository git settings for invisible beads usage
 									huh.NewOption("No, I'll sync manually", "false"),
 								).
 								Value(&autoSyncStr),
+						),
+					)
+					if err := syncForm.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
 
+					// Step 2: Enforce Devlogs
+					enforceForm := huh.NewForm(
+						huh.NewGroup(
 							huh.NewSelect[string]().
 								Title("Enforce Devlogs?").
 								Description("Prevents commits unless a devlog entry is provided. Highly recommended for AI agents.").
@@ -543,7 +552,16 @@ With --stealth: configures per-repository git settings for invisible beads usage
 									huh.NewOption("No, allow loose commits", "false"),
 								).
 								Value(&enforceDevlogStr),
+						),
+					)
+					if err := enforceForm.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
 
+					// Step 3: AI Enrichment
+					aiForm := huh.NewForm(
+						huh.NewGroup(
 							huh.NewSelect[string]().
 								Title("Background AI Enrichment?").
 								Description("Uses Ollama to automatically extract architectural entities in the background.").
@@ -552,7 +570,93 @@ With --stealth: configures per-repository git settings for invisible beads usage
 									huh.NewOption("No, use fast Regex only", "false"),
 								).
 								Value(&backgroundEnrichStr),
+						),
+					)
+					if err := aiForm.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
 
+					// Step 4: Ollama Selection (Conditional)
+					if backgroundEnrichStr == "true" {
+						// Ollama Selection Wizard
+						ollama, err := extractor.NewOllamaExtractor("")
+						if err != nil || !ollama.Available(ctx) {
+							fmt.Printf("\n  %s Ollama not detected or not running.\n", ui.RenderWarn("⚠"))
+							fmt.Println("    To use AI enrichment, please ensure Ollama is installed and running.")
+							fmt.Println("    Refer to " + ui.RenderAccent("docs/OLLAMA_ENRICHMENT.md") + " for setup instructions.")
+							fmt.Println("    Or use " + ui.RenderCommand("bd help devlog") + " for more information.")
+							fmt.Printf("\n    Disabling background enrichment for now.\n")
+							backgroundEnrichStr = "false"
+						} else {
+							models, err := ollama.ListModels(ctx)
+							if err != nil || len(models) == 0 {
+								// No models found, offer to pull
+								pull := false
+								pullForm := huh.NewForm(
+									huh.NewGroup(
+										huh.NewConfirm().
+											Title("No Ollama models found").
+											Description("Would you like to pull 'llama3.2:1b' (lightweight) now?").
+											Affirmative("Yes, pull llama3.2:1b").
+											Negative("No, disable AI").
+											Value(&pull),
+									),
+								)
+								if err := pullForm.Run(); err == nil && pull {
+									selectedModel = "llama3.2:1b"
+									fmt.Printf("  %s Pulling %s...\n", ui.RenderAccent("→"), selectedModel)
+									err := ollama.PullModel(ctx, selectedModel, func(resp api.ProgressResponse) error {
+										if resp.Status != "" {
+											if resp.Total > 0 {
+												percent := float64(resp.Completed) / float64(resp.Total) * 100
+												fmt.Printf("\r  %s %s: %.1f%%          ", ui.RenderAccent("→"), resp.Status, percent)
+											} else {
+												fmt.Printf("\r  %s %s          ", ui.RenderAccent("→"), resp.Status)
+											}
+										}
+										return nil
+									})
+									if err != nil {
+										fmt.Printf("\n  %s Failed to pull model: %v\n", ui.RenderFail("✗"), err)
+										backgroundEnrichStr = "false"
+									} else {
+										fmt.Printf("\n  %s Model pulled successfully!\n", ui.RenderPass("✓"))
+									}
+								} else {
+									backgroundEnrichStr = "false"
+								}
+							} else {
+								// Models found, show selection
+								options := make([]huh.Option[string], len(models))
+								for i, m := range models {
+									options[i] = huh.NewOption(m, m)
+								}
+
+								modelForm := huh.NewForm(
+									huh.NewGroup(
+										huh.NewSelect[string]().
+											Title("Select Ollama Model").
+											Description("Choose a model for architectural entity extraction.").
+											Options(options...).
+											Value(&selectedModel),
+									),
+								)
+								if err := modelForm.Run(); err != nil {
+									backgroundEnrichStr = "false"
+								}
+							}
+						}
+					}
+
+					// Step 5: Agent Instructions
+					agentOptions := make([]huh.Option[string], len(AgentToolCandidates))
+					for i, tool := range AgentToolCandidates {
+						agentOptions[i] = huh.NewOption(tool.Name, tool.Name).Selected(true)
+					}
+
+					agentForm := huh.NewForm(
+						huh.NewGroup(
 							huh.NewMultiSelect[string]().
 								Title("Agent Instructions").
 								Description("Select which agent instruction files to generate or update.\n(Space to toggle, Enter to confirm)").
@@ -562,7 +666,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 						),
 					)
 
-					if err := form.Run(); err != nil {
+					if err := agentForm.Run(); err != nil {
 						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
 						os.Exit(1)
 					}
@@ -595,6 +699,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		// Persist background enrich setting if enabled
 		if backgroundEnrich {
 			_ = config.SetYamlConfig("entity_extraction.background_enrichment", "true")
+			_ = config.SetYamlConfig("ollama.model", selectedModel)
+		} else {
+			_ = config.SetYamlConfig("entity_extraction.background_enrichment", "false")
 		}
 
 		orchFiles := initializeOrchestration(false)
