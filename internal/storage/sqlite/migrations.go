@@ -63,6 +63,7 @@ var migrationsList = []Migration{
 	{"populate_fts", migrations.MigratePopulateFTS},
 	{"extraction_evol_schema", migrations.MigrateExtractionEvolSchema},
 	{"devlog_enrichment_status", migrations.MigrateDevlogEnrichmentStatus},
+	{"author_columns", migrations.MigrateAuthorColumns},
 }
 
 // MigrationInfo contains metadata about a migration for inspection

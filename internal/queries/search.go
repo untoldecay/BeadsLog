@@ -18,6 +18,7 @@ type SearchResult struct {
 
 type SearchOptions struct {
 	Query    string
+	Author   string
 	Limit    int
 	Strict   bool // If true, only BM25 on sessions, no expansion
 	TextOnly bool // If true, only BM25, no entity lookup
@@ -45,17 +46,24 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
 	}
 
 	// 1. BM25 Text Search
-	textQuery := "" +
-		`
+	textQuery := `
         SELECT s.id, s.title, snippet(sessions_fts, 1, '<b>', '</b>', '...', 64), bm25(sessions_fts) 
         FROM sessions_fts 
         JOIN sessions s ON sessions_fts.rowid = s.rowid
-        WHERE sessions_fts MATCH ? 
-        ORDER BY bm25(sessions_fts) 
-        LIMIT ?
+        WHERE sessions_fts MATCH ?
     `
+	var textArgs []interface{}
+	textArgs = append(textArgs, matchQuery)
+	
+	if opts.Author != "" {
+		textQuery += " AND s.author LIKE ?"
+		textArgs = append(textArgs, "%"+opts.Author+"%")
+	}
+	
+	textQuery += " ORDER BY bm25(sessions_fts) LIMIT ?"
+	textArgs = append(textArgs, opts.Limit)
 
-	rows, err := db.QueryContext(ctx, textQuery, matchQuery, opts.Limit)
+	rows, err := db.QueryContext(ctx, textQuery, textArgs...)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -98,9 +106,19 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
             JOIN session_entities se ON s.id = se.session_id
             JOIN entities e ON se.entity_id = e.id
             WHERE e.name = ?
-            LIMIT ?
         `
-		rRows, err := db.QueryContext(ctx, relatedQuery, entityName, opts.Limit)
+		var relatedArgs []interface{}
+		relatedArgs = append(relatedArgs, entityName)
+
+		if opts.Author != "" {
+			relatedQuery += " AND s.author LIKE ?"
+			relatedArgs = append(relatedArgs, "%"+opts.Author+"%")
+		}
+
+		relatedQuery += " LIMIT ?"
+		relatedArgs = append(relatedArgs, opts.Limit)
+
+		rRows, err := db.QueryContext(ctx, relatedQuery, relatedArgs...)
 		if err == nil {
 			defer rRows.Close()
 			for rRows.Next() {

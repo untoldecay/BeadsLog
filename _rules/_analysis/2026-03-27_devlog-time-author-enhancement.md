@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-27
 **Branch:** `dev/devlog-time-author-01`
-**Status:** Investigation Complete
+**Status:** Implementation Complete & Verified
 
 ## 1. Objective
 Assess the impact and dependencies of enhancing the BeadsLog devlog system to include granular time logging (`HH:MM`) and developer attribution (GitHub author). This involves modifying the generation prompt, the index structure, the database schema, and the ingestion logic.
@@ -123,10 +123,16 @@ A dedicated sandbox script `test_enhancement.sh` will be created to perform the 
 5. **Database Verify:** Run `bd devlog sync` and query the database for author/time precision.
 6. **Command Verify:** Run `bd devlog authors` and `bd devlog list --author` to ensure metrics and filters work.
 7. **Enforcement Verify:** Trigger `bd check --hook pre-commit` without a log and verify the new instruction message.
+**Status:** Implementation Complete & Verified
 
-## 7. Conclusion
-The transition from manual Markdown editing to the `bd devlog record` command is the most significant resilience improvement in this proposal. By integrating migration into the `init` and `onboard` phases, we ensure a seamless transition for existing projects while providing agents with a more robust and less error-prone way to maintain project memory.
-The proposed changes significantly improve devlog utility for teams. The addition of `bd devlog record` is a major resilience improvement, preventing the frequent "AI syntax error" corruption in `_index.md`. The distinction between name (display) and email (CV attribution) should be maintained to align with project standards.
+## 8. Implementation Notes (Final)
+The implementation followed the roadmap with a few critical refinements:
+1. **Author Override:** Added a `--author` flag to `bd devlog record` to handle environments where `git config` is missing (e.g., restricted agent environments).
+2. **Sync Sensitivity:** Updated `SyncSession`'s `needsUpdate` logic to be sensitive to `author` and `author_email` changes, ensuring that index-only metadata updates trigger a database refresh even if the underlying markdown file hasn't changed.
+3. **FTS Rebuild:** Confirmed that dropping and recreating the FTS table is the most reliable path for adding searchable metadata columns in SQLite.
+
+## 9. Conclusion
+The devlog system is now a robust, multi-user project memory with high-precision time tracking. The introduction of `bd devlog record` successfully eliminates the primary source of index corruption while significantly reducing the effort required for agents to maintain their development logs.
 
 ---
 *Report by BeadsLog Agent - 2026-03-27*

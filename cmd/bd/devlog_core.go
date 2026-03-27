@@ -19,23 +19,37 @@ import (
 )
 
 type IndexRow struct {
-	Subject  string
-	Problem  string
-	Date     string
-	Filename string
-	Dir      string // Directory containing the index file
+	Subject     string
+	Problem     string
+	Author      string
+	AuthorEmail string
+	Date        string
+	Filename    string
+	Dir         string // Directory containing the index file
 }
 
 // SyncSession synchronizes a session from an index row into the database
 // It handles creation, updates, and content hash verification
 func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
-	sessionID := fmt.Sprintf("sess-%s", hashID(row.Subject+row.Date))
 	db := store.UnderlyingDB()
 
+	// 1. Lookup-by-Filename Strategy (ID Stability)
+	// Check if this file is already tracked under ANY ID
+	var sessionID string
+	err := db.QueryRow("SELECT id FROM sessions WHERE filename = ?", row.Filename).Scan(&sessionID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// New file: Generate legacy hash-based ID
+			sessionID = fmt.Sprintf("sess-%s", hashID(row.Subject+row.Date))
+		} else {
+			return false, fmt.Errorf("failed to lookup session by filename: %w", err)
+		}
+	}
+
 	// Check if session exists and get current state
-	var currentFilename, currentHash string
+	var currentFilename, currentHash, currentAuthor, currentAuthorEmail string
 	var currentMissing bool
-	err := db.QueryRow("SELECT filename, file_hash, is_missing FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing)
+	err = db.QueryRow("SELECT filename, file_hash, is_missing, COALESCE(author, ''), COALESCE(author_email, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentAuthor, &currentAuthorEmail)
 	
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
@@ -70,7 +84,12 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	}
 
 	// Determine if update is needed
-	needsUpdate := !exists || currentFilename != row.Filename || currentHash != contentHash || currentMissing != isMissing
+	needsUpdate := !exists || 
+		currentFilename != row.Filename || 
+		currentHash != contentHash || 
+		currentMissing != isMissing ||
+		currentAuthor != row.Author ||
+		currentAuthorEmail != row.AuthorEmail
 
 	if !needsUpdate {
 		return false, nil // No changes
@@ -79,15 +98,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status, author, author_email)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1)
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?
 			WHERE id = ?
-		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, sessionID)
+		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, sessionID)
 	}
 
 	if err != nil {
@@ -215,17 +234,37 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 			}
 
 			// Critical Check: Double appends (two rows on same line)
-			// A valid row has exactly 5 pipes (starts with |, ends with |, 3 internal)
 			pipeCount := strings.Count(line, "|")
-			if pipeCount > 5 {
+			if pipeCount > 6 {
 				return nil, fmt.Errorf("line %d: malformed row (too many pipes, likely multiple sessions merged into one line)", i+1)
 			}
 			if pipeCount < 5 {
-				return nil, fmt.Errorf("line %d: malformed row (missing columns, expected 4 columns)", i+1)
+				return nil, fmt.Errorf("line %d: malformed row (missing columns, expected at least 4 columns)", i+1)
 			}
 
 			parts := strings.Split(line, "|")
-			if len(parts) >= 5 {
+			if pipeCount == 6 {
+				// New 5-column format: | Subject | Problems | Author | Date | Devlog |
+				filenamePart := strings.TrimSpace(parts[5])
+				// Extract filename from markdown link [name](file)
+				if strings.Contains(filenamePart, "](") {
+					start := strings.Index(filenamePart, "](") + 2
+					end := strings.Index(filenamePart[start:], ")")
+					if end != -1 {
+						filenamePart = filenamePart[start : start+end]
+					}
+				}
+
+				rows = append(rows, IndexRow{
+					Subject:  strings.TrimSpace(parts[1]),
+					Problem:  strings.TrimSpace(parts[2]),
+					Author:   strings.TrimSpace(parts[3]),
+					Date:     strings.TrimSpace(parts[4]),
+					Filename: filenamePart,
+					Dir:      dir,
+				})
+			} else if pipeCount == 5 {
+				// Legacy 4-column format: | Subject | Problems | Date | Devlog |
 				filenamePart := strings.TrimSpace(parts[4])
 				// Extract filename from markdown link [name](file)
 				if strings.Contains(filenamePart, "](") {
@@ -367,7 +406,7 @@ func hashID(s string) string {
 }
 
 func parseDate(dateStr string) time.Time {
-	layouts := []string{"2006-01-02", "Jan 2"}
+	layouts := []string{"2006-01-02 15:04", "2006-01-02", "Jan 2"}
 	for _, layout := range layouts {
         // Handle markdown link in date column if present (e.g. [2025-01-01](...))
         if strings.Contains(dateStr, "[") && strings.Contains(dateStr, "]") {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -958,6 +959,7 @@ var devlogListCmd = &cobra.Command{
 	Short: "List devlog sessions",
 	Run: func(cmd *cobra.Command, args []string) {
 		sessionType, _ := cmd.Flags().GetString("type")
+		author, _ := cmd.Flags().GetString("author")
 		
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -966,11 +968,20 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		query := "SELECT id, title, timestamp, type FROM sessions"
+		query := "SELECT id, title, timestamp, type, COALESCE(author, 'Unknown') FROM sessions"
 		var queryArgs []interface{}
+		var conditions []string
 		if sessionType != "" {
-			query += " WHERE type = ?"
+			conditions = append(conditions, "type = ?")
 			queryArgs = append(queryArgs, sessionType)
+		}
+		if author != "" {
+			conditions = append(conditions, "author LIKE ?")
+			queryArgs = append(queryArgs, "%"+author+"%")
+		}
+		
+		if len(conditions) > 0 {
+			query += " WHERE " + strings.Join(conditions, " AND ")
 		}
 		query += " ORDER BY timestamp DESC"
 
@@ -982,8 +993,8 @@ var devlogListCmd = &cobra.Command{
 		defer rows.Close()
 
 		for rows.Next() {
-			var id, title, timestampStr, typ string
-			if err := rows.Scan(&id, &title, &timestampStr, &typ); err != nil {
+			var id, title, timestampStr, typ, authorName string
+			if err := rows.Scan(&id, &title, &timestampStr, &typ, &authorName); err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
@@ -997,7 +1008,7 @@ var devlogListCmd = &cobra.Command{
 				displayTime = timestampStr[:16] 
 			}
 
-			fmt.Printf("[%s] [%s] %s - %s\n", displayTime, id, typ, title)
+			fmt.Printf("[%s] [%s] [%s] %s - %s\n", displayTime, id, authorName, typ, title)
 		}
 		fmt.Printf("\n%s Tip: Use --help to filter by session type.\n", ui.RenderAccent("💡"))
 	},
@@ -1169,6 +1180,7 @@ var devlogSearchCmd = &cobra.Command{
 		textOnly, _ := cmd.Flags().GetBool("text-only")
 		limit, _ := cmd.Flags().GetInt("limit")
 		jsonOutput, _ := cmd.Flags().GetBool("json")
+		author, _ := cmd.Flags().GetString("author")
 
 		// Fallback to global json flag if not explicitly set on command
 		if !cmd.Flags().Changed("json") {
@@ -1186,6 +1198,7 @@ var devlogSearchCmd = &cobra.Command{
 		// Tier 1: HybridSearch (Exact Match + Entity Expansion)
 		opts := queries.SearchOptions{
 			Query:    query,
+			Author:   author,
 			Limit:    limit,
 			Strict:   strict,
 			TextOnly: textOnly,
@@ -1352,6 +1365,7 @@ var devlogResumeCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		lastN, _ := cmd.Flags().GetInt("last")
+		author, _ := cmd.Flags().GetString("author")
 		
 		if lastN > 0 || len(args) == 0 {
 			if lastN == 0 { lastN = 1 } // Default to last 1 if no arg and no flag
@@ -1364,7 +1378,16 @@ var devlogResumeCmd = &cobra.Command{
 			defer store.Close()
 
 			fmt.Printf("Resuming last %d session(s):\n\n", lastN)
-			rows, err := store.UnderlyingDB().QueryContext(rootCtx, "SELECT title, narrative FROM sessions ORDER BY timestamp DESC LIMIT ?", lastN)
+			query := "SELECT title, narrative FROM sessions"
+			var queryArgs []interface{}
+			if author != "" {
+				query += " WHERE author LIKE ?"
+				queryArgs = append(queryArgs, "%"+author+"%")
+			}
+			query += " ORDER BY timestamp DESC LIMIT ?"
+			queryArgs = append(queryArgs, lastN)
+
+			rows, err := store.UnderlyingDB().QueryContext(rootCtx, query, queryArgs...)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error fetching sessions: %v\n", err)
 				os.Exit(1)
@@ -1381,7 +1404,7 @@ var devlogResumeCmd = &cobra.Command{
 
 		query := args[0]
 		fmt.Printf("Resuming context for: %s\n", query)
-		// Minimal implementation: search sessions and show latest
+		// Search sessions and show latest
 		devlogSearchCmd.Run(cmd, args)
 		fmt.Printf("\n%s Tip: Use --help to customize context window size.\n", ui.RenderAccent("💡"))
 	},
@@ -1886,9 +1909,223 @@ var devlogVerifyCmd = &cobra.Command{
 	},
 }
 
+var devlogRecordCmd = &cobra.Command{
+	Use:   "record",
+	Short: "Automatically record a devlog entry in the index",
+	Run: func(cmd *cobra.Command, args []string) {
+		subject, _ := cmd.Flags().GetString("subject")
+		problem, _ := cmd.Flags().GetString("problem")
+		file, _ := cmd.Flags().GetString("file")
+		author, _ := cmd.Flags().GetString("author")
+
+		if subject == "" || problem == "" || file == "" {
+			fmt.Println("Error: --subject, --problem, and --file are mandatory.")
+			os.Exit(1)
+		}
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+
+		indexPath := filepath.Join(devlogDir, "_index.md")
+		
+		// 1. Get Author
+		if author == "" {
+			author = os.Getenv("BD_ACTOR")
+		}
+		if author == "" {
+			out, _ := exec.Command("git", "config", "user.name").Output()
+			author = strings.TrimSpace(string(out))
+		}
+		if author == "" {
+			author = "Unknown"
+		}
+
+		// 2. Get Date
+		date := time.Now().Format("2006-01-02 15:04")
+
+		// 3. Format Row
+		// New 5-column format: | Subject | Problems | Author | Date | Devlog |
+		row := fmt.Sprintf("| %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, date, filepath.Base(file), file)
+
+		// 4. Append to File
+		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			fmt.Printf("Error opening index: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+
+		if _, err := f.WriteString(row); err != nil {
+			fmt.Printf("Error writing to index: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✓ Recorded session: %s\n", subject)
+
+		// 5. Sync
+		fmt.Println("→ Syncing devlog...")
+		devlogSyncCmd.Run(cmd, []string{})
+	},
+}
+
+var devlogMigrateCmd = &cobra.Command{
+	Use:   "migrate",
+	Short: "Migrate devlog index to new format",
+	Run: func(cmd *cobra.Command, args []string) {
+		formatIndex, _ := cmd.Flags().GetBool("format-index")
+		if !formatIndex {
+			fmt.Println("Use --format-index to upgrade _index.md to 5-column format.")
+			return
+		}
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+
+		indexPath := filepath.Join(devlogDir, "_index.md")
+		content, err := os.ReadFile(indexPath)
+		if err != nil {
+			fmt.Printf("Error reading index: %v\n", err)
+			os.Exit(1)
+		}
+
+		lines := strings.Split(string(content), "\n")
+		var newLines []string
+		inTable := false
+		migratedCount := 0
+
+		authorOut, _ := exec.Command("git", "config", "user.name").Output()
+		currentAuthor := strings.TrimSpace(string(authorOut))
+		if currentAuthor == "" {
+			currentAuthor = "Unknown"
+		}
+
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.Contains(trimmed, "| Subject | Problems |") {
+				if !strings.Contains(trimmed, "| Author |") {
+					newLines = append(newLines, "| Subject | Problems | Author | Date | Devlog |")
+					inTable = true
+					continue
+				}
+			}
+
+			if inTable && strings.HasPrefix(trimmed, "|---") {
+				if strings.Count(trimmed, "|") == 5 {
+					newLines = append(newLines, "|---------|----------|--------|------|---------|")
+					continue
+				}
+			}
+
+			if inTable && strings.HasPrefix(trimmed, "|") {
+				pipes := strings.Count(trimmed, "|")
+				if pipes == 5 {
+					// Migrate 4 -> 5
+					parts := strings.Split(trimmed, "|")
+					subj := strings.TrimSpace(parts[1])
+					prob := strings.TrimSpace(parts[2])
+					date := strings.TrimSpace(parts[3])
+					file := strings.TrimSpace(parts[4])
+
+					// Add 00:00 to date if only YYYY-MM-DD
+					if len(date) == 10 {
+						date += " 00:00"
+					}
+
+					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s |", subj, prob, currentAuthor, date, file))
+					migratedCount++
+					continue
+				}
+			}
+			newLines = append(newLines, line)
+		}
+
+		if migratedCount > 0 {
+			err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
+			if err != nil {
+				fmt.Printf("Error writing index: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("✓ Migrated %d rows in %s\n", migratedCount, indexPath)
+		} else {
+			fmt.Println("Index already in new format or no rows to migrate.")
+		}
+	},
+}
+
+var devlogAuthorsCmd = &cobra.Command{
+	Use:   "authors",
+	Short: "List devlog authors and metrics",
+	Run: func(cmd *cobra.Command, args []string) {
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+
+		db := store.UnderlyingDB()
+		rows, err := db.Query(`
+			SELECT 
+				COALESCE(author, 'Unknown') as name, 
+				MIN(timestamp) as first_seen, 
+				MAX(timestamp) as last_seen, 
+				COUNT(*) as session_count 
+			FROM sessions 
+			GROUP BY name 
+			ORDER BY session_count DESC
+		`)
+		if err != nil {
+			fmt.Printf("Error querying authors: %v\n", err)
+			os.Exit(1)
+		}
+		defer rows.Close()
+
+		fmt.Println("\n👥 Devlog Contributors")
+		fmt.Println("--------------------------------------------------------------------------------")
+		fmt.Printf("%-20s %-20s %-20s %-10s\n", "Author", "First Session", "Last Session", "Count")
+		fmt.Println("--------------------------------------------------------------------------------")
+
+		for rows.Next() {
+			var name, first, last string
+			var count int
+			if err := rows.Scan(&name, &first, &last, &count); err != nil {
+				continue
+			}
+			// Truncate timestamp for display if it has too much precision
+			if len(first) > 16 {
+				first = first[:16]
+			}
+			if len(last) > 16 {
+				last = last[:16]
+			}
+			fmt.Printf("%-20s %-20s %-20s %-10d\n", name, first, last, count)
+		}
+		fmt.Println()
+	},
+}
+
 func init() {
 	devlogResumeCmd.Flags().IntP("last", "l", 0, "Resume last N sessions")
-	
+	devlogResumeCmd.Flags().String("author", "", "Filter resume context by author")
+
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
 	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
@@ -1899,13 +2136,23 @@ func init() {
 	devlogSearchCmd.Flags().Bool("strict", false, "Disable fuzzy matching and entity expansion")
 	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
+	devlogSearchCmd.Flags().String("author", "", "Filter search results by author")
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
+	devlogListCmd.Flags().String("author", "", "Filter by author")
+
 	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (Fast Regex only)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
 	devlogVerifyCmd.Flags().Bool("fix-ai", false, "Force AI extraction for backfilling (slow, higher quality)")
 
 	devlogEnrichCmd.Flags().Bool("all", false, "Schedule all sessions for enrichment")
+
+	devlogRecordCmd.Flags().String("subject", "", "Subject of the devlog")
+	devlogRecordCmd.Flags().String("problem", "", "Problem description")
+	devlogRecordCmd.Flags().String("file", "", "Devlog file path")
+	devlogRecordCmd.Flags().String("author", "", "Author name (overrides git config)")
+
+	devlogMigrateCmd.Flags().Bool("format-index", false, "Upgrade _index.md to 5-column format")
 
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)
@@ -1923,6 +2170,9 @@ func init() {
 	devlogCmd.AddCommand(devlogVerifyCmd)
 	devlogCmd.AddCommand(devlogExtractCmd)
 	devlogCmd.AddCommand(devlogEnrichCmd)
+	devlogCmd.AddCommand(devlogRecordCmd)
+	devlogCmd.AddCommand(devlogMigrateCmd)
+	devlogCmd.AddCommand(devlogAuthorsCmd)
 	
 	rootCmd.AddCommand(devlogCmd)
 }

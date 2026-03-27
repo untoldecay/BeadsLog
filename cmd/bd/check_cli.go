@@ -147,8 +147,9 @@ This project requires a devlog update for every commit that modifies code.
 1. Run the devlog generation prompt:
    cat %s/_generate-devlog.md
 2. Generate the session log (YYYY-MM-DD_*.md).
-3. Update the index (%s/_index.md).
-4. Stage these files:
+3. Record the session:
+   bd devlog record --subject "[fix]..." --problem "..." --file "%s/..."
+4. Stage changes:
    git add %s/
 5. Retry the commit.
 

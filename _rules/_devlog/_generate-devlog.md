@@ -19,9 +19,8 @@ The full conversation history of the current development session.
     *   **If a log for today exists:** Read that file and append the new phases from the current session to it. Do not create a new file.
     *   **If no log for today exists:** Create a new file named `_rules/_devlog/[YYYY-MM-DD]_[concise-title-separated-by-dashes].md`.
         *   **Naming Convention:** The title **MUST NOT** be generic like `session_summary`. It must be descriptive of the main task (e.g., `2025-07-04_csv-import-fix.md`, `2025-10-12_auth-refactor-and-docs.md`).
-4.  **Maintain Index:** Always update the `_rules/_devlog/_index.md` file with work subjects from the current session.
-    *   **If index doesn't exist:** Create the index file with the current session's work subjects.
-    *   **If index exists:** Append new work subjects to the existing table.
+4.  **Record Session:** After creating/updating the devlog file, you MUST record the session using the `bd devlog record` command. This ensures the index is updated with proper metadata (Author, Date, etc.) automatically.
+    *   **Command:** `bd devlog record --subject "[prefix] description" --problem "brief description" --file "_rules/_devlog/[filename].md"`
     *   **Nomenclature Rules:** Use prefix format `[prefix]description` for subjects (e.g., `[fix]user-authentication`, `[feature]csv-import`, `[deploy]v4.1.0`).
 
 ## Output Structure (Embedded Template):
@@ -82,36 +81,4 @@ To provide a complete, transparent, and chronological log of the entire developm
 
 ---
 
-## Index Maintenance Instructions
-
-**Index Reference:** All work subjects from this session must be referenced in the `_rules/_devlog/_index.md` file.
-
-### **CRITICAL AI UPDATE RULES:**
-1. **APPEND ONLY:** Add new rows to the **existing Markdown table** at the very bottom of the index file.
-2. **NO NEW HEADERS:** Do not create a new "## Work Index" header. Use the one already there.
-3. **ONE ROW PER SUBJECT:** Each distinct work subject gets its own line.
-
-### Index Structure:
-```markdown
-| [prefix] subject-description | Brief problem description | YYYY-MM-DD | [filename.md](filename.md) |
-```
-
-### Subject Nomenclature:
-- **[fix]** - Bug fixes and error resolution
-- **[feature]** - New feature implementation
-- **[enhance]** - Improvements to existing functionality
-- **[rationalize]** - Code cleanup and consolidation
-- **[deploy]** - Deployment activities and version releases
-- **[security]** - Security fixes and vulnerability patches
-- **[debug]** - Troubleshooting and investigation
-- **[test]** - Testing and validation activities
-
-### Example Subjects:
-- `[rationalize] Export endpoint system` - Consolidated 5 redundant export endpoints to 2 unified endpoints
-- `[fix] Vector export format detection` - Added intelligent format selection for vector vs regular tables
-- `[enhance] API client export support` - Updated frontend to use rationalized export endpoints
-- `[deploy] Export rationalization v4.1.141` - Successfully deployed unified export system to staging
-
-**Important:** Each distinct work subject in a session should be listed on its own line in the index, even if multiple subjects reference the same devlog file.
-
-**Note:** Add a reference to this index maintenance in the devlog's "Final Session Summary" section to remind users that subjects must be referenced in the `_index.md` file in case the AI assistant doesn't follow this prompt directly.
+## End of Instructions
