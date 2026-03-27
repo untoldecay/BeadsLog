@@ -54,3 +54,7 @@ sync-branch: "beads-metadata"
 # - github.repo
 
 devlog.enforce-on-commit: true
+
+entity_extraction.background_enrichment: true
+
+ollama.model: "llama3.2:1b"

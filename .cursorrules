@@ -1,4 +1,4 @@
-<!-- BD_PROTOCOL_START -->
+<beads_protocol>
 # BEADSLOG AGENTS.MD - ALWAYS-ON PROTOCOL
 ================================================
 
@@ -14,6 +14,7 @@ Graph: bd devlog graph "entity" (dependencies), bd devlog impact "entity" (depen
 Issues: bd ready (ready work), bd list --status open (queue), bd show "id" (details)
 Sync: bd sync (issues→git), bd devlog sync (logs→db), bd devlog verify --fix (integrity)
 Help: bd --help, bd devlog --help (always first)
+Context: _rules/_orchestration/PROJECT_CONTEXT.md (PRD, Tech Stack, Conventions)
 
 CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
 1. RESUME: Run bd devlog resume --last 1 to load last session context
@@ -22,11 +23,26 @@ CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
 4. IMPLEMENT: Code changes → Tests → git commit -m "fix: clear message" (auto-generates devlog)
 5. CLOSE: Run bd close "id" --reason "Done" → bd sync → bd devlog sync (persist everything)
 
+RESILIENCE POLICY (ANTI-PANIC):
+If a bd command fails (e.g., sync error), DO NOT fallback to brute-force grep/ls.
+Instead:
+1. Run 'bd status' to diagnose the environment.
+2. Proceed with 'bd devlog search' or 'bd devlog graph' LOCALLY.
+3. Retrieval-led reasoning is MANDATORY even if the remote metadata is offline.
+
 TOOL PRIORITY ORDER:
 1. --help flags first (bd --help, bd devlog --help)
 2. Devlog/graph queries
 3. Issue commands
 4. Code reading/editing last
+
+🚨 SESSION CLOSE PROTOCOL (REQUIRED) 🚨
+Before saying "done" or "complete", you MUST run this checklist:
+1. git status (Check what changed)
+2. git add <files> (Stage changes)
+3. git commit -m "..." (Commit code)
+4. bd sync && bd devlog sync (Persist Beads data)
+5. git push (Share with team)
 
 NEVER:
 - Modify .beads/issues.jsonl manually (ALWAYS use bd)
@@ -38,4 +54,4 @@ NEVER:
 END PROTOCOL
 ================================================
 
-<!-- BD_PROTOCOL_END -->
+</beads_protocol>
