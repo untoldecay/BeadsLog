@@ -26,6 +26,9 @@ Use these to query and maintain the knowledge graph.
 | `bd devlog graph` | `bd devlog graph "entity"` | Visualize architectural dependencies. |
 | `bd devlog impact` | `bd devlog impact "entity"` | See what depends on a specific component. |
 | `bd devlog verify` | `bd devlog verify [--fix]` | Adopt orphans and backfill metadata. |
+| `bd devlog record` | `bd devlog record --subject "..." --problem "..." --file "..."` | Automatically record a session in the index with dual attribution. |
+| `bd devlog migrate`| `bd devlog migrate --format-index` | Upgrade legacy 4/5-column indexes to the 6-column standard. |
+| `bd devlog authors`| `bd devlog authors` | List contributors (Human + Agent) and their session metrics. |
 | `bd devlog enrich` | `bd devlog enrich --all` | Schedule sessions for background AI update. |
 | `bd devlog extract`| `bd devlog extract [target]`| Foreground AI regeneration for a session. |
 

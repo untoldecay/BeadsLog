@@ -64,12 +64,18 @@ Devlog data is stored in four primary SQLite tables:
 
 | Table | Purpose |
 | :--- | :--- |
-| `sessions` | Stores the narrative, file hash, and `enrichment_status`. |
+| `sessions` | Stores the narrative, file hash, `author`, `agent`, and `enrichment_status`. |
 | `entities` | The unique components (Services, Technologies) with confidence scores. |
 | `session_entities` | A join table linking sessions to the entities they mention. |
 | `entity_deps` | The directed graph of relationships (the "Edges"). |
 
-## Why Markdown as the Source of Truth?
+### ID Stability (Lookup-by-Filename-and-Title)
+To prevent duplicate sessions when metadata (like Time or Author) is updated in the index, BeadsLog uses a **Lookup-by-Filename-and-Title** strategy. Before generating a new hash-based ID, the system checks if a session with the same filename and subject already exists in the database. If found, it preserves the original ID while updating the metadata.
+
+### 6-Column Index Standard
+As of v0.35+, the `_index.md` uses a 6-column Markdown table:
+`| Subject | Problems | Author | Agent | Date | Devlog |`
+This allows for precise tracking of both the human responsible for the work and the AI agent that executed it. Legacy 4 or 5-column indexes are automatically migrated during `bd init` or `bd devlog initialize`.
 
 Most AI tools store "memory" in a hidden database. BeadsLog prioritizes **Crystallization**:
 - **Portability:** Your architectural graph is version-controlled in Git.

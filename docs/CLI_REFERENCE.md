@@ -799,12 +799,22 @@ bd devlog impact "AddColumnModal" --strict
 ```bash
 # List all sessions
 bd devlog list
+bd devlog list --author untoldecay
 
 # Show specific session
 bd devlog show [date/filename]
 
 # Resume context (last N sessions)
 bd devlog resume --last 3
+bd devlog resume --author untoldecay
+
+# Automated Recording (Recommended for Agents)
+bd devlog record --subject "[fix] bug-id" --problem "Description" --file "path/to/log.md"
+# Flags: --author, --agent (optional overrides)
+
+# Migration & Metrics
+bd devlog migrate --format-index    # Upgrade index to 6-column format
+bd devlog authors                   # List all Human/AI contributors
 ```
 
 ## See Also

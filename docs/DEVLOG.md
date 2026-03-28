@@ -8,6 +8,8 @@ Unlike a Git commit (which focuses on *what* code changed), a Devlog focus on th
 - The assumptions made (and which ones were wrong).
 - The "Why" behind architectural decisions.
 - The semantic relationships discovered during the build.
+- **Attribution:** Tracks both the **Human Author** (the owner) and the **AI Agent** (the actor).
+- **Precision:** High-precision time logging (`HH:MM`) for exact sequencing of work.
 
 ## Structured Example
 A typical devlog file resides in `_rules/_devlog/` and looks like this:
@@ -15,30 +17,21 @@ A typical devlog file resides in `_rules/_devlog/` and looks like this:
 ```markdown
 # Session: OAuth Integration Fix
 
-**Date:** 2026-01-27
+**Date:** 2026-01-27 14:30
+**Author:** untoldecay
+**Agent:** Gemini CLI
 
 ### Objective:
-Resolve the redirect loop in the production environment.
-
-### Phase 1: Debugging
-Initial Assumption: The cookie domain was misconfigured.
-Action: Checked nginx.conf and env vars.
-Result: Domain was correct. The real issue was proxy_buffering truncating the header.
-
-### Final Summary
-Fixed by disabling proxy_buffering for the /auth endpoint.
-
-### Architectural Relationships
-- nginx -> AuthAPI (proxies_to)
-- AuthAPI -> Redis (uses)
+...
 ```
 
 ## The Workflow Stand
 The Devlog is the **entry and exit point** of every task:
 1. **Onboard:** The agent reads past devlogs to gain context.
 2. **Execute:** The agent builds the feature.
-3. **Crystallize:** At the end of the session, the agent generates a new Devlog.
-4. **Sync:** The system ingests the devlog and updates the architectural graph.
+3. **Record:** The agent uses `bd devlog record` to update the index automatically.
+4. **Crystallize:** Discovered relationships are saved to the narrative.
+5. **Sync:** The system ingests the devlog and updates the architectural graph.
 
 ## Crystallization
 This is the "magic" of BeadsLog. If an agent forgets to add the `Architectural Relationships` block, the **Background AI worker** will read the narrative and append it for them. This turns temporary thoughts into permanent, version-controlled wiki data.
