@@ -1917,6 +1917,7 @@ var devlogRecordCmd = &cobra.Command{
 		problem, _ := cmd.Flags().GetString("problem")
 		file, _ := cmd.Flags().GetString("file")
 		author, _ := cmd.Flags().GetString("author")
+		agent, _ := cmd.Flags().GetString("agent")
 
 		if subject == "" || problem == "" || file == "" {
 			fmt.Println("Error: --subject, --problem, and --file are mandatory.")
@@ -1937,7 +1938,7 @@ var devlogRecordCmd = &cobra.Command{
 
 		indexPath := filepath.Join(devlogDir, "_index.md")
 		
-		// 1. Get Author
+		// 1. Get Author (The Human)
 		if author == "" {
 			author = os.Getenv("BD_ACTOR")
 		}
@@ -1949,12 +1950,20 @@ var devlogRecordCmd = &cobra.Command{
 			author = "Unknown"
 		}
 
-		// 2. Get Date
+		// 2. Get Agent (The AI)
+		if agent == "" {
+			agent = os.Getenv("BD_AGENT_NAME")
+		}
+		if agent == "" {
+			agent = "Unknown"
+		}
+
+		// 3. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
-		// 3. Format Row
-		// New 5-column format: | Subject | Problems | Author | Date | Devlog |
-		row := fmt.Sprintf("| %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, date, filepath.Base(file), file)
+		// 4. Format Row
+		// New 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, filepath.Base(file), file)
 
 		// 4. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -2020,24 +2029,36 @@ var devlogMigrateCmd = &cobra.Command{
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if strings.Contains(trimmed, "| Subject | Problems |") {
-				if !strings.Contains(trimmed, "| Author |") {
-					newLines = append(newLines, "| Subject | Problems | Author | Date | Devlog |")
+				if !strings.Contains(trimmed, "| Agent |") {
+					newLines = append(newLines, "| Subject | Problems | Author | Agent | Date | Devlog |")
 					inTable = true
 					continue
 				}
 			}
 
 			if inTable && strings.HasPrefix(trimmed, "|---") {
-				if strings.Count(trimmed, "|") == 5 {
-					newLines = append(newLines, "|---------|----------|--------|------|---------|")
+				if strings.Count(trimmed, "|") == 5 || strings.Count(trimmed, "|") == 6 {
+					newLines = append(newLines, "|---------|----------|--------|-------|------|---------|")
 					continue
 				}
 			}
 
 			if inTable && strings.HasPrefix(trimmed, "|") {
 				pipes := strings.Count(trimmed, "|")
-				if pipes == 5 {
-					// Migrate 4 -> 5
+				if pipes == 6 {
+					// Migrate 5 -> 6 (Missing Agent)
+					parts := strings.Split(trimmed, "|")
+					subj := strings.TrimSpace(parts[1])
+					prob := strings.TrimSpace(parts[2])
+					auth := strings.TrimSpace(parts[3])
+					date := strings.TrimSpace(parts[4])
+					file := strings.TrimSpace(parts[5])
+
+					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, auth, "Unknown", date, file))
+					migratedCount++
+					continue
+				} else if pipes == 5 {
+					// Migrate 4 -> 6
 					parts := strings.Split(trimmed, "|")
 					subj := strings.TrimSpace(parts[1])
 					prob := strings.TrimSpace(parts[2])
@@ -2049,7 +2070,7 @@ var devlogMigrateCmd = &cobra.Command{
 						date += " 00:00"
 					}
 
-					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s |", subj, prob, currentAuthor, date, file))
+					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, currentAuthor, "Unknown", date, file))
 					migratedCount++
 					continue
 				}
@@ -2084,12 +2105,13 @@ var devlogAuthorsCmd = &cobra.Command{
 		db := store.UnderlyingDB()
 		rows, err := db.Query(`
 			SELECT 
-				COALESCE(author, 'Unknown') as name, 
+				COALESCE(author, 'Unknown') as author_name, 
+				COALESCE(agent, 'Unknown') as agent_name,
 				MIN(timestamp) as first_seen, 
 				MAX(timestamp) as last_seen, 
 				COUNT(*) as session_count 
 			FROM sessions 
-			GROUP BY name 
+			GROUP BY author_name, agent_name 
 			ORDER BY session_count DESC
 		`)
 		if err != nil {
@@ -2099,14 +2121,14 @@ var devlogAuthorsCmd = &cobra.Command{
 		defer rows.Close()
 
 		fmt.Println("\n👥 Devlog Contributors")
-		fmt.Println("--------------------------------------------------------------------------------")
-		fmt.Printf("%-20s %-20s %-20s %-10s\n", "Author", "First Session", "Last Session", "Count")
-		fmt.Println("--------------------------------------------------------------------------------")
+		fmt.Println("--------------------------------------------------------------------------------------------------")
+		fmt.Printf("%-20s %-20s %-20s %-20s %-10s\n", "Author", "Agent", "First Session", "Last Session", "Count")
+		fmt.Println("--------------------------------------------------------------------------------------------------")
 
 		for rows.Next() {
-			var name, first, last string
+			var authorName, agentName, first, last string
 			var count int
-			if err := rows.Scan(&name, &first, &last, &count); err != nil {
+			if err := rows.Scan(&authorName, &agentName, &first, &last, &count); err != nil {
 				continue
 			}
 			// Truncate timestamp for display if it has too much precision
@@ -2116,7 +2138,7 @@ var devlogAuthorsCmd = &cobra.Command{
 			if len(last) > 16 {
 				last = last[:16]
 			}
-			fmt.Printf("%-20s %-20s %-20s %-10d\n", name, first, last, count)
+			fmt.Printf("%-20s %-20s %-20s %-20s %-10d\n", authorName, agentName, first, last, count)
 		}
 		fmt.Println()
 	},
@@ -2151,6 +2173,7 @@ func init() {
 	devlogRecordCmd.Flags().String("problem", "", "Problem description")
 	devlogRecordCmd.Flags().String("file", "", "Devlog file path")
 	devlogRecordCmd.Flags().String("author", "", "Author name (overrides git config)")
+	devlogRecordCmd.Flags().String("agent", "", "Agent name (overrides detected name)")
 
 	devlogMigrateCmd.Flags().Bool("format-index", false, "Upgrade _index.md to 5-column format")
 
