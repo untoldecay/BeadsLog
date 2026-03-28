@@ -98,29 +98,20 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce, backgroundE
 
 
 	// Create _index.md
-
 	indexPath := filepath.Join(baseDir, "_index.md")
-
 	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-
 		if err := os.WriteFile(indexPath, []byte(indexTemplate), 0644); err != nil {
-
 			if !quiet {
-
 				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
-
 			}
-
 		}
-
+	} else {
+		// UPGRADE: Automatically migrate existing index if it's legacy
+		migrateIndexInternal(indexPath, quiet)
 	}
 
-
-
 	// Create _generate-devlog.md in the baseDir
-
 	promptPath := filepath.Join(baseDir, "_generate-devlog.md")
-
 	statusPrompt := "(Created)"
 
 	template := promptTemplateManual
@@ -128,22 +119,16 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce, backgroundE
 		template = promptTemplateAuto
 	}
 
-	if _, err := os.Stat(promptPath); os.IsNotExist(err) {
-
-		if err := os.WriteFile(promptPath, []byte(template), 0644); err != nil {
-
-			if !quiet {
-
-				fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
-
-			}
-
+	// UPGRADE: Always refresh prompt if it exists but is outdated
+	// Or just always overwrite if we want to ensure latest instructions
+	if _, err := os.Stat(promptPath); err == nil {
+		statusPrompt = "(Updated)"
+	}
+	
+	if err := os.WriteFile(promptPath, []byte(template), 0644); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error writing prompt: %v\n", err)
 		}
-
-	} else {
-
-		statusPrompt = "(Already exists)"
-
 	}
 
 	result.PromptStatus = statusPrompt
@@ -555,271 +540,78 @@ const indexTemplate = `# Development Log Index
 
 > [!IMPORTANT]
 > **AI AGENT INSTRUCTIONS:**
-> 1. **APPEND ONLY:** Always add new session rows to the **existing table** at the bottom of this file.
-> 2. **NO DUPLICATES:** Never create a new "Work Index" header or a second table.
-> 3. **STAY AT BOTTOM:** Ensure the table remains the very last element in this file.
+> 1. **RECORD SESSION:** Use ` + "`bd devlog record`" + ` to add new entries. NEVER edit this table manually.
+> 2. **STAY AT BOTTOM:** The table remains the last element in this file.
 
-This index provides a concise record of all development work for easy scanning and pattern recognition across sessions.
+This index provides a record of human-AI collaboration.
 
 ## Nomenclature Rules:
-- **[fix]** - Bug fixes and error resolution
-- **[feature]** - New feature implementation
-- **[enhance]** - Improvements to existing functionality
-- **[rationalize]** - Code cleanup and consolidation
-- **[deploy]** - Deployment activities and version releases
-- **[security]** - Security fixes and vulnerability patches
-- **[debug]** - Troubleshooting and investigation
-- **[test]** - Testing and validation activities
+- **[fix]** - Bug fixes
+- **[feature]** - New features
+- **[enhance]** - Improvements
+- **[rationalize]** - Cleanup
+- **[deploy]** - Releases
+- **[security]** - Security
+- **[debug]** - Investigation
+- **[test]** - Validation
 
 ## Work Index
 
-| Subject | Problems | Date | Devlog |
-|---------|----------|------|---------|
-| [init] Setup | Initial devlog structure setup | 2024-01-01 | [2024-01-01_setup.md](2024-01-01_setup.md) |
+| Subject | Problems | Author | Agent | Date | Devlog |
+|---------|----------|--------|-------|------|---------|
+| [init] Setup | Initial devlog structure setup | Unknown | Unknown | 2024-01-01 00:00 | [2024-01-01_setup.md](2024-01-01_setup.md) |
 `
 
 const promptTemplateManual = `# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)
 
 ## Objective:
-Analyze the entire conversation history of the current session and generate a comprehensive, chronological development log. The primary purpose is to be a transparent record of the entire problem-solving process, detailing every assumption (especially flawed ones), every action taken, the resulting outcomes, and the evidence-based corrections that led to the final solution.
+Analyze the session history and generate a comprehensive development log. Document assumptions, actions, outcomes, and corrections.
 
 ## ⚠️ MANDATORY: Architectural Relationships
-Since Background AI Enrichment is DISABLED, you MUST manually extract and append architectural relationships at the bottom of the file.
-Use the following format:
+Since Background AI Enrichment is DISABLED, manually append relationships at the bottom:
 ` + "```markdown" + `
 ### Architectural Relationships
 - EntityA -> EntityB (uses)
-- EntityC -> EntityA (depends on)
 ` + "```" + `
 
-## Persona:
-Act as a meticulous technical writer and project manager, documenting the development journey with a focus on learning from mistakes.
+## persona:
+Meticulous technical writer documenting the learning journey.
 
-## Input:
-The full conversation history of the current development session.
+## File Handling:
+1.  **Check for Existing Log:** Find today's file in ` + "`_rules/_devlog/`" + `.
+2.  **Update or Create:** Append to today's log or create ` + "`_rules/_devlog/[YYYY-MM-DD]_[title].md`" + `.
+3.  **Record Session:** After saving the file, you MUST run:
+    *   ` + "`bd devlog record --subject \"[prefix] description\" --problem \"description\" --file \"_rules/_devlog/[filename].md\"`" + `
 
-## File Handling Logic:
-1.  **Check for Existing Log:** Before generating, list the files in the ` + "`_rules/_devlog/`" + ` directory.
-2.  **Identify Today's Log:** Find the most recent file. Check if its filename matches today's date (e.g., ` + "`2025-07-04_session_summary.md`" + ` or ` + "`2025-07-04_specific-title.md`" + `).
-3.  **Update or Create:**
-    *   **If a log for today exists:** Read that file and append the new phases from the current session to it. Do not create a new file.
-    *   **If no log for today exists:** Create a new file named ` + "`_rules/_devlog/[YYYY-MM-DD]_[concise-title-separated-by-dashes].md`" + `.
-        *   **Naming Convention:** The title **MUST NOT** be generic like ` + "`session_summary`" + `. It must be descriptive of the main task (e.g., ` + "`2025-07-04_csv-import-fix.md`" + `, ` + "`2025-10-12_auth-refactor-and-docs.md`" + `).
-4.  **Maintain Index:** Always update the ` + "`_rules/_devlog/_index.md`" + ` file with work subjects from the current session.
-    *   **If index doesn't exist:** Create the index file with the current session's work subjects.
-    *   **If index exists:** Append new work subjects to the existing table.
-    *   **Nomenclature Rules:** Use prefix format ` + "`[prefix]description`" + ` for subjects (e.g., ` + "`[fix]user-authentication`" + `, ` + "`[feature]csv-import`" + `, ` + "`[deploy]v4.1.0`" + `).
-
-## Output Structure (Embedded Template):
-Generate or update a single markdown file with the following structure.
-
+## Output Structure:
 ---
-
-# Comprehensive Development Log: [Briefly Describe Main Goal of the Session]
-
-**Date:** [Current Date: YYYY-MM-DD]
-
-### **Objective:**
-To provide a complete, transparent, and chronological log of the entire development and troubleshooting process for the features worked on during this session. This document details every assumption, every action taken, the resulting errors, and the evidence-based corrections, serving as a definitive record to prevent repeating these mistakes.
-
----
-
-### **Phase [X]: [Name of the First Major Task or Problem]**
-
-**Initial Problem:** [Describe the starting problem or goal for this phase.]
-
-*   **My Assumption/Plan #1:** [Describe the initial plan or assumption.]
-    *   **Action Taken:** [Detail the specific steps taken, e.g., "Modified file X to do Y", "Ran command Z".]
-    *   **Result:** [Describe the outcome. Was it a success, failure, or partial success? Include any errors or unexpected behavior.]
-    *   **Analysis/Correction:** [Explain why the initial assumption was right or wrong. If wrong, what was the evidence (e.g., error message, user feedback, file inspection) that led to the correction? What was the fix?]
-
-*(Repeat for all assumptions and plans within the phase)*
-
----
-
-### **Phase [Y]: [Name of the Second Major Task or Problem]**
-
-[Repeat the structure from the previous phase for each major part of the session.]
-
----
-
-### **Final Session Summary**
-
-**Final Status:** [Briefly describe the state of the feature(s) at the end of the session.]
-**Key Learnings:**
-*   [A key technical takeaway, e.g., "Electron-builder's ` + "`asarUnpack`" + ` is required for native addons to preserve their directory structure."]
-*   [Another key learning, e.g., "Backspace handling in contenteditable requires differentiating between empty and non-empty states to provide intuitive merging vs. de-escalation."]
-
----
-
-### **Architectural Relationships**
-<!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- EntityA -> EntityB (uses)
-- EntityC -> EntityA (depends on)
-
----
-
-## Guidelines for Generation:
-1.  **Chronological Order:** The phases must follow the order in which they occurred in the conversation.
-2.  **Focus on the "Why":** Don't just list actions. Explain the *reasoning* behind each action (the assumption) and the *analysis* of the result. The goal is to capture the thought process.
-3.  **Be Honest About Mistakes:** The most valuable parts of the log are the "Flawed Assumptions" or incorrect plans. Document them clearly.
-4.  **Use Evidence:** When a correction is made, mention the evidence that prompted it (e.g., "The user provided 'before' and 'after' HTML that showed...", "The error message ` + "`net::ERR_FILE_NOT_FOUND`" + ` indicated...").
-5.  **First-Person Narrative:** Write from the perspective of the AI assistant who performed the work (e.g., "My flawed assumption was...", "I modified the file...").
-
----
-
-## Index Maintenance Instructions
-
-**Index Reference:** All work subjects from this session must be referenced in the ` + "`_rules/_devlog/_index.md`" + ` file.
-
-### **CRITICAL AI UPDATE RULES:**
-1. **APPEND ONLY:** Add new rows to the **existing Markdown table** at the very bottom of the index file.
-2. **NO NEW HEADERS:** Do not create a new "## Work Index" header. Use the one already there.
-3. **ONE ROW PER SUBJECT:** Each distinct work subject gets its own line.
-
-### Index Structure:
-` + "```markdown" + `
-| [prefix] subject-description | Brief problem description | YYYY-MM-DD | [filename.md](filename.md) |
-` + "```" + `
-
-### Subject Nomenclature:
-- **[fix]** - Bug fixes and error resolution
-- **[feature]** - New feature implementation
-- **[enhance]** - Improvements to existing functionality
-- **[rationalize]** - Code cleanup and consolidation
-- **[deploy]** - Deployment activities and version releases
-- **[security]** - Security fixes and vulnerability patches
-- **[debug]** - Troubleshooting and investigation
-- **[test]** - Testing and validation activities
-
-### Example Subjects:
-- ` + "`[rationalize] Export endpoint system`" + ` - Consolidated 5 redundant export endpoints to 2 unified endpoints
-- ` + "`[fix] Vector export format detection`" + ` - Added intelligent format selection for vector vs regular tables
-- ` + "`[enhance] API client export support`" + ` - Updated frontend to use rationalized export endpoints
-- ` + "`[deploy] Export rationalization v4.1.141`" + ` - Successfully deployed unified export system to staging
-
-**Important:** Each distinct work subject in a session should be listed on its own line in the index, even if multiple subjects reference the same devlog file.
-
-**Note:** Add a reference to this index maintenance in the devlog's "Final Session Summary" section to remind users that subjects must be referenced in the ` + "`_index.md`" + ` file in case the AI assistant doesn't follow this prompt directly.
+# Comprehensive Development Log: [Goal]
+**Date:** [YYYY-MM-DD]
+...
 `
 
 const promptTemplateAuto = `# Prompt: Generate Chronological Debugging & Development Log (AI Enhanced)
 
 ## Objective:
-Analyze the entire conversation history of the current session and generate a comprehensive, chronological development log. The primary purpose is to be a transparent record of the entire problem-solving process, detailing every assumption (especially flawed ones), every action taken, the resulting outcomes, and the evidence-based corrections that led to the final solution.
+Analyze the session history and generate a comprehensive development log.
 
 ## ✨ Background AI Active:
-Background AI Enrichment is ENABLED. You do NOT need to manually extract relationships or use arrows. Focus strictly on the technical narrative and your problem-solving journey. The system will automatically build the architectural graph from your prose in the background.
+Background AI Enrichment is ENABLED. Focus strictly on the technical narrative.
 
-## Persona:
-Act as a meticulous technical writer and project manager, documenting the development journey with a focus on learning from mistakes.
+## persona:
+Meticulous technical writer documenting the learning journey.
 
-## Input:
-The full conversation history of the current development session.
+## File Handling:
+1.  **Check for Existing Log:** Find today's file in ` + "`_rules/_devlog/`" + `.
+2.  **Update or Create:** Append to today's log or create ` + "`_rules/_devlog/[YYYY-MM-DD]_[title].md`" + `.
+3.  **Record Session:** After saving the file, you MUST run:
+    *   ` + "`bd devlog record --subject \"[prefix] description\" --problem \"description\" --file \"_rules/_devlog/[filename].md\"`" + `
 
-## File Handling Logic:
-1.  **Check for Existing Log:** Before generating, list the files in the ` + "`_rules/_devlog/`" + ` directory.
-2.  **Identify Today's Log:** Find the most recent file. Check if its filename matches today's date (e.g., ` + "`2025-07-04_session_summary.md`" + ` or ` + "`2025-07-04_specific-title.md`" + `).
-3.  **Update or Create:**
-    *   **If a log for today exists:** Read that file and append the new phases from the current session to it. Do not create a new file.
-    *   **If no log for today exists:** Create a new file named ` + "`_rules/_devlog/[YYYY-MM-DD]_[concise-title-separated-by-dashes].md`" + `.
-        *   **Naming Convention:** The title **MUST NOT** be generic like ` + "`session_summary`" + `. It must be descriptive of the main task (e.g., ` + "`2025-07-04_csv-import-fix.md`" + `, ` + "`2025-10-12_auth-refactor-and-docs.md`" + `).
-4.  **Maintain Index:** Always update the ` + "`_rules/_devlog/_index.md`" + ` file with work subjects from the current session.
-    *   **If index doesn't exist:** Create the index file with the current session's work subjects.
-    *   **If index exists:** Append new work subjects to the existing table.
-    *   **Nomenclature Rules:** Use prefix format ` + "`[prefix]description`" + ` for subjects (e.g., ` + "`[fix]user-authentication`" + `, ` + "`[feature]csv-import`" + `, ` + "`[deploy]v4.1.0`" + `).
-
-## Output Structure (Embedded Template):
-Generate or update a single markdown file with the following structure.
-
+## Output Structure:
 ---
-
-# Comprehensive Development Log: [Briefly Describe Main Goal of the Session]
-
-**Date:** [Current Date: YYYY-MM-DD]
-
-### **Objective:**
-To provide a complete, transparent, and chronological log of the entire development and troubleshooting process for the features worked on during this session. This document details every assumption, every action taken, the resulting errors, and the evidence-based corrections, serving as a definitive record to prevent repeating these mistakes.
-
----
-
-### **Phase [X]: [Name of the First Major Task or Problem]**
-
-**Initial Problem:** [Describe the starting problem or goal for this phase.]
-
-*   **My Assumption/Plan #1:** [Describe the initial plan or assumption.]
-    *   **Action Taken:** [Detail the specific steps taken, e.g., "Modified file X to do Y", "Ran command Z".]
-    *   **Result:** [Describe the outcome. Was it a success, failure, or partial success? Include any errors or unexpected behavior.]
-    *   **Analysis/Correction:** [Explain why the initial assumption was right or wrong. If wrong, what was the evidence (e.g., error message, user feedback, file inspection) that led to the correction? What was the fix?]
-
-*(Repeat for all assumptions and plans within the phase)*
-
----
-
-### **Phase [Y]: [Name of the Second Major Task or Problem]**
-
-[Repeat the structure from the previous phase for each major part of the session.]
-
----
-
-### **Final Session Summary**
-
-**Final Status:** [Briefly describe the state of the feature(s) at the end of the session.]
-**Key Learnings:**
-*   [A key technical takeaway, e.g., "Electron-builder's ` + "`asarUnpack`" + ` is required for native addons to preserve their directory structure."]
-*   [Another key learning, e.g., "Backspace handling in contenteditable requires differentiating between empty and non-empty states to provide intuitive merging vs. de-escalation."]
-
----
-
-### **Architectural Relationships**
-<!-- Format: [From Entity] -> [To Entity] (relationship type) -->
-- EntityA -> EntityB (uses)
-- EntityC -> EntityA (depends on)
-
----
-
-## Guidelines for Generation:
-1.  **Chronological Order:** The phases must follow the order in which they occurred in the conversation.
-2.  **Focus on the "Why":** Don't just list actions. Explain the *reasoning* behind each action (the assumption) and the *analysis* of the result. The goal is to capture the thought process.
-3.  **Be Honest About Mistakes:** The most valuable parts of the log are the "Flawed Assumptions" or incorrect plans. Document them clearly.
-4.  **Use Evidence:** When a correction is made, mention the evidence that prompted it (e.g., "The user provided 'before' and 'after' HTML that showed...", "The error message ` + "`net::ERR_FILE_NOT_FOUND`" + ` indicated...").
-5.  **First-Person Narrative:** Write from the perspective of the AI assistant who performed the work (e.g., "My flawed assumption was...", "I modified the file...").
-
----
-
-## Index Maintenance Instructions
-
-**Index Reference:** All work subjects from this session must be referenced in the ` + "`_rules/_devlog/_index.md`" + ` file.
-
-### **CRITICAL AI UPDATE RULES:**
-1. **APPEND ONLY:** Add new rows to the **existing Markdown table** at the very bottom of the index file.
-2. **NO NEW HEADERS:** Do not create a new "## Work Index" header. Use the one already there.
-3. **ONE ROW PER SUBJECT:** Each distinct work subject gets its own line.
-
-### Index Structure:
-` + "```markdown" + `
-| [prefix] subject-description | Brief problem description | YYYY-MM-DD | [filename.md](filename.md) |
-` + "```" + `
-
-### Subject Nomenclature:
-- **[fix]** - Bug fixes and error resolution
-- **[feature]** - New feature implementation
-- **[enhance]** - Improvements to existing functionality
-- **[rationalize]** - Code cleanup and consolidation
-- **[deploy]** - Deployment activities and version releases
-- **[security]** - Security fixes and vulnerability patches
-- **[debug]** - Troubleshooting and investigation
-- **[test]** - Testing and validation activities
-
-### Example Subjects:
-- ` + "`[rationalize] Export endpoint system`" + ` - Consolidated 5 redundant export endpoints to 2 unified endpoints
-- ` + "`[fix] Vector export format detection`" + ` - Added intelligent format selection for vector vs regular tables
-- ` + "`[enhance] API client export support`" + ` - Updated frontend to use rationalized export endpoints
-- ` + "`[deploy] Export rationalization v4.1.141`" + ` - Successfully deployed unified export system to staging
-
-**Important:** Each distinct work subject in a session should be listed on its own line in the index, even if multiple subjects reference the same devlog file.
-
-**Note:** Add a reference to this index maintenance in the devlog's "Final Session Summary" section to remind users that subjects must be referenced in the ` + "`_index.md`" + ` file in case the AI assistant doesn't follow this prompt directly.
+# Comprehensive Development Log: [Goal]
+**Date:** [YYYY-MM-DD]
+...
 `
 
 func refreshDevlogPrompt(store *sqlite.SQLiteStorage) {
@@ -1986,13 +1778,91 @@ var devlogRecordCmd = &cobra.Command{
 	},
 }
 
+func migrateIndexInternal(indexPath string, quiet bool) int {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		return 0
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	inTable := false
+	migratedCount := 0
+
+	authorOut, _ := exec.Command("git", "config", "user.name").Output()
+	currentAuthor := strings.TrimSpace(string(authorOut))
+	if currentAuthor == "" {
+		currentAuthor = "Unknown"
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "| Subject | Problems |") {
+			if !strings.Contains(trimmed, "| Agent |") {
+				newLines = append(newLines, "| Subject | Problems | Author | Agent | Date | Devlog |")
+				inTable = true
+				continue
+			}
+		}
+
+		if inTable && strings.HasPrefix(trimmed, "|---") {
+			if strings.Count(trimmed, "|") == 5 || strings.Count(trimmed, "|") == 6 {
+				newLines = append(newLines, "|---------|----------|--------|-------|------|---------|")
+				continue
+			}
+		}
+
+		if inTable && strings.HasPrefix(trimmed, "|") {
+			pipes := strings.Count(trimmed, "|")
+			if pipes == 6 {
+				// Migrate 5 -> 6 (Missing Agent)
+				parts := strings.Split(trimmed, "|")
+				subj := strings.TrimSpace(parts[1])
+				prob := strings.TrimSpace(parts[2])
+				auth := strings.TrimSpace(parts[3])
+				date := strings.TrimSpace(parts[4])
+				file := strings.TrimSpace(parts[5])
+
+				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, auth, "Unknown", date, file))
+				migratedCount++
+				continue
+			} else if pipes == 5 {
+				// Migrate 4 -> 6
+				parts := strings.Split(trimmed, "|")
+				subj := strings.TrimSpace(parts[1])
+				prob := strings.TrimSpace(parts[2])
+				date := strings.TrimSpace(parts[3])
+				file := strings.TrimSpace(parts[4])
+
+				// Add 00:00 to date if only YYYY-MM-DD
+				if len(date) == 10 {
+					date += " 00:00"
+				}
+
+				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, currentAuthor, "Unknown", date, file))
+				migratedCount++
+				continue
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if migratedCount > 0 {
+		err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
+		if err == nil && !quiet {
+			fmt.Printf("  %s Migrated %d rows in %s to 6-column format\n", ui.RenderPass("✓"), migratedCount, indexPath)
+		}
+	}
+	return migratedCount
+}
+
 var devlogMigrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Migrate devlog index to new format",
 	Run: func(cmd *cobra.Command, args []string) {
 		formatIndex, _ := cmd.Flags().GetBool("format-index")
 		if !formatIndex {
-			fmt.Println("Use --format-index to upgrade _index.md to 5-column format.")
+			fmt.Println("Use --format-index to upgrade _index.md to 6-column format.")
 			return
 		}
 
@@ -2009,85 +1879,7 @@ var devlogMigrateCmd = &cobra.Command{
 		}
 
 		indexPath := filepath.Join(devlogDir, "_index.md")
-		content, err := os.ReadFile(indexPath)
-		if err != nil {
-			fmt.Printf("Error reading index: %v\n", err)
-			os.Exit(1)
-		}
-
-		lines := strings.Split(string(content), "\n")
-		var newLines []string
-		inTable := false
-		migratedCount := 0
-
-		authorOut, _ := exec.Command("git", "config", "user.name").Output()
-		currentAuthor := strings.TrimSpace(string(authorOut))
-		if currentAuthor == "" {
-			currentAuthor = "Unknown"
-		}
-
-		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if strings.Contains(trimmed, "| Subject | Problems |") {
-				if !strings.Contains(trimmed, "| Agent |") {
-					newLines = append(newLines, "| Subject | Problems | Author | Agent | Date | Devlog |")
-					inTable = true
-					continue
-				}
-			}
-
-			if inTable && strings.HasPrefix(trimmed, "|---") {
-				if strings.Count(trimmed, "|") == 5 || strings.Count(trimmed, "|") == 6 {
-					newLines = append(newLines, "|---------|----------|--------|-------|------|---------|")
-					continue
-				}
-			}
-
-			if inTable && strings.HasPrefix(trimmed, "|") {
-				pipes := strings.Count(trimmed, "|")
-				if pipes == 6 {
-					// Migrate 5 -> 6 (Missing Agent)
-					parts := strings.Split(trimmed, "|")
-					subj := strings.TrimSpace(parts[1])
-					prob := strings.TrimSpace(parts[2])
-					auth := strings.TrimSpace(parts[3])
-					date := strings.TrimSpace(parts[4])
-					file := strings.TrimSpace(parts[5])
-
-					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, auth, "Unknown", date, file))
-					migratedCount++
-					continue
-				} else if pipes == 5 {
-					// Migrate 4 -> 6
-					parts := strings.Split(trimmed, "|")
-					subj := strings.TrimSpace(parts[1])
-					prob := strings.TrimSpace(parts[2])
-					date := strings.TrimSpace(parts[3])
-					file := strings.TrimSpace(parts[4])
-
-					// Add 00:00 to date if only YYYY-MM-DD
-					if len(date) == 10 {
-						date += " 00:00"
-					}
-
-					newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, currentAuthor, "Unknown", date, file))
-					migratedCount++
-					continue
-				}
-			}
-			newLines = append(newLines, line)
-		}
-
-		if migratedCount > 0 {
-			err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
-			if err != nil {
-				fmt.Printf("Error writing index: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("✓ Migrated %d rows in %s\n", migratedCount, indexPath)
-		} else {
-			fmt.Println("Index already in new format or no rows to migrate.")
-		}
+		migrateIndexInternal(indexPath, false)
 	},
 }
 

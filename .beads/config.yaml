@@ -53,7 +53,7 @@ sync-branch: "beads-metadata"
 # - github.org
 # - github.repo
 
-devlog.enforce-on-commit: true
+devlog.enforce-on-commit: false
 
 entity_extraction.background_enrichment: true
 

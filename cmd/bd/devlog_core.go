@@ -34,16 +34,16 @@ type IndexRow struct {
 func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	db := store.UnderlyingDB()
 
-	// 1. Lookup-by-Filename Strategy (ID Stability)
-	// Check if this file is already tracked under ANY ID
+	// 1. Lookup-by-Filename-and-Title Strategy (ID Stability)
+	// Check if this specific subject in this file is already tracked
 	var sessionID string
-	err := db.QueryRow("SELECT id FROM sessions WHERE filename = ?", row.Filename).Scan(&sessionID)
+	err := db.QueryRow("SELECT id FROM sessions WHERE filename = ? AND title = ?", row.Filename, row.Subject).Scan(&sessionID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			// New file: Generate legacy hash-based ID
+			// New entry: Generate legacy hash-based ID
 			sessionID = fmt.Sprintf("sess-%s", hashID(row.Subject+row.Date))
 		} else {
-			return false, fmt.Errorf("failed to lookup session by filename: %w", err)
+			return false, fmt.Errorf("failed to lookup session: %w", err)
 		}
 	}
 
