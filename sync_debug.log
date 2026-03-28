@@ -1,0 +1,68 @@
+--no-daemon flag set, using direct modeauto-import skipped, JSONL unchanged (hash match)Scanning 105 sessions...
+  Updated: [enhance] Init UX Overhaul
+  Updated: [fix] Agent Onboarding Enforcement
+  Updated: [rationalize] Sandbox Hygiene
+  Updated: [enhance] Quickstart Refactor
+  Updated: [enhance] Protocol Enforcement
+  Updated: [feature] Protocol Embedding
+  Updated: [test] Onboarding Sandbox
+  Updated: [enhance] Init Hardening
+  Updated: [feature] Auto-Versioning
+  Updated: [feature] Build Counters
+  Updated: [enhance] Init Integrity Check
+  Updated: [enhance] Empty Graph Hints
+  Updated: [enhance] Verify Relationships
+  Updated: [fix] Relationship Parsing
+  Updated: [enhance] Sync Verbosity
+  Updated: [analysis] Fuzzy Logic Plan
+  Updated: [chore] Future Planning
+  Updated: [feature] Hybrid Search
+  Updated: [enhance] Fuzzy Commands
+  Updated: [feature] FTS Foundation
+  Updated: [enhance] CLI Suggestions
+  Updated: [fix] Advanced Search Graph
+  Updated: [enhance] Devlog List Timestamp
+  Updated: [enhance] Interactive Init Wizard
+  Updated: [enhance] Interactive Devlog Reset
+  Updated: [fix] RenderInitReport imports
+  Updated: [enhance] Branded Init and High-Contrast UI
+  Updated: [enhance] Final Init UI Polish
+  Updated: [enhance] Onboarding Complete Protocol
+  Updated: [fix] RenderInitReport code hygiene
+  Updated: [fix] Restore Native Select Behavior
+  Updated: [enhance] Branded Logo Spacing
+  Updated: [feature] Interactive init wizard
+  Updated: [enhance] Init UI/UX Polish
+  Updated: [fix] Daemon Start Recursion
+  Updated: [fix] Metadata Corruption
+  Updated: [feature] Entity Extraction Evolution
+  Updated: [feature] Ollama Integration
+  Updated: [fix] Config Persistence & Source Metadata
+  Updated: [enhance] Verify Retrofit & Repair
+  Updated: [enhance] Verify UX & Fast-Path
+  Updated: [feature] Semantic Relationship Extraction
+  Updated: [fix] HashID Safeguard
+  Updated: [feature] Background AI Enrichment
+  Updated: [feature] Protocol Hardening
+  Updated: [feature] Regeneration & Enrichment Controls
+  Updated: [docs] Project Documentation Overhaul
+  Updated: [docs] Project README Rewrite
+  Updated: [docs] Verify Help Update
+Missing log session, _rules/_devlog/2026-01-26_orphaned-test.md : open _rules/_devlog/2026-01-26_orphaned-test.md: no such file or directory
+Missing log session, _rules/_devlog/2026-01-27_background-test.md : open _rules/_devlog/2026-01-27_background-test.md: no such file or directory
+  Updated: [enhance] Always-On Protocol
+  Updated: [fix] Auth middleware
+  Updated: [feature] Pivot Eval Harness to OpenCode CLI
+  Updated: [enhance] OpenCode Eval Visibility
+  Updated: [rationalize] Eval Harness Stability
+  Updated: [enhance] Eval Cleanup & TTY
+  Updated: [enhance] Chronological Reporting
+  Updated: [feature] Parallel Eval Optimization
+  Updated: [enhance] Silent Sandbox Hydration
+  Updated: [rationalize] Project-Aware Cleanup
+  Updated: [enhance] Eval Documentation
+  Updated: [fix] Eval Tool Result Capture
+  Updated: [enhance] High-Fidelity Result Display
+✅ Synced 62 sessions
+
+💡 Tip: Use -v for detailed sync logs or --help for options.
