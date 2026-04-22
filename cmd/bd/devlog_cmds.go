@@ -1755,7 +1755,8 @@ var devlogRecordCmd = &cobra.Command{
 
 		// 4. Format Row
 		// New 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
-		row := fmt.Sprintf("| %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, filepath.Base(file), file)
+		fileName := filepath.Base(file)
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, fileName, fileName)
 
 		// 4. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
