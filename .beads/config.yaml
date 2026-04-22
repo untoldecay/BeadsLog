@@ -58,3 +58,9 @@ devlog.enforce-on-commit: false
 entity_extraction.background_enrichment: true
 
 ollama.model: "llama3.2:1b"
+
+eval.mode: true
+
+eval.session_id: "eval-1775244538-59536"
+
+eval.scenario_id: "test-redact"
