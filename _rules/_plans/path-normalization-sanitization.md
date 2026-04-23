@@ -14,12 +14,17 @@
 
 ## **Proposed Solution**
 
-### **1. Defensive Parsing (Prevention)**
+### **1. Defensive Parsing (Prevention) - DONE**
 Update the parser to be "prefix-aware". Even if an index file contains the prefix, the system should normalize it to the base filename during ingestion.
 - **Target:** `parseIndexMD` in `cmd/bd/devlog_core.go`.
 - **Action:** If the extracted filename starts with the `Dir` (the devlog directory), strip the prefix.
 
-### **2. Self-Healing Repair (Cleanup)**
+### **2. Smart Resolution (Resilience) - DONE**
+Make `show` and `sync` commands immune to existing polluted paths in the database.
+- **Target:** `devlogShowCmd` in `cmd/bd/devlog_cmds.go` and `SyncSession` in `cmd/bd/devlog_core.go`.
+- **Action:** Use `filepath.Base(filename)` when joining with the devlog directory.
+
+### **3. Self-Healing Repair (Cleanup) - DONE**
 Integrate path sanitization into the existing `bd devlog verify --fix` workflow.
 - **Target:** `devlogVerifyCmd` in `cmd/bd/devlog_cmds.go`.
 - **Action:** 

@@ -59,9 +59,10 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 
 	// Read file content
 	// If Filename is relative, resolve it relative to the index directory
+	// Use base filename to prevent double-path if Filename already has prefix
 	filePath := row.Filename
 	if !filepath.IsAbs(filePath) && row.Dir != "" {
-		filePath = filepath.Join(row.Dir, row.Filename)
+		filePath = filepath.Join(row.Dir, filepath.Base(row.Filename))
 	}
 
 	content, err := ioutil.ReadFile(filePath)

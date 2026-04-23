@@ -946,9 +946,10 @@ var devlogShowCmd = &cobra.Command{
 		content, err := os.ReadFile(filename)
 		if err != nil {
 			// 2. Relative to devlog_dir
+			// Use base filename to prevent double-path if filename already has prefix
 			devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
 			if devlogDir != "" {
-				path := filepath.Join(devlogDir, filename)
+				path := filepath.Join(devlogDir, filepath.Base(filename))
 				content, err = os.ReadFile(path)
 			}
 		}
