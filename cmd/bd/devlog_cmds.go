@@ -1524,17 +1524,22 @@ var devlogVerifyCmd = &cobra.Command{
 
 		db := store.UnderlyingDB()
 
-		// 0. Orphaned Files Detection (Disk vs Index)
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+		indexPath := filepath.Join(devlogDir, "_index.md")
+
+		// 0. Path Normalization (Fix "double path" bug in index/DB)
+		if fix && target == "" {
+			normalizePathsInternal(store, indexPath, false)
+		}
+
+		// 1. Orphaned Files Detection (Disk vs Index)
 		// ... (Orphan detection logic remains, but we skip it if targeting a specific session ID)
 		var orphans []string
 		if target == "" {
-			devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
-			if devlogDir == "" {
-				devlogDir = "_rules/_devlog"
-			}
-
 			indexedFiles := make(map[string]bool)
-			indexPath := filepath.Join(devlogDir, "_index.md")
 			if rows, err := parseIndexMD(indexPath); err == nil {
 				for _, r := range rows {
 					indexedFiles[filepath.Base(r.Filename)] = true
@@ -1855,6 +1860,75 @@ func migrateIndexInternal(indexPath string, quiet bool) int {
 		}
 	}
 	return migratedCount
+}
+
+func normalizePathsInternal(store *sqlite.SQLiteStorage, indexPath string, quiet bool) int {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		return 0
+	}
+
+	devlogDir := filepath.Dir(indexPath)
+	prefix := devlogDir + string(filepath.Separator)
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	normalizedCount := 0
+	inTable := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "| Subject | Problems |") {
+			inTable = true
+			newLines = append(newLines, line)
+			continue
+		}
+
+		if inTable && strings.HasPrefix(trimmed, "|") && !strings.HasPrefix(trimmed, "|---") {
+			pipeCount := strings.Count(trimmed, "|")
+			if pipeCount >= 5 {
+				// We have a row. Find the last column (the Devlog link)
+				parts := strings.Split(line, "|")
+				lastIdx := len(parts) - 2 // The content is between the last two pipes
+				fileCol := parts[lastIdx]
+
+				if strings.Contains(fileCol, "](") {
+					start := strings.Index(fileCol, "](") + 2
+					end := strings.Index(fileCol[start:], ")")
+					if end != -1 {
+						rawPath := fileCol[start : start+end]
+						if strings.HasPrefix(rawPath, prefix) {
+							// Found a polluted path!
+							cleanPath := rawPath[len(prefix):]
+							
+							// 1. Update Index Row
+							newFileCol := strings.Replace(fileCol, rawPath, cleanPath, 1)
+							parts[lastIdx] = newFileCol
+							line = strings.Join(parts, "|")
+							
+							// 2. Update Database (immediately to prevent sync collision)
+							db := store.UnderlyingDB()
+							_, dbErr := db.Exec("UPDATE sessions SET filename = ? WHERE filename = ?", cleanPath, rawPath)
+							if dbErr == nil {
+								normalizedCount++
+							} else if !quiet {
+								fmt.Fprintf(os.Stderr, "  %s Warning: failed to update DB for %s: %v\n", ui.RenderWarn("⚠"), rawPath, dbErr)
+							}
+						}
+					}
+				}
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if normalizedCount > 0 {
+		err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
+		if err == nil && !quiet {
+			fmt.Printf("  %s Normalized %d polluted paths in %s\n", ui.RenderPass("✓"), normalizedCount, indexPath)
+		}
+	}
+	return normalizedCount
 }
 
 var devlogMigrateCmd = &cobra.Command{

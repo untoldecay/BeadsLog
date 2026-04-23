@@ -255,6 +255,10 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 						filenamePart = filenamePart[start : start+end]
 					}
 				}
+				// Normalize: Strip Dir prefix if present (prevent double-path bug)
+				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
+					filenamePart = filenamePart[len(dir)+1:]
+				}
 
 				rows = append(rows, IndexRow{
 					Subject:  strings.TrimSpace(parts[1]),
@@ -275,6 +279,10 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 						filenamePart = filenamePart[start : start+end]
 					}
 				}
+				// Normalize: Strip Dir prefix if present
+				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
+					filenamePart = filenamePart[len(dir)+1:]
+				}
 
 				rows = append(rows, IndexRow{
 					Subject:  strings.TrimSpace(parts[1]),
@@ -294,6 +302,10 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 					if end != -1 {
 						filenamePart = filenamePart[start : start+end]
 					}
+				}
+				// Normalize: Strip Dir prefix if present
+				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
+					filenamePart = filenamePart[len(dir)+1:]
 				}
 
 				rows = append(rows, IndexRow{
