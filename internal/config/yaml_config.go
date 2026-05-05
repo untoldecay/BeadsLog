@@ -69,6 +69,8 @@ var YamlOnlyKeys = map[string]bool{
 	// Devlog settings (bd-tod)
 	"devlog.enforce-on-commit": true,
 	"devlog.dir":               true,
+	"devlog.author":            true,
+	"devlog.branch-tracking":    true,
 
 	// Hierarchy settings (GH#995)
 	"hierarchy.max-depth": true,

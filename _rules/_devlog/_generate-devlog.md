@@ -1,14 +1,10 @@
-# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)
+# Prompt: Generate Chronological Debugging & Development Log (AI Enhanced)
 
 ## Objective:
-Analyze the session history and generate a comprehensive development log. Document assumptions, actions, outcomes, and corrections.
+Analyze the session history and generate a comprehensive development log.
 
-## ⚠️ MANDATORY: Architectural Relationships
-Since Background AI Enrichment is DISABLED, manually append relationships at the bottom:
-```markdown
-### Architectural Relationships
-- EntityA -> EntityB (uses)
-```
+## ✨ Background AI Active:
+Background AI Enrichment is ENABLED. Focus strictly on the technical narrative.
 
 ## persona:
 Meticulous technical writer documenting the learning journey.

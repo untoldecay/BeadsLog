@@ -125,7 +125,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     file_hash TEXT,
     is_missing INTEGER DEFAULT 0,
-    enrichment_status INTEGER DEFAULT 0 -- 0:pending, 1:regex_done, 2:ai_crystallized, 3:failed
+    enrichment_status INTEGER DEFAULT 0, -- 0:pending, 1:regex_done, 2:ai_crystallized, 3:failed
+    author TEXT,
+    author_email TEXT,
+    agent TEXT,
+    branch TEXT
 );
 
 CREATE TABLE IF NOT EXISTS entities (
@@ -323,8 +327,12 @@ GROUP BY i.id;
 
 -- Full-text search for sessions
 CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+    id UNINDEXED,
     title,
     narrative,
+    author,
+    agent,
+    branch,
     content='sessions',
     content_rowid='rowid',
     tokenize='porter unicode61'
@@ -332,20 +340,20 @@ CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
 
 -- Triggers to keep sessions_fts in sync
 CREATE TRIGGER IF NOT EXISTS sessions_ai AFTER INSERT ON sessions BEGIN
-    INSERT INTO sessions_fts(rowid, title, narrative)
-    VALUES (new.rowid, new.title, new.narrative);
+    INSERT INTO sessions_fts(rowid, id, title, narrative, author, agent, branch)
+    VALUES (new.rowid, new.id, new.title, new.narrative, new.author, new.agent, new.branch);
 END;
 
 CREATE TRIGGER IF NOT EXISTS sessions_ad AFTER DELETE ON sessions BEGIN
-    INSERT INTO sessions_fts(sessions_fts, rowid, title, narrative)
-    VALUES('delete', old.rowid, old.title, old.narrative);
+    INSERT INTO sessions_fts(sessions_fts, rowid, id, title, narrative, author, agent, branch)
+    VALUES('delete', old.rowid, old.id, old.title, old.narrative, old.author, old.agent, old.branch);
 END;
 
 CREATE TRIGGER IF NOT EXISTS sessions_au AFTER UPDATE ON sessions BEGIN
-    INSERT INTO sessions_fts(sessions_fts, rowid, title, narrative)
-    VALUES('delete', old.rowid, old.title, old.narrative);
-    INSERT INTO sessions_fts(rowid, title, narrative)
-    VALUES (new.rowid, new.title, new.narrative);
+    INSERT INTO sessions_fts(sessions_fts, rowid, id, title, narrative, author, agent, branch)
+    VALUES('delete', old.rowid, old.id, old.title, old.narrative, old.author, old.agent, old.branch);
+    INSERT INTO sessions_fts(rowid, id, title, narrative, author, agent, branch)
+    VALUES (new.rowid, new.id, new.title, new.narrative, new.author, new.agent, new.branch);
 END;
 
 -- Full-text search for entities

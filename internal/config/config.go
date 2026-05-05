@@ -125,6 +125,8 @@ func Initialize() error {
 	// Devlog configuration defaults
 	v.SetDefault("devlog.enforce-on-commit", false)
 	v.SetDefault("devlog.dir", "")
+	v.SetDefault("devlog.author", "")
+	v.SetDefault("devlog.branch-tracking", true)
 
 	// Hierarchy configuration defaults (GH#995)
 	// Maximum nesting depth for hierarchical IDs (e.g., bd-abc.1.2.3)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -509,11 +510,17 @@ With --stealth: configures per-repository git settings for invisible beads usage
 
 				
 
-				var autoSyncStr, enforceDevlogStr, backgroundEnrichStr string
+				var autoSyncStr, enforceDevlogStr, backgroundEnrichStr, branchTrackingStr string
+				var devlogAuthor string
 
 				autoSyncStr = "true"
 				enforceDevlogStr = "true"
 				backgroundEnrichStr = "false"
+				branchTrackingStr = "true"
+
+				// Auto-detect git user for devlog author default
+				out, _ := exec.Command("git", "config", "user.name").Output()
+				devlogAuthor = strings.TrimSpace(string(out))
 
 				selectedModel := "llama3.2:3b" // Default
 
@@ -559,7 +566,40 @@ With --stealth: configures per-repository git settings for invisible beads usage
 						os.Exit(1)
 					}
 
-					// Step 3: AI Enrichment
+					// Step 3: Author Pseudonym
+					authorForm := huh.NewForm(
+						huh.NewGroup(
+							huh.NewInput().
+								Title("Devlog Author Pseudonym").
+								Description("The name that will appear in your development logs.").
+								Placeholder("e.g., untoldecay").
+								Value(&devlogAuthor),
+						),
+					)
+					if err := authorForm.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
+
+					// Step 4: Branch Tracking
+					branchForm := huh.NewForm(
+						huh.NewGroup(
+							huh.NewSelect[string]().
+								Title("Track Branch Context?").
+								Description("Automatically record the current git branch and upstream status in devlogs.").
+								Options(
+									huh.NewOption("Yes, track branch info", "true"),
+									huh.NewOption("No, keep it simple", "false"),
+								).
+								Value(&branchTrackingStr),
+						),
+					)
+					if err := branchForm.Run(); err != nil {
+						fmt.Fprintf(os.Stderr, "Setup wizard cancelled: %v\n", err)
+						os.Exit(1)
+					}
+
+					// Step 5: AI Enrichment
 					aiForm := huh.NewForm(
 						huh.NewGroup(
 							huh.NewSelect[string]().
@@ -695,6 +735,12 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		autoSync := autoSyncStr == "true"
 		enforceDevlog := enforceDevlogStr == "true"
 		backgroundEnrich := backgroundEnrichStr == "true"
+
+		// Persist settings
+		if devlogAuthor != "" {
+			_ = config.SetYamlConfig("devlog.author", devlogAuthor)
+		}
+		_ = config.SetYamlConfig("devlog.branch-tracking", branchTrackingStr)
 
 		// Persist background enrich setting if enabled
 		if backgroundEnrich {

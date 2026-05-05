@@ -63,7 +63,8 @@ var migrationsList = []Migration{
 	{"populate_fts", migrations.MigratePopulateFTS},
 	{"extraction_evol_schema", migrations.MigrateExtractionEvolSchema},
 	{"devlog_enrichment_status", migrations.MigrateDevlogEnrichmentStatus},
-	{"author_columns", migrations.MigrateAuthorColumns},
+	{"devlog_author_columns", migrations.MigrateAuthorColumns},
+	{"devlog_branch_column", migrations.MigrateDevlogBranchColumn},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -134,6 +135,8 @@ func getMigrationDescription(name string) string {
 		"populate_fts":                 "Populates FTS5 indexes for existing sessions and entities",
 		"extraction_evol_schema":       "Adds confidence/source columns to entities and creates extraction_log table",
 		"devlog_enrichment_status":     "Adds enrichment_status to sessions for background AI processing",
+		"devlog_author_columns":        "Adds author, author_email, and agent columns to devlog sessions",
+		"devlog_branch_column":         "Adds branch column to devlog sessions and updates FTS index",
 	}
 
 	if desc, ok := descriptions[name]; ok {

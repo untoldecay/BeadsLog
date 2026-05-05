@@ -485,6 +485,9 @@ var devlogSyncCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// UPGRADE: Automatically migrate existing index if it's legacy
+		migrateIndexInternal(indexPath, quietFlag)
+
 		rows, err := parseIndexMD(indexPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "🚨 **SYNTAX ERROR in %s**\n", indexPath)
@@ -557,9 +560,9 @@ This index provides a record of human-AI collaboration.
 
 ## Work Index
 
-| Subject | Problems | Author | Agent | Date | Devlog |
-|---------|----------|--------|-------|------|---------|
-| [init] Setup | Initial devlog structure setup | Unknown | Unknown | 2024-01-01 00:00 | [2024-01-01_setup.md](2024-01-01_setup.md) |
+| Subject | Problems | Author | Agent | Date | Branch | Devlog |
+|---------|----------|--------|-------|------|--------|---------|
+| [init] Setup | Initial devlog structure setup | Unknown | Unknown | 2024-01-01 00:00 | main | [2024-01-01_setup.md](2024-01-01_setup.md) |
 `
 
 const promptTemplateManual = `# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)
@@ -1738,6 +1741,9 @@ var devlogRecordCmd = &cobra.Command{
 		
 		// 1. Get Author (The Human)
 		if author == "" {
+			author = config.GetString("devlog.author")
+		}
+		if author == "" {
 			author = os.Getenv("BD_ACTOR")
 		}
 		if author == "" {
@@ -1759,12 +1765,29 @@ var devlogRecordCmd = &cobra.Command{
 		// 3. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
-		// 4. Format Row
-		// New 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
-		fileName := filepath.Base(file)
-		row := fmt.Sprintf("| %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, fileName, fileName)
+		// 4. Get Branch Info
+		branchInfo := "N/A"
+		if config.GetBool("devlog.branch-tracking") {
+			// Get current branch
+			branchOut, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+			branchName := strings.TrimSpace(string(branchOut))
+			if branchName != "" {
+				// Check for upstream
+				upstreamOut, err := exec.Command("git", "rev-parse", "--abbrev-ref", "@{u}").Output()
+				if err == nil && strings.TrimSpace(string(upstreamOut)) != "" {
+					branchInfo = branchName
+				} else {
+					branchInfo = branchName + " (local)"
+				}
+			}
+		}
 
-		// 4. Append to File
+		// 5. Format Row
+		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+		fileName := filepath.Base(file)
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName)
+
+		// 6. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			fmt.Printf("Error opening index: %v\n", err)
@@ -1805,24 +1828,37 @@ func migrateIndexInternal(indexPath string, quiet bool) int {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.Contains(trimmed, "| Subject | Problems |") {
-			if !strings.Contains(trimmed, "| Agent |") {
-				newLines = append(newLines, "| Subject | Problems | Author | Agent | Date | Devlog |")
+			if !strings.Contains(trimmed, "| Branch |") {
+				newLines = append(newLines, "| Subject | Problems | Author | Agent | Date | Branch | Devlog |")
 				inTable = true
 				continue
 			}
 		}
 
 		if inTable && strings.HasPrefix(trimmed, "|---") {
-			if strings.Count(trimmed, "|") == 5 || strings.Count(trimmed, "|") == 6 {
-				newLines = append(newLines, "|---------|----------|--------|-------|------|---------|")
+			if strings.Count(trimmed, "|") >= 5 && strings.Count(trimmed, "|") <= 7 {
+				newLines = append(newLines, "|---------|----------|--------|-------|------|--------|---------|")
 				continue
 			}
 		}
 
 		if inTable && strings.HasPrefix(trimmed, "|") {
 			pipes := strings.Count(trimmed, "|")
-			if pipes == 6 {
-				// Migrate 5 -> 6 (Missing Agent)
+			if pipes == 7 {
+				// Migrate 6 -> 7 (Missing Branch)
+				parts := strings.Split(trimmed, "|")
+				subj := strings.TrimSpace(parts[1])
+				prob := strings.TrimSpace(parts[2])
+				auth := strings.TrimSpace(parts[3])
+				agent := strings.TrimSpace(parts[4])
+				date := strings.TrimSpace(parts[5])
+				file := strings.TrimSpace(parts[6])
+
+				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |", subj, prob, auth, agent, date, "N/A", file))
+				migratedCount++
+				continue
+			} else if pipes == 6 {
+				// Migrate 5 -> 7 (Missing Agent and Branch)
 				parts := strings.Split(trimmed, "|")
 				subj := strings.TrimSpace(parts[1])
 				prob := strings.TrimSpace(parts[2])
@@ -1830,11 +1866,11 @@ func migrateIndexInternal(indexPath string, quiet bool) int {
 				date := strings.TrimSpace(parts[4])
 				file := strings.TrimSpace(parts[5])
 
-				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, auth, "Unknown", date, file))
+				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |", subj, prob, auth, "Unknown", date, "N/A", file))
 				migratedCount++
 				continue
 			} else if pipes == 5 {
-				// Migrate 4 -> 6
+				// Migrate 4 -> 7
 				parts := strings.Split(trimmed, "|")
 				subj := strings.TrimSpace(parts[1])
 				prob := strings.TrimSpace(parts[2])
@@ -1846,7 +1882,7 @@ func migrateIndexInternal(indexPath string, quiet bool) int {
 					date += " 00:00"
 				}
 
-				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |", subj, prob, currentAuthor, "Unknown", date, file))
+				newLines = append(newLines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |", subj, prob, currentAuthor, "Unknown", date, "N/A", file))
 				migratedCount++
 				continue
 			}
@@ -1857,7 +1893,7 @@ func migrateIndexInternal(indexPath string, quiet bool) int {
 	if migratedCount > 0 {
 		err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
 		if err == nil && !quiet {
-			fmt.Printf("  %s Migrated %d rows in %s to 6-column format\n", ui.RenderPass("✓"), migratedCount, indexPath)
+			fmt.Printf("  %s Migrated %d rows in %s to 7-column format\n", ui.RenderPass("✓"), migratedCount, indexPath)
 		}
 	}
 	return migratedCount

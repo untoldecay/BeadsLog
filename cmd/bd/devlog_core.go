@@ -23,6 +23,7 @@ type IndexRow struct {
 	Problem     string
 	Author      string
 	Agent       string
+	Branch      string
 	AuthorEmail string
 	Date        string
 	Filename    string
@@ -48,9 +49,9 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	}
 
 	// Check if session exists and get current state
-	var currentFilename, currentHash, currentAuthor, currentAuthorEmail, currentAgent string
+	var currentFilename, currentHash, currentAuthor, currentAuthorEmail, currentAgent, currentBranch string
 	var currentMissing bool
-	err = db.QueryRow("SELECT filename, file_hash, is_missing, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentAuthor, &currentAuthorEmail, &currentAgent)
+	err = db.QueryRow("SELECT filename, file_hash, is_missing, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, ''), COALESCE(branch, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentAuthor, &currentAuthorEmail, &currentAgent, &currentBranch)
 	
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
@@ -92,7 +93,8 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 		currentMissing != isMissing ||
 		currentAuthor != row.Author ||
 		currentAuthorEmail != row.AuthorEmail ||
-		currentAgent != row.Agent
+		currentAgent != row.Agent ||
+		currentBranch != row.Branch
 
 	if !needsUpdate {
 		return false, nil // No changes
@@ -101,15 +103,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status, author, author_email, agent)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status, author, author_email, agent, branch)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent, row.Branch)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?, branch = ?
 			WHERE id = ?
-		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent, sessionID)
+		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent, row.Branch, sessionID)
 	}
 
 	if err != nil {
@@ -238,7 +240,7 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 
 			// Critical Check: Double appends (two rows on same line)
 			pipeCount := strings.Count(line, "|")
-			if pipeCount > 7 {
+			if pipeCount > 8 {
 				return nil, fmt.Errorf("line %d: malformed row (too many pipes)", i+1)
 			}
 			if pipeCount < 5 {
@@ -246,9 +248,9 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 			}
 
 			parts := strings.Split(line, "|")
-			if pipeCount == 7 {
-				// 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
-				filenamePart := strings.TrimSpace(parts[6])
+			if pipeCount == 8 {
+				// 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+				filenamePart := strings.TrimSpace(parts[7])
 				if strings.Contains(filenamePart, "](") {
 					start := strings.Index(filenamePart, "](") + 2
 					end := strings.Index(filenamePart[start:], ")")
@@ -267,10 +269,12 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 					Author:   strings.TrimSpace(parts[3]),
 					Agent:    strings.TrimSpace(parts[4]),
 					Date:     strings.TrimSpace(parts[5]),
+					Branch:   strings.TrimSpace(parts[6]),
 					Filename: filenamePart,
 					Dir:      dir,
 				})
-			} else if pipeCount == 6 {
+			} else if pipeCount == 7 {
+				// 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
 				// 5-column format: | Subject | Problems | Author | Date | Devlog |
 				filenamePart := strings.TrimSpace(parts[5])
 				if strings.Contains(filenamePart, "](") {
