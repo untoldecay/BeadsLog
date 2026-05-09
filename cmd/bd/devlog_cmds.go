@@ -667,6 +667,10 @@ func refreshDevlogPrompt(store *sqlite.SQLiteStorage) {
 var devlogGraphCmd = &cobra.Command{
 	Use:   "graph [entity]",
 	Short: "Display entity dependency graph (Fuzzy)",
+	Long: `Display the architectural graph for a given entity.
+This includes:
+- Explicit Dependencies: Linked via arrows in devlogs (A -> B).
+- Implicit Relationships: Inferred from frequent session co-occurrence.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		term := args[0]
@@ -1003,7 +1007,15 @@ var devlogShowCmd = &cobra.Command{
 
 var devlogSearchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search sessions and entities (Hybrid BM25 + Graph)",
+	Short: "Hybrid search across devlog sessions",
+	Long: `Search devlog sessions using a hybrid FTS5 ranking engine.
+Matches are ranked based on BM25 relevance, phrase bonuses, term proximity (NEAR), and recency.
+If high-confidence matches are absent, the system automatically falls back to individual keyword matching.
+
+Examples:
+  bd devlog search "auth bug"          # Search for phrase/terms
+  bd devlog search "mcp" --preview     # Show 3-line snippets
+  bd devlog search "rules" --explain   # See score breakdown`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := args[0]

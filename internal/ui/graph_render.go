@@ -153,8 +153,10 @@ func RenderPath(path []queries.PathStep, width int) string {
 		entity := lipgloss.NewStyle().Bold(true).Foreground(ColorAccent).Render(step.EntityName)
 		parts = append(parts, entity)
 		
+		// If there's a next step, show the session that LINKS this entity to the next one
 		if i < len(path)-1 {
-			session := lipgloss.NewStyle().Italic(true).Foreground(ColorMuted).Render(fmt.Sprintf("[%s] %s", step.SessionID, step.SessionTitle))
+			nextStep := path[i+1]
+			session := lipgloss.NewStyle().Italic(true).Foreground(ColorMuted).Render(fmt.Sprintf("[%s] %s", nextStep.SessionID, nextStep.SessionTitle))
 			parts = append(parts, "  via "+session+"  →")
 		}
 	}
