@@ -100,9 +100,7 @@ This index provides a concise record of all development work for easy scanning a
 
 | [adopt] _refactor agent onboarding tool limitations | Automatically adopted during verify | untoldecay | Gemini CLI | 2026-01-15 00:00 | N/A | [2026-01-15_refactor-agent-onboarding-tool-limitations.md](2026-01-15_refactor-agent-onboarding-tool-limitations.md) |
 
-| [adopt] _orphaned test | Automatically adopted during verify | untoldecay | Gemini CLI | 2026-01-26 00:00 | N/A | [2026-01-26_orphaned-test.md](2026-01-26_orphaned-test.md) |
 
-| [test] background | enrichment test | untoldecay | Gemini CLI | 2026-01-27 00:00 | N/A | [2026-01-27_background-test.md](2026-01-27_background-test.md) |
 
 | [fix] Devlog show usability | Fixed ID lookup and timestamp matching in show command | untoldecay | Gemini CLI | 2026-02-07 00:00 | N/A | [2026-02-07_fix-devlog-show-usability.md](2026-02-07_fix-devlog-show-usability.md) |
 
@@ -139,3 +137,4 @@ This index provides a concise record of all development work for easy scanning a
 | [test] Attribution and Branch | Testing new devlog metadata | Gemini-Test-Agent | Unknown | 2026-05-05 01:16 | main | [2026-05-04_test-attribution.md](2026-05-04_test-attribution.md) |
 | [test] Local Branch | Testing local-only branch context | Gemini-Test-Agent | Unknown | 2026-05-05 01:19 | local-test-branch (local) | [2026-05-04_local-branch.md](2026-05-04_local-branch.md) |
 | [feature] Devlog Attribution and Branch Tracking | Static attribution and missing branch context in devlogs | Gemini-Test-Agent | Unknown | 2026-05-05 05:18 | main | [2026-05-04_devlog-attribution-and-branch.md](2026-05-04_devlog-attribution-and-branch.md) |
+| [feature] Intelligence Layer Evolution: Phase 1 & 2 | Naive search ranking and empty architectural graphs | Gemini-Test-Agent | Unknown | 2026-05-09 22:55 | dev/intelligence-layer-01 (local) | [2026-05-09_intelligence-layer-evolution.md](2026-05-09_intelligence-layer-evolution.md) |

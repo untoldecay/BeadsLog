@@ -50,8 +50,8 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 
 	// Check if session exists and get current state
 	var currentFilename, currentHash, currentAuthor, currentAuthorEmail, currentAgent, currentBranch string
-	var currentMissing bool
-	err = db.QueryRow("SELECT filename, file_hash, is_missing, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, ''), COALESCE(branch, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentAuthor, &currentAuthorEmail, &currentAgent, &currentBranch)
+	var currentMissing, currentGhost bool
+	err = db.QueryRow("SELECT filename, file_hash, is_missing, is_ghost, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, ''), COALESCE(branch, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentGhost, &currentAuthor, &currentAuthorEmail, &currentAgent, &currentBranch)
 	
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
@@ -70,16 +70,22 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	var contentHash string
 	var narrative string
 	isMissing := false
+	isGhost := currentGhost
 	
 	if err != nil {
 		isMissing = true
-		// If file doesn't exist, we can still create the session record but warn
-		fmt.Fprintf(os.Stderr, "Missing log session, %s : %v\n", filePath, err)
+		// Only warn if NOT already marked as ghost
+		if !currentGhost {
+			fmt.Fprintf(os.Stderr, "Missing log session, %s : %v (marking as ghost)\n", filePath, err)
+			isGhost = true
+		}
 		narrative = row.Problem // Use problem description as fallback narrative
 		// Hash only the problem
 		sum := sha256.Sum256([]byte(narrative))
 		contentHash = fmt.Sprintf("%x", sum)
 	} else {
+		isMissing = false
+		isGhost = false // Recovered!
 		narrative = row.Problem + "\n\n" + string(content) // Prepend problem description
 		// Hash combined content
 		sum := sha256.Sum256([]byte(narrative))
@@ -91,6 +97,7 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 		currentFilename != row.Filename || 
 		currentHash != contentHash || 
 		currentMissing != isMissing ||
+		currentGhost != isGhost ||
 		currentAuthor != row.Author ||
 		currentAuthorEmail != row.AuthorEmail ||
 		currentAgent != row.Agent ||
@@ -103,15 +110,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, enrichment_status, author, author_email, agent, branch)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent, row.Branch)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, is_ghost, enrichment_status, author, author_email, agent, branch)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?, branch = ?
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, is_ghost = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?, branch = ?
 			WHERE id = ?
-		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, row.Author, row.AuthorEmail, row.Agent, row.Branch, sessionID)
+		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch, sessionID)
 	}
 
 	if err != nil {

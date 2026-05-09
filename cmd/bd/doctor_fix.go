@@ -192,6 +192,7 @@ func applyFixList(path string, fixes []doctorCheck) {
 		"Schema Compatibility",
 		"JSONL Integrity",
 		"DB-JSONL Sync",
+		"Devlog Ghost Sessions",
 	}
 	priority := make(map[string]int, len(order))
 	for i, name := range order {
@@ -300,6 +301,8 @@ func applyFixList(path string, fixes []doctorCheck) {
 		case "Expired Tombstones":
 			// consolidate cleanup into doctor --fix
 			err = fix.ExpiredTombstones(path)
+		case "Devlog Ghost Sessions":
+			err = fix.DevlogGhosts(path)
 		case "Compaction Candidates":
 			// No auto-fix: compaction requires agent review
 			fmt.Printf("  ⚠ Run 'bd compact --analyze' to review candidates\n")

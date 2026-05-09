@@ -588,6 +588,11 @@ func runDiagnostics(path string) doctorResult {
 	result.Checks = append(result.Checks, migrationsCheck)
 	// Status is determined by the check itself based on migration priorities
 
+	// Check 31: Devlog ghost sessions (missing files)
+	ghostCheck := convertDoctorCheck(doctor.CheckDevlogGhosts(path))
+	result.Checks = append(result.Checks, ghostCheck)
+	// Don't fail overall check for ghost sessions, just warn
+
 	return result
 }
 

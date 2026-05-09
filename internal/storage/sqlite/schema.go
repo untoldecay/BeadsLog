@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     file_hash TEXT,
     is_missing INTEGER DEFAULT 0,
+    is_ghost INTEGER DEFAULT 0,
     enrichment_status INTEGER DEFAULT 0, -- 0:pending, 1:regex_done, 2:ai_crystallized, 3:failed
     author TEXT,
     author_email TEXT,

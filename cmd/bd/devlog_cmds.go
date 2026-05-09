@@ -706,46 +706,81 @@ var devlogGraphCmd = &cobra.Command{
 			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
 			if len(suggestions) > 0 {
 				fmt.Println("\nDid you mean?")
-				                for _, s := range suggestions {
-				                    fmt.Printf("- %s\n", s.Name)
-				                }
-				            }
-				            return
-				        }
-				
-				        fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
-		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s.Name)
+				}
+			}
+			return
+		}
 
 		type graphMatch struct {
 			Name  string
 			Graph *queries.EntityGraph
+			Co    []queries.CooccurrenceNode
 		}
 		var matches []graphMatch
 
 		for _, t := range targets {
-			graph, err := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
-			if err == nil && len(graph.Nodes) > 0 {
-				matches = append(matches, graphMatch{Name: t.Name, Graph: graph})
+			graph, _ := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
+			co, _ := queries.GetRelatedEntitiesByCooccurrence(rootCtx, db, t.ID, 5)
+			
+			if (graph != nil && len(graph.Nodes) > 0) || len(co) > 0 {
+				matches = append(matches, graphMatch{Name: t.Name, Graph: graph, Co: co})
 			}
 		}
 
 		if len(matches) > 0 {
-			// Convert to anonymous struct slice for the UI helper
-			uiMatches := make([]struct {
-				Name  string
-				Graph *queries.EntityGraph
-			}, len(matches))
-			for i, m := range matches {
-				uiMatches[i] = struct {
-					Name  string
-					Graph *queries.EntityGraph
-				}{Name: m.Name, Graph: m.Graph}
+			for _, m := range matches {
+				fmt.Printf("\n=== Entity: %s ===\n", ui.RenderAccent(m.Name))
+				
+				if m.Graph != nil && len(m.Graph.Nodes) > 1 { // More than just the root
+					fmt.Println("\nExplicit Dependencies (Graph):")
+					fmt.Println(ui.RenderEntityTree(m.Graph))
+				}
+				
+				if len(m.Co) > 0 {
+					fmt.Println("\nImplicit Relationships (Co-occurrence):")
+					fmt.Println(ui.RenderCooccurrenceTable(m.Name, m.Co, ui.GetWidth()))
+				}
 			}
-			fmt.Println(ui.RenderGraphTable(term, uiMatches, ui.GetWidth()))
 		} else {
-			fmt.Println("No graphs found.")
+			fmt.Println("No graph or co-occurrence data found.")
 		}
 		fmt.Printf("\n%s Tip: Use --help for depth and filtering options.\n", ui.RenderAccent("💡"))
+	},
+}
+
+var devlogPathCmd = &cobra.Command{
+	Use:   "path [entityA] [entityB]",
+	Short: "Find historical path between two entities via devlog sessions",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		start := args[0]
+		end := args[1]
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		targetsA, _ := queries.ResolveEntities(rootCtx, db, start, 1)
+		targetsB, _ := queries.ResolveEntities(rootCtx, db, end, 1)
+
+		if len(targetsA) == 0 || len(targetsB) == 0 {
+			fmt.Println("One or both entities not found.")
+			return
+		}
+
+		path, err := queries.GetPathBetweenEntities(rootCtx, db, targetsA[0].ID, targetsB[0].ID)
+		if err != nil {
+			fmt.Printf("Error finding path: %v\n", err)
+			return
+		}
+
+		fmt.Println(ui.RenderPath(path, ui.GetWidth()))
 	},
 }
 
@@ -977,6 +1012,8 @@ var devlogSearchCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		jsonOutput, _ := cmd.Flags().GetBool("json")
 		author, _ := cmd.Flags().GetString("author")
+		preview, _ := cmd.Flags().GetBool("preview")
+		explain, _ := cmd.Flags().GetBool("explain")
 
 		// Fallback to global json flag if not explicitly set on command
 		if !cmd.Flags().Changed("json") {
@@ -998,6 +1035,8 @@ var devlogSearchCmd = &cobra.Command{
 			Limit:    limit,
 			Strict:   strict,
 			TextOnly: textOnly,
+			Preview:  preview,
+			Explain:  explain,
 		}
 		response, err := queries.HybridSearch(rootCtx, db, opts)
 		if err != nil {
@@ -1033,7 +1072,7 @@ var devlogSearchCmd = &cobra.Command{
 			}
 
 			// Found direct results (sessions and/or related entities)
-			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth()))
+			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth(), response.Strategy, explain))
 			fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
 			return
 		}
@@ -1291,17 +1330,38 @@ var devlogStatusCmd = &cobra.Command{
 
 		// Get stats
 		db := store.UnderlyingDB()
-		var sessionsCount, entitiesCount, relationshipsCount int
-		
+		var sessionsCount, entitiesCount, relationshipsCount, ghostCount int
+
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessionsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entitiesCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps").Scan(&relationshipsCount)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghostCount)
 
 		fmt.Printf("\nDatabase Statistics:\n")
 		fmt.Printf("  Sessions:      %d\n", sessionsCount)
+		if ghostCount > 0 {
+			fmt.Printf("  Ghosts:        %d (run 'bd doctor --fix' to prune)\n", ghostCount)
+		}
 		fmt.Printf("  Entities:      %d\n", entitiesCount)
 		fmt.Printf("  Relationships: %d\n", relationshipsCount)
 
+		// Enrichment Stats
+		var optimized, pending, failed int
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 2").Scan(&optimized)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 1").Scan(&pending)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 3").Scan(&failed)
+
+		fmt.Printf("\nEnrichment Status (AI):\n")
+		fmt.Printf("  ● Optimized: %d\n", optimized)
+		if pending > 0 {
+			fmt.Printf("  ○ Pending:   %d (in queue)\n", pending)
+		}
+		if failed > 0 {
+			fmt.Printf("  ✖ Failed:    %d\n", failed)
+		}
+		if pending == 0 && failed == 0 && optimized > 0 {
+			fmt.Printf("  ✨ All memory optimized\n")
+		}
 		// Check hooks
 		fmt.Printf("\nGit Hooks:\n")
 		hooks := []string{"post-commit", "post-merge"}
@@ -2063,6 +2123,8 @@ func init() {
 	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
 	devlogSearchCmd.Flags().String("author", "", "Filter search results by author")
+	devlogSearchCmd.Flags().Bool("preview", false, "Show first 3 lines of narrative in results")
+	devlogSearchCmd.Flags().Bool("explain", false, "Show score breakdown for matches")
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
 	devlogListCmd.Flags().String("author", "", "Filter by author")
@@ -2086,6 +2148,7 @@ func init() {
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
+	devlogCmd.AddCommand(devlogPathCmd)
 	devlogCmd.AddCommand(devlogListCmd)
 	devlogCmd.AddCommand(entitiesCmd)
 	devlogCmd.AddCommand(devlogShowCmd)
@@ -2110,10 +2173,17 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 	items := make([]ui.SearchResultItem, len(results))
 	for i, r := range results {
 		items[i] = ui.SearchResultItem{
-			ID:        r.ID,
-			Title:     r.Title,
-			Narrative: r.Narrative,
-			Reason:    r.Reason,
+			ID:              r.ID,
+			Title:           r.Title,
+			Narrative:       r.Narrative,
+			Reason:          r.Reason,
+			Score:           r.Score,
+			BM25:            r.BM25,
+			PhraseBonus:     r.PhraseBonus,
+			NearBonus:       r.NearBonus,
+			EntityBonus:     r.EntityBonus,
+			RecencyBonus:    r.RecencyBonus,
+			IsLowConfidence: r.IsLowConfidence,
 		}
 	}
 	return items

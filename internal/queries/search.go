@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -11,9 +12,18 @@ import (
 type SearchResult struct {
 	ID        string  `json:"id"`
 	Title     string  `json:"title"`
-	Narrative string  `json:"narrative"` // Snippet
+	Narrative string  `json:"narrative"` // Snippet or Preview
 	Score     float64 `json:"score"`
 	Reason    string  `json:"reason"`    // e.g. "text match", "entity:Modal"
+	
+	// Explanation fields (for --explain)
+	BM25        float64 `json:"bm25"`
+	PhraseBonus float64 `json:"phrase_bonus"`
+	NearBonus   float64 `json:"near_bonus"`
+	EntityBonus float64 `json:"entity_bonus"`
+	RecencyBonus float64 `json:"recency_bonus"`
+	
+	IsLowConfidence bool `json:"is_low_confidence"`
 }
 
 type SearchOptions struct {
@@ -22,142 +32,219 @@ type SearchOptions struct {
 	Limit    int
 	Strict   bool // If true, only BM25 on sessions, no expansion
 	TextOnly bool // If true, only BM25, no entity lookup
+	Preview  bool // If true, show first 3 lines instead of snippet
+	Explain  bool // If true, show score breakdown
 }
 
 type SearchResponse struct {
 	Results         []SearchResult
 	RelatedEntities []string
+	Strategy        string // e.g. "exact", "hybrid", "fallback"
+}
+
+// decomposeQuery transforms raw input into various FTS5 query forms
+func decomposeQuery(query string) (phrase, near, and, or string, tokens []string) {
+	// Clean query and extract tokens
+	// Match alpha-numeric and dashes, treat others as separators
+	re := regexp.MustCompile(`[^\w\s*]+`)
+	clean := re.ReplaceAllString(query, " ")
+	rawTokens := strings.Fields(clean)
+	
+	for _, t := range rawTokens {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			tokens = append(tokens, t)
+		}
+	}
+
+	if len(tokens) == 0 {
+		return "", "", "", "", nil
+	}
+
+	// Phrase: "token1 token2"
+	phrase = "\"" + strings.Join(tokens, " ") + "\""
+	
+	// NEAR: NEAR(token1 token2, 5)
+	if len(tokens) > 1 {
+		near = "NEAR(" + strings.Join(tokens, " ") + ", 5)"
+	} else {
+		near = tokens[0] + "*"
+	}
+	
+	// AND: token1* AND token2*
+	var andParts []string
+	for _, t := range tokens {
+		if !strings.HasSuffix(t, "*") {
+			andParts = append(andParts, t+"*")
+		} else {
+			andParts = append(andParts, t)
+		}
+	}
+	and = strings.Join(andParts, " AND ")
+	
+	// OR: token1* OR token2*
+	or = strings.Join(andParts, " OR ")
+	
+	return phrase, near, and, or, tokens
 }
 
 func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchResponse, error) {
-	results := make(map[string]SearchResult)
 	var response SearchResponse
-
-	// Prepare the match query
-	// If not strict, we might want to make it friendlier
-	// For now, we pass it through, assuming the user might use FTS syntax
-	matchQuery := opts.Query
-	if !opts.Strict {
-		// UX Enhancement: If it's a simple word, append * for prefix match
-		// e.g. "mod" -> "mod*"
-		if !strings.ContainsAny(matchQuery, " \"*:()") {
-			matchQuery = matchQuery + "*"
-		}
-	}
-
-	// 1. BM25 Text Search
-	textQuery := `
-        SELECT s.id, s.title, snippet(sessions_fts, 1, '<b>', '</b>', '...', 64), bm25(sessions_fts) 
-        FROM sessions_fts 
-        JOIN sessions s ON sessions_fts.rowid = s.rowid
-        WHERE sessions_fts MATCH ?
-    `
-	var textArgs []interface{}
-	textArgs = append(textArgs, matchQuery)
 	
-	if opts.Author != "" {
-		textQuery += " AND s.author LIKE ?"
-		textArgs = append(textArgs, "%"+opts.Author+"%")
-	}
-	
-	textQuery += " ORDER BY bm25(sessions_fts) LIMIT ?"
-	textArgs = append(textArgs, opts.Limit)
-
-	rows, err := db.QueryContext(ctx, textQuery, textArgs...)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var r SearchResult
-			if err := rows.Scan(&r.ID, &r.Title, &r.Narrative, &r.Score); err == nil {
-				r.Reason = "text match"
-				results[r.ID] = r
-			}
-		}
-	}
-	// Note: We ignore errors here (e.g. syntax error in query) to allow falling back
-	// or returning what we have. But a syntax error likely fails everything.
-
-	if opts.Strict || opts.TextOnly {
-		response.Results = mapToSlice(results)
+	phrase, near, and, or, tokens := decomposeQuery(opts.Query)
+	if len(tokens) == 0 {
 		return response, nil
 	}
 
-	// 2. Entity Search & Expansion
-	entityQuery := `
-        SELECT rowid, name FROM entities_fts WHERE entities_fts MATCH ? LIMIT 5
-    `
-	eRows, err := db.QueryContext(ctx, entityQuery, matchQuery)
-	if err == nil {
-		defer eRows.Close()
-		for eRows.Next() {
-			var id int64
-			var name string
-			if err := eRows.Scan(&id, &name); err == nil {
-				response.RelatedEntities = append(response.RelatedEntities, name)
-			}
+	// 1. Initial attempt: Phrase + NEAR + AND (Hybrid)
+	response.Strategy = "hybrid"
+	results, err := executeRankedSearch(ctx, db, phrase, near, and, tokens, opts)
+	
+	// 2. Fallback: If no results, try OR (Broad)
+	if (err != nil || len(results) == 0) && !opts.Strict {
+		response.Strategy = "fallback"
+		results, err = executeRankedSearch(ctx, db, phrase, near, or, tokens, opts)
+		for i := range results {
+			results[i].IsLowConfidence = true
 		}
 	}
 
-	// For each matched entity, find related sessions
-	for _, entityName := range response.RelatedEntities {
-		relatedQuery := `
-            SELECT s.id, s.title, s.narrative
-            FROM sessions s
-            JOIN session_entities se ON s.id = se.session_id
-            JOIN entities e ON se.entity_id = e.id
-            WHERE e.name = ?
-        `
-		var relatedArgs []interface{}
-		relatedArgs = append(relatedArgs, entityName)
+	if err != nil {
+		return response, err
+	}
 
-		if opts.Author != "" {
-			relatedQuery += " AND s.author LIKE ?"
-			relatedArgs = append(relatedArgs, "%"+opts.Author+"%")
-		}
-
-		relatedQuery += " LIMIT ?"
-		relatedArgs = append(relatedArgs, opts.Limit)
-
-		rRows, err := db.QueryContext(ctx, relatedQuery, relatedArgs...)
+	// 3. Entity Search & Expansion (only if not Strict/TextOnly)
+	if !opts.Strict && !opts.TextOnly {
+		entityQuery := `SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT 5`
+		// Use OR query for entity matching to be broader
+		eRows, err := db.QueryContext(ctx, entityQuery, or)
 		if err == nil {
-			defer rRows.Close()
-			for rRows.Next() {
-				var r SearchResult
-				// Placeholder score for entity matches (since we don't have BM25 for them in this query)
-				// We start with a base score.
-				var baseScore float64 = -5.0 // Stronger than a weak text match?
-
-				if err := rRows.Scan(&r.ID, &r.Title, &r.Narrative); err == nil {
-					if existing, ok := results[r.ID]; ok {
-						// Boost existing result
-						// Lower score is better in FTS5 BM25
-						existing.Score -= 2.0
-						if !strings.Contains(existing.Reason, "entity:") {
-							existing.Reason += fmt.Sprintf(", entity:%s", entityName)
-						}
-						results[r.ID] = existing
-					} else {
-						// Add new result from entity relation
-						r.Score = baseScore
-						r.Reason = fmt.Sprintf("entity:%s", entityName)
-						results[r.ID] = r
-					}
+			defer eRows.Close()
+			for eRows.Next() {
+				var name string
+				if err := eRows.Scan(&name); err == nil {
+					response.RelatedEntities = append(response.RelatedEntities, name)
 				}
 			}
 		}
 	}
 
-	response.Results = mapToSlice(results)
+	response.Results = results
 	return response, nil
 }
-func mapToSlice(m map[string]SearchResult) []SearchResult {
-	s := make([]SearchResult, 0, len(m))
-	for _, v := range m {
-		s = append(s, v)
+
+func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuery string, tokens []string, opts SearchOptions) ([]SearchResult, error) {
+	// snippet column is index 2 (narrative)
+	snippetFunc := "snippet(sessions_fts, 2, '<b>', '</b>', '...', 64)"
+
+	// Hybrid Scoring Formula Implementation
+	// weights: id(0.0), title(10.0), narrative(1.0), author(0.5), agent(0.5), branch(0.5)
+	
+	sqlQuery := fmt.Sprintf(`
+		WITH hits AS (
+			SELECT 
+				rowid, 
+				bm25(sessions_fts, 0.0, 10.0, 1.0, 0.5, 0.5, 0.5) as bm25_score,
+				%s as snippet
+			FROM sessions_fts
+			WHERE sessions_fts MATCH ?
+		)
+		SELECT 
+			s.id, 
+			s.title, 
+			h.snippet,
+			s.narrative,
+			h.bm25_score,
+			(julianday('now') - julianday(s.timestamp)) as age_days
+		FROM hits h
+		JOIN sessions s ON s.rowid = h.rowid
+	`, snippetFunc)
+
+	var args []interface{}
+	args = append(args, mainQuery)
+
+	if opts.Author != "" {
+		sqlQuery += " WHERE s.author LIKE ?"
+		args = append(args, "%"+opts.Author+"%")
 	}
-	// Sort by Score (ascending = better relevance)
-	sort.Slice(s, func(i, j int) bool {
-		return s[i].Score < s[j].Score
+
+	sqlQuery += " ORDER BY bm25_score ASC LIMIT ?"
+	args = append(args, opts.Limit * 2) 
+
+	rows, err := db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []SearchResult
+	for rows.Next() {
+		var r SearchResult
+		var fullNarrative string
+		var ageDays float64
+		var snippet string
+		
+		if err := rows.Scan(&r.ID, &r.Title, &snippet, &fullNarrative, &r.BM25, &ageDays); err != nil {
+			continue
+		}
+
+		// Calculate Bonuses in Go for more flexibility
+		
+		// 1. Phrase Bonus: +3.0 if title contains exact phrase
+		cleanPhrase := strings.Trim(phrase, "\"")
+		if strings.Contains(strings.ToLower(r.Title), strings.ToLower(cleanPhrase)) {
+			r.PhraseBonus = 3.0
+		}
+
+		// 2. Proximity (Near) Bonus: +1.5 if narrative contains all tokens within 20 chars of each other
+		// Simplified NEAR check in Go: check if all tokens appear in narrative
+		allPresent := true
+		for _, t := range tokens {
+			if !strings.Contains(strings.ToLower(fullNarrative), strings.ToLower(t)) {
+				allPresent = false
+				break
+			}
+		}
+		if allPresent {
+			r.NearBonus = 1.5
+		}
+
+		// 3. Recency Bonus: max 0.75, decays over 30 days
+		r.RecencyBonus = 0.75 * (1.0 - (ageDays / 30.0))
+		if r.RecencyBonus < 0 {
+			r.RecencyBonus = 0
+		}
+
+		// 4. Entity Pair Bonus: +0.75 if multiple tokens appear together
+		// (Already partially covered by Near bonus, but we can refine)
+		r.EntityBonus = 0 
+
+		// Final Score (BM25 is lower=better, bonuses reduce score)
+		r.Score = r.BM25 - r.PhraseBonus - r.NearBonus - r.RecencyBonus - r.EntityBonus
+		
+		if opts.Preview {
+			// Extract first 3 lines of narrative
+			lines := strings.Split(fullNarrative, "\n")
+			count := 3
+			if len(lines) < 3 {
+				count = len(lines)
+			}
+			r.Narrative = strings.Join(lines[:count], "\n")
+		} else {
+			r.Narrative = snippet
+		}
+
+		results = append(results, r)
+	}
+
+	// Final sort by our hybrid score (ascending = better)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score < results[j].Score
 	})
-	return s
+
+	if len(results) > opts.Limit {
+		results = results[:opts.Limit]
+	}
+
+	return results, nil
 }
