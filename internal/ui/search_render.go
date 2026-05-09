@@ -84,12 +84,16 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 			
 			// Content column (Title + Narrative + Explain)
 			title := r.Title
-			if explain {
-				title = fmt.Sprintf("%s (Score: %.2f)", title, r.Score)
-			}
-			
 			var contentLines []string
-			contentLines = append(contentLines, title)
+
+			if explain {
+				// Invert scores for display: BM25 is usually negative, so -r.BM25 is positive.
+				// Final score should be shown as "Higher is better" for human intuition.
+				displayScore := -r.Score 
+				contentLines = append(contentLines, fmt.Sprintf("%s (Relevance: %.2f)", title, displayScore))
+			} else {
+				contentLines = append(contentLines, title)
+			}
 			
 			if r.Narrative != "" {
 				narrative := strings.ReplaceAll(r.Narrative, "\n", " ")
@@ -102,9 +106,10 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 			}
 			
 			if explain {
-				explainStr := fmt.Sprintf("BM25: %.2f | Phrase: +%.1f | Near: +%.1f | Recency: +%.1f | Entity: +%.1f", 
-					r.BM25, r.PhraseBonus, r.NearBonus, r.RecencyBonus, r.EntityBonus)
-				contentLines = append(contentLines, explainStr)
+				displayBM25 := -r.BM25
+				explainStr := fmt.Sprintf("   Base: %.2f | Phrase: +%.1f | Near: +%.1f | Recency: +%.1f | Entity: +%.1f", 
+					displayBM25, r.PhraseBonus, r.NearBonus, r.RecencyBonus, r.EntityBonus)
+				contentLines = append(contentLines, lipgloss.NewStyle().Foreground(ColorMuted).Render(explainStr))
 			}
 			
 			rows = append(rows, []string{idCol, strings.Join(contentLines, "\n")})
@@ -243,7 +248,7 @@ func RenderEntitiesTable(entities [][]string, width int) string {
 			}
 			style := lipgloss.NewStyle().Padding(0, 1)
 			if col == 1 {
-				style = style.Align(lipgloss.Right)
+				style = style.Align(lipgloss.Right).Foreground(ColorMuted)
 			} else {
 				style = style.Align(lipgloss.Left)
 			}
