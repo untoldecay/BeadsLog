@@ -794,6 +794,7 @@ var devlogListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		sessionType, _ := cmd.Flags().GetString("type")
 		author, _ := cmd.Flags().GetString("author")
+		preview, _ := cmd.Flags().GetBool("preview")
 		
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -802,7 +803,11 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		query := "SELECT id, title, timestamp, type, COALESCE(author, 'Unknown') FROM sessions"
+		fields := "id, title, timestamp, type, COALESCE(author, 'Unknown')"
+		if preview {
+			fields += ", narrative"
+		}
+		query := fmt.Sprintf("SELECT %s FROM sessions", fields)
 		var queryArgs []interface{}
 		var conditions []string
 		if sessionType != "" {
@@ -828,7 +833,16 @@ var devlogListCmd = &cobra.Command{
 
 		for rows.Next() {
 			var id, title, timestampStr, typ, authorName string
-			if err := rows.Scan(&id, &title, &timestampStr, &typ, &authorName); err != nil {
+			var narrative sql.NullString
+			
+			var err error
+			if preview {
+				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName, &narrative)
+			} else {
+				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName)
+			}
+			
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
@@ -837,12 +851,36 @@ var devlogListCmd = &cobra.Command{
 			displayTime := timestampStr
 			if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
 				displayTime = t.Local().Format("2006-01-02 15:04")
-			} else if len(timestampStr) > 16 {
-				// Fallback if not RFC3339 but likely ISO-ish
-				displayTime = timestampStr[:16] 
 			}
 
-			fmt.Printf("[%s] [%s] [%s] %s - %s\n", displayTime, id, authorName, typ, title)
+			// Render standard line
+			line := fmt.Sprintf("[%s] [%s] [%s] %s - %s", 
+				ui.RenderMuted(displayTime), 
+				ui.RenderAccent(id), 
+				ui.RenderMuted(authorName), 
+				ui.RenderMuted(typ), 
+				title)
+			fmt.Println(line)
+
+			// Render preview if requested
+			if preview && narrative.Valid && narrative.String != "" {
+				lines := strings.Split(narrative.String, "\n")
+				count := 0
+				for _, l := range lines {
+					trimmed := strings.TrimSpace(l)
+					if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") {
+						continue
+					}
+					// Clean markers
+					clean := strings.ReplaceAll(trimmed, "**", "")
+					
+					fmt.Printf("      %s\n", ui.RenderMuted(clean))
+					count++
+					if count >= 2 { // 2 lines of content is enough for list
+						break
+					}
+				}
+			}
 		}
 		fmt.Printf("\n%s Tip: Use --help to filter by session type.\n", ui.RenderAccent("💡"))
 	},
@@ -2140,6 +2178,7 @@ func init() {
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
 	devlogListCmd.Flags().String("author", "", "Filter by author")
+	devlogListCmd.Flags().Bool("preview", false, "Show snippets of the session narrative")
 
 	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (Fast Regex only)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
