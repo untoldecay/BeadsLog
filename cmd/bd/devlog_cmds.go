@@ -906,7 +906,7 @@ var devlogListCmd = &cobra.Command{
 				}
 			}
 		}
-		fmt.Printf("\n%s Tip: Use --help to filter by session type.\n", ui.RenderAccent("💡"))
+		fmt.Printf("\n%s Tip: Use --preview for snippets, --type to filter, or --help for more.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1187,7 +1187,7 @@ Examples:
 
 			// Found direct results (sessions and/or related entities)
 			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth(), response.Strategy, explain))
-			fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
+			fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 			return
 		}
 
@@ -1208,7 +1208,7 @@ Examples:
 
 				if err == nil && len(correctedResponse.Results) > 0 {
 					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
-					fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
+					fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
