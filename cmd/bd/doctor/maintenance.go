@@ -392,3 +392,67 @@ func CheckPersistentMolIssues(path string) DoctorCheck {
 		Category: CategoryMaintenance,
 	}
 }
+
+// CheckDevlogGhosts detects devlog sessions whose files are missing (ghosts)
+func CheckDevlogGhosts(path string) DoctorCheck {
+	beadsDir := resolveBeadsDir(filepath.Join(path, ".beads"))
+
+	// Check metadata.json first for custom database name
+	var dbPath string
+	if cfg, err := configfile.Load(beadsDir); err == nil && cfg != nil && cfg.Database != "" {
+		dbPath = cfg.DatabasePath(beadsDir)
+	} else {
+		dbPath = filepath.Join(beadsDir, beads.CanonicalDatabaseName)
+	}
+
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return DoctorCheck{
+			Name:     "Devlog Ghost Sessions",
+			Status:   StatusOK,
+			Message:  "N/A (no database)",
+			Category: CategoryMaintenance,
+		}
+	}
+
+	ctx := context.Background()
+	store, err := sqlite.New(ctx, dbPath)
+	if err != nil {
+		return DoctorCheck{
+			Name:     "Devlog Ghost Sessions",
+			Status:   StatusOK,
+			Message:  "N/A (unable to open database)",
+			Category: CategoryMaintenance,
+		}
+	}
+	defer func() { _ = store.Close() }()
+
+	db := store.UnderlyingDB()
+	var ghostCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghostCount)
+	if err != nil {
+		return DoctorCheck{
+			Name:     "Devlog Ghost Sessions",
+			Status:   StatusOK,
+			Message:  "N/A (query failed)",
+			Category: CategoryMaintenance,
+		}
+	}
+
+	if ghostCount == 0 {
+		return DoctorCheck{
+			Name:     "Devlog Ghost Sessions",
+			Status:   StatusOK,
+			Message:  "No ghost devlog sessions",
+			Category: CategoryMaintenance,
+		}
+	}
+
+	return DoctorCheck{
+		Name:     "Devlog Ghost Sessions",
+		Status:   StatusWarning,
+		Message:  fmt.Sprintf("%d ghost session(s) detected", ghostCount),
+		Detail:   "Sessions whose markdown files are missing from disk",
+		Fix:      "Run 'bd doctor --fix' to prune ghost sessions from index and database",
+		Category: CategoryMaintenance,
+	}
+}

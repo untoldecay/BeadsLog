@@ -106,3 +106,65 @@ func RenderGraphTable(query string, matches []struct {
 		}).
 		String()
 }
+
+// RenderCooccurrenceTable renders a list of entities frequently mentioned together
+func RenderCooccurrenceTable(target string, coNodes []queries.CooccurrenceNode, width int) string {
+	if len(coNodes) == 0 {
+		return ""
+	}
+
+	rows := [][]string{}
+	for _, node := range coNodes {
+		rows = append(rows, []string{
+			node.Name,
+			fmt.Sprintf("%d sessions", node.Count),
+		})
+	}
+
+	return table.New().
+		Headers(fmt.Sprintf("💡 Co-mentioned with %q", target), "Frequency").
+		Rows(rows...).
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
+		Width(width).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return TableHeaderStyle
+			}
+			style := lipgloss.NewStyle().Padding(0, 1)
+			if col == 1 {
+				style = style.Align(lipgloss.Right).Foreground(ColorMuted)
+			} else {
+				style = style.Align(lipgloss.Left)
+			}
+			return style
+		}).
+		String()
+}
+
+// RenderPath renders a path between two entities
+func RenderPath(path []queries.PathStep, width int) string {
+	if len(path) == 0 {
+		return TableHintStyle.Render("No path found.")
+	}
+
+	var parts []string
+	for i, step := range path {
+		entity := lipgloss.NewStyle().Bold(true).Foreground(ColorAccent).Render(step.EntityName)
+		parts = append(parts, entity)
+		
+		// If there's a next step, show the session that LINKS this entity to the next one
+		if i < len(path)-1 {
+			nextStep := path[i+1]
+			session := lipgloss.NewStyle().Italic(true).Foreground(ColorMuted).Render(fmt.Sprintf("[%s] %s", nextStep.SessionID, nextStep.SessionTitle))
+			parts = append(parts, "  via "+session+"  →")
+		}
+	}
+
+	return lipgloss.NewStyle().
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorMuted).
+		Width(width).
+		Render(strings.Join(parts, "\n"))
+}

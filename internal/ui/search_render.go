@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -11,8 +12,19 @@ import (
 type SearchResultItem struct {
 	ID        string
 	Title     string
+	Date      string
 	Narrative string
 	Reason    string
+	
+	// Explanation fields
+	Score        float64
+	BM25         float64
+	PhraseBonus  float64
+	NearBonus    float64
+	EntityBonus  float64
+	RecencyBonus float64
+	
+	IsLowConfidence bool
 }
 
 // renderSingleTable renders a simple list into a 1-column table with a header
@@ -42,15 +54,18 @@ func renderSingleTable(title string, items []string, width int) string {
 }
 
 // RenderResultsWithContext renders the search results with headers and tables
-func RenderResultsWithContext(query string, results []SearchResultItem, related []string, neighbors []string, width int) string {
+func RenderResultsWithContext(query string, results []SearchResultItem, related []string, neighbors []string, width int, strategy string, explain bool) string {
 	var sections []string
 
 	// 1. Header
-	header := fmt.Sprintf("🔍 Search: %q", query)
-	sections = append(sections, TableHeaderStyle.Render(header))
+	headerText := fmt.Sprintf("🔍 Search: %q", query)
+	if strategy == "fallback" {
+		headerText += " (Fallback Mode)"
+	}
+	sections = append(sections, TableHeaderStyle.Render(headerText))
 	sections = append(sections, "") // Spacer
 
-	// 2. Context Tables
+	// 2. Context Tables (only if not fallback or if they have items)
 	if relatedTable := renderSingleTable("💡 Related Entities (Matched via FTS)", related, width); relatedTable != "" {
 		sections = append(sections, relatedTable)
 		sections = append(sections, "") // Spacer
@@ -65,34 +80,66 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 	if len(results) > 0 {
 		rows := [][]string{}
 		for i, r := range results {
-			// Truncate title
-			maxTitleWidth := width - 25
-			if maxTitleWidth < 10 {
-				maxTitleWidth = 10
-			}
-			title := r.Title
-			if len(title) > maxTitleWidth {
-				title = title[:maxTitleWidth-3] + "..."
-			}
-
+			// ID column
 			idCol := fmt.Sprintf("%d. [%s]", i+1, r.ID)
-			rows = append(rows, []string{idCol, title})
+			if r.Date != "" {
+				idCol += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Date)
+			}
+			
+			// Content column (Title + Narrative + Explain)
+			title := r.Title
+			var contentLines []string
+
+			if explain {
+				// Invert scores for display: BM25 is usually negative, so -r.BM25 is positive.
+				// Final score should be shown as "Higher is better" for human intuition.
+				displayScore := -r.Score 
+				contentLines = append(contentLines, fmt.Sprintf("%s (Relevance: %.2f)", title, displayScore))
+			} else {
+				contentLines = append(contentLines, title)
+			}
+			
+			if r.Narrative != "" {
+				narrative := strings.ReplaceAll(r.Narrative, "\n", " ")
+				// Truncate narrative if too long for a single line in table
+				maxNarrativeWidth := width - 20
+				if len(narrative) > maxNarrativeWidth {
+					narrative = narrative[:maxNarrativeWidth-3] + "..."
+				}
+				contentLines = append(contentLines, narrative)
+			}
+			
+			if explain {
+				displayBM25 := -r.BM25
+				explainStr := fmt.Sprintf("   Base: %.2f | Phrase: +%.1f | Near: +%.1f | Recency: +%.1f | Entity: +%.1f", 
+					displayBM25, r.PhraseBonus, r.NearBonus, r.RecencyBonus, r.EntityBonus)
+				contentLines = append(contentLines, lipgloss.NewStyle().Foreground(ColorMuted).Render(explainStr))
+			}
+			
+			rows = append(rows, []string{idCol, strings.Join(contentLines, "\n")})
+		}
+
+		titleText := fmt.Sprintf("📄 Found %d sessions", len(results))
+		if strategy == "fallback" {
+			titleText += " (Low Confidence Matches)"
 		}
 
 		t := table.New().
-			Headers(fmt.Sprintf("📄 Found %d sessions", len(results))).
+			Headers(titleText, "").
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
 			Width(width).
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
 				if row == table.HeaderRow {
-					return TableHeaderStyle.Width(width - 2)
+					return TableHeaderStyle
 				}
-				// Column 0 (ID) gets fixed width, Column 1 (Title) takes rest
+				
 				style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
 				if col == 0 {
-					style = style.Width(20)
+					style = style.Width(15).Foreground(ColorAccent)
+				} else {
+					style = style.Width(width - 17)
 				}
 				return style
 			})
@@ -122,35 +169,25 @@ func RenderTypoCorrection(query, corrected string, results []SearchResultItem, w
 		rows := [][]string{}
 		for i, r := range results {
 			if i >= 5 {
-				break // Limit to 5 for typo preview
+				break
 			}
-			// Truncate title
-			maxTitleWidth := width - 25
-			if maxTitleWidth < 10 {
-				maxTitleWidth = 10
-			}
-			title := r.Title
-			if len(title) > maxTitleWidth {
-				title = title[:maxTitleWidth-3] + "..."
-			}
-
 			idCol := fmt.Sprintf("%d. [%s]", i+1, r.ID)
-			rows = append(rows, []string{idCol, title})
+			rows = append(rows, []string{idCol, r.Title})
 		}
 
 		t := table.New().
-			Headers(fmt.Sprintf("📄 Found %d sessions", len(results))).
+			Headers(fmt.Sprintf("📄 Found %d sessions", len(results)), "").
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
 			Width(width).
 			Rows(rows...).
 			StyleFunc(func(row, col int) lipgloss.Style {
 				if row == table.HeaderRow {
-					return TableHeaderStyle.Width(width - 2)
+					return TableHeaderStyle
 				}
 				style := lipgloss.NewStyle().Padding(0, 1).Align(lipgloss.Left)
 				if col == 0 {
-					style = style.Width(20)
+					style = style.Width(15).Foreground(ColorAccent)
 				}
 				return style
 			})
@@ -201,22 +238,21 @@ func RenderImpactTable(target string, deps []string, width int) string {
 		String()
 }
 
-// RenderEntitiesTable renders a list of entities and their mention counts
-func RenderEntitiesTable(entities [][]string, width int) string {
+// RenderEntitiesTable renders a list of entities and their counts
+func RenderEntitiesTable(title string, entities [][]string, width int) string {
 	return table.New().
-		Headers("Top Entities", "Mentions").
+		Headers(title, "Count").
 		Rows(entities...).
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).
 		Width(width).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
-				// Each header cell needs to be half width - 1 for border
 				return TableHeaderStyle.Width(width/2 - 1)
 			}
 			style := lipgloss.NewStyle().Padding(0, 1)
 			if col == 1 {
-				style = style.Align(lipgloss.Right)
+				style = style.Align(lipgloss.Right).Foreground(ColorMuted)
 			} else {
 				style = style.Align(lipgloss.Left)
 			}

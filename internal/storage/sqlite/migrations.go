@@ -65,6 +65,7 @@ var migrationsList = []Migration{
 	{"devlog_enrichment_status", migrations.MigrateDevlogEnrichmentStatus},
 	{"devlog_author_columns", migrations.MigrateAuthorColumns},
 	{"devlog_branch_column", migrations.MigrateDevlogBranchColumn},
+	{"devlog_ghost_column", migrations.MigrateDevlogGhostColumn},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -137,6 +138,7 @@ func getMigrationDescription(name string) string {
 		"devlog_enrichment_status":     "Adds enrichment_status to sessions for background AI processing",
 		"devlog_author_columns":        "Adds author, author_email, and agent columns to devlog sessions",
 		"devlog_branch_column":         "Adds branch column to devlog sessions and updates FTS index",
+		"devlog_ghost_column":          "Adds is_ghost column to sessions table for silent handling of missing files",
 	}
 
 	if desc, ok := descriptions[name]; ok {

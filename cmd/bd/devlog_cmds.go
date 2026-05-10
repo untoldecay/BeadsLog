@@ -667,12 +667,17 @@ func refreshDevlogPrompt(store *sqlite.SQLiteStorage) {
 var devlogGraphCmd = &cobra.Command{
 	Use:   "graph [entity]",
 	Short: "Display entity dependency graph (Fuzzy)",
+	Long: `Display the architectural graph for a given entity.
+This includes:
+- Explicit Dependencies: Linked via arrows in devlogs (A -> B).
+- Implicit Relationships: Inferred from frequent session co-occurrence.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		term := args[0]
 		depth, _ := cmd.Flags().GetInt("depth")
 		strict, _ := cmd.Flags().GetBool("strict")
 		limit, _ := cmd.Flags().GetInt("limit")
+		relType, _ := cmd.Flags().GetString("type")
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -706,46 +711,104 @@ var devlogGraphCmd = &cobra.Command{
 			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
 			if len(suggestions) > 0 {
 				fmt.Println("\nDid you mean?")
-				                for _, s := range suggestions {
-				                    fmt.Printf("- %s\n", s.Name)
-				                }
-				            }
-				            return
-				        }
-				
-				        fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
-		fmt.Printf("Graph for '%s' (Matches: %d):\n\n", term, len(targets))
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s.Name)
+				}
+			}
+			return
+		}
 
 		type graphMatch struct {
 			Name  string
 			Graph *queries.EntityGraph
+			Co    []queries.CooccurrenceNode
 		}
 		var matches []graphMatch
 
 		for _, t := range targets {
-			graph, err := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
-			if err == nil && len(graph.Nodes) > 0 {
-				matches = append(matches, graphMatch{Name: t.Name, Graph: graph})
+			graph, _ := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth, relType)
+			co, _ := queries.GetRelatedEntitiesByCooccurrence(rootCtx, db, t.ID, 5)
+			
+			if (graph != nil && len(graph.Nodes) > 0) || len(co) > 0 {
+				matches = append(matches, graphMatch{Name: t.Name, Graph: graph, Co: co})
 			}
 		}
 
 		if len(matches) > 0 {
-			// Convert to anonymous struct slice for the UI helper
-			uiMatches := make([]struct {
-				Name  string
-				Graph *queries.EntityGraph
-			}, len(matches))
-			for i, m := range matches {
-				uiMatches[i] = struct {
-					Name  string
-					Graph *queries.EntityGraph
-				}{Name: m.Name, Graph: m.Graph}
+			for _, m := range matches {
+				fmt.Printf("\n=== Entity: %s ===\n", ui.RenderAccent(m.Name))
+				
+				if m.Graph != nil && len(m.Graph.Nodes) > 1 { // More than just the root
+					fmt.Println("\nExplicit Dependencies (Graph):")
+					fmt.Println(ui.RenderEntityTree(m.Graph))
+				}
+				
+				if len(m.Co) > 0 {
+					fmt.Println("\nImplicit Relationships (Co-occurrence):")
+					fmt.Println(ui.RenderCooccurrenceTable(m.Name, m.Co, ui.GetWidth()))
+				}
 			}
-			fmt.Println(ui.RenderGraphTable(term, uiMatches, ui.GetWidth()))
 		} else {
-			fmt.Println("No graphs found.")
+			fmt.Println("No graph or co-occurrence data found.")
 		}
 		fmt.Printf("\n%s Tip: Use --help for depth and filtering options.\n", ui.RenderAccent("💡"))
+	},
+}
+
+var devlogPathCmd = &cobra.Command{
+	Use:   "path [entityA] [entityB]",
+	Short: "Find historical path between two entities via devlog sessions",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		termA := args[0]
+		termB := args[1]
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		resolveWithSuggestions := func(term string) (string, string) {
+			targets, _ := queries.ResolveEntities(rootCtx, db, term, 1)
+			if len(targets) > 0 {
+				return targets[0].ID, targets[0].Name
+			}
+			
+			// Suggestions if not found
+			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
+			if len(suggestions) > 0 {
+				fmt.Printf("No exact match for '%s'. Did you mean?\n", term)
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s.Name)
+				}
+			} else {
+				fmt.Printf("No entity found matching '%s'.\n", term)
+			}
+			return "", ""
+		}
+
+		idA, nameA := resolveWithSuggestions(termA)
+		if idA == "" {
+			return
+		}
+
+		idB, nameB := resolveWithSuggestions(termB)
+		if idB == "" {
+			return
+		}
+
+		fmt.Printf("Finding path from %s to %s...\n", ui.RenderAccent(nameA), ui.RenderAccent(nameB))
+
+		path, err := queries.GetPathBetweenEntities(rootCtx, db, idA, idB)
+		if err != nil {
+			fmt.Printf("Error finding path: %v\n", err)
+			return
+		}
+
+		fmt.Println(ui.RenderPath(path, ui.GetWidth()))
 	},
 }
 
@@ -755,6 +818,7 @@ var devlogListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		sessionType, _ := cmd.Flags().GetString("type")
 		author, _ := cmd.Flags().GetString("author")
+		preview, _ := cmd.Flags().GetBool("preview")
 		
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -763,7 +827,11 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer store.Close()
 
-		query := "SELECT id, title, timestamp, type, COALESCE(author, 'Unknown') FROM sessions"
+		fields := "id, title, timestamp, type, COALESCE(author, 'Unknown')"
+		if preview {
+			fields += ", narrative"
+		}
+		query := fmt.Sprintf("SELECT %s FROM sessions", fields)
 		var queryArgs []interface{}
 		var conditions []string
 		if sessionType != "" {
@@ -789,7 +857,16 @@ var devlogListCmd = &cobra.Command{
 
 		for rows.Next() {
 			var id, title, timestampStr, typ, authorName string
-			if err := rows.Scan(&id, &title, &timestampStr, &typ, &authorName); err != nil {
+			var narrative sql.NullString
+			
+			var err error
+			if preview {
+				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName, &narrative)
+			} else {
+				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName)
+			}
+			
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
@@ -798,31 +875,92 @@ var devlogListCmd = &cobra.Command{
 			displayTime := timestampStr
 			if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
 				displayTime = t.Local().Format("2006-01-02 15:04")
-			} else if len(timestampStr) > 16 {
-				// Fallback if not RFC3339 but likely ISO-ish
-				displayTime = timestampStr[:16] 
 			}
 
-			fmt.Printf("[%s] [%s] [%s] %s - %s\n", displayTime, id, authorName, typ, title)
+			// Render standard line
+			line := fmt.Sprintf("[%s] [%s] [%s] %s - %s", 
+				ui.RenderMuted(displayTime), 
+				ui.RenderAccent(id), 
+				ui.RenderMuted(authorName), 
+				ui.RenderMuted(typ), 
+				title)
+			fmt.Println(line)
+
+			// Render preview if requested
+			if preview && narrative.Valid && narrative.String != "" {
+				lines := strings.Split(narrative.String, "\n")
+				count := 0
+				for _, l := range lines {
+					trimmed := strings.TrimSpace(l)
+					if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") {
+						continue
+					}
+					// Clean markers
+					clean := strings.ReplaceAll(trimmed, "**", "")
+					
+					fmt.Printf("      %s\n", ui.RenderMuted(clean))
+					count++
+					if count >= 2 { // 2 lines of content is enough for list
+						break
+					}
+				}
+			}
 		}
-		fmt.Printf("\n%s Tip: Use --help to filter by session type.\n", ui.RenderAccent("💡"))
+		fmt.Printf("\n%s Tip: Use --preview for snippets, --type to filter, or --help for more.\n", ui.RenderAccent("💡"))
 	},
 }
 
 var entitiesCmd = &cobra.Command{
 	Use:   "entities",
-	Short: "List top entities by mention count",
+	Short: "List top entities ranked by architectural significance",
+	Long: `List top entities. By default, ranks by degree centrality (number of unique relationships).
+Noise terms like CSS properties and common generic verbs are automatically filtered.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		sortBy, _ := cmd.Flags().GetString("sort")
+		limit, _ := cmd.Flags().GetInt("limit")
+		minRels, _ := cmd.Flags().GetInt("min-rels")
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
 			os.Exit(1)
 		}
 		defer store.Close()
+		db := store.UnderlyingDB()
 
-		rows, err := store.UnderlyingDB().QueryContext(rootCtx, "SELECT name, mention_count FROM entities ORDER BY mention_count DESC LIMIT 20")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", err)
+		var query string
+		if sortBy == "mentions" {
+			query = `
+				SELECT name, mention_count 
+				FROM entities 
+				WHERE name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
+				  AND name NOT LIKE 'border-%' AND name NOT LIKE 'padding-%' AND name NOT LIKE 'margin-%'
+				ORDER BY mention_count DESC 
+				LIMIT ?`
+		} else {
+			// Default: sort by unique relationship count (centrality)
+			query = `
+				SELECT e.name, COUNT(DISTINCT ed.relationship || ed.to_entity || ed.from_entity) as rel_count
+				FROM entities e
+				JOIN entity_deps ed ON (e.id = ed.from_entity OR e.id = ed.to_entity)
+				WHERE e.name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
+				  AND e.name NOT LIKE 'border-%' AND e.name NOT LIKE 'padding-%' AND e.name NOT LIKE 'margin-%'
+				GROUP BY e.id
+				HAVING rel_count >= ?
+				ORDER BY rel_count DESC, e.mention_count DESC
+				LIMIT ?`
+		}
+
+		var rows *sql.Rows
+		var qErr error
+		if sortBy == "mentions" {
+			rows, qErr = db.QueryContext(rootCtx, query, limit)
+		} else {
+			rows, qErr = db.QueryContext(rootCtx, query, minRels, limit)
+		}
+
+		if qErr != nil {
+			fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", qErr)
 			os.Exit(1)
 		}
 		defer rows.Close()
@@ -832,18 +970,21 @@ var entitiesCmd = &cobra.Command{
 			var name string
 			var count int
 			if err := rows.Scan(&name, &count); err != nil {
-				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
 			entities = append(entities, []string{name, fmt.Sprintf("%d", count)})
 		}
 
 		if len(entities) > 0 {
-			fmt.Println(ui.RenderEntitiesTable(entities, ui.GetWidth()))
+			title := "Top Architectural Entities (by Relationships)"
+			if sortBy == "mentions" {
+				title = "Top Mentioned Entities"
+			}
+			fmt.Println(ui.RenderEntitiesTable(title, entities, ui.GetWidth()))
 		} else {
-			fmt.Println("No entities found.")
+			fmt.Println("No significant entities found.")
 		}
-		fmt.Printf("\n%s Tip: Use --help for command options.\n", ui.RenderAccent("💡"))
+		fmt.Printf("\n%s Tip: Use --sort=mentions to see raw frequency, or --limit to see more.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -968,7 +1109,15 @@ var devlogShowCmd = &cobra.Command{
 
 var devlogSearchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search sessions and entities (Hybrid BM25 + Graph)",
+	Short: "Hybrid search across devlog sessions",
+	Long: `Search devlog sessions using a hybrid FTS5 ranking engine.
+Matches are ranked based on BM25 relevance, phrase bonuses, term proximity (NEAR), and recency.
+If high-confidence matches are absent, the system automatically falls back to individual keyword matching.
+
+Examples:
+  bd devlog search "auth bug"          # Search for phrase/terms
+  bd devlog search "mcp" --preview     # Show 3-line snippets
+  bd devlog search "rules" --explain   # See score breakdown`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := args[0]
@@ -977,6 +1126,8 @@ var devlogSearchCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		jsonOutput, _ := cmd.Flags().GetBool("json")
 		author, _ := cmd.Flags().GetString("author")
+		preview, _ := cmd.Flags().GetBool("preview")
+		explain, _ := cmd.Flags().GetBool("explain")
 
 		// Fallback to global json flag if not explicitly set on command
 		if !cmd.Flags().Changed("json") {
@@ -998,6 +1149,8 @@ var devlogSearchCmd = &cobra.Command{
 			Limit:    limit,
 			Strict:   strict,
 			TextOnly: textOnly,
+			Preview:  preview,
+			Explain:  explain,
 		}
 		response, err := queries.HybridSearch(rootCtx, db, opts)
 		if err != nil {
@@ -1017,7 +1170,7 @@ var devlogSearchCmd = &cobra.Command{
 			var graphNeighbors []string
 			if len(response.RelatedEntities) > 0 {
 				primaryEntity := response.RelatedEntities[0]
-				graph, err := queries.GetEntityGraphExact(rootCtx, db, primaryEntity, 1) // Depth 1 for neighbors
+				graph, err := queries.GetEntityGraphExact(rootCtx, db, primaryEntity, 1, "") // Depth 1 for neighbors
 				if err == nil && graph != nil {
 					for _, node := range graph.Nodes {
 						// Only show direct neighbors (depth 1), not the root or deeper
@@ -1033,8 +1186,8 @@ var devlogSearchCmd = &cobra.Command{
 			}
 
 			// Found direct results (sessions and/or related entities)
-			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth()))
-			fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
+			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth(), response.Strategy, explain))
+			fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 			return
 		}
 
@@ -1055,7 +1208,7 @@ var devlogSearchCmd = &cobra.Command{
 
 				if err == nil && len(correctedResponse.Results) > 0 {
 					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
-					fmt.Printf("\n%s Tip: Use --help for advanced search options (strict, type, etc.)\n", ui.RenderAccent("💡"))
+					fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
 				}
@@ -1291,17 +1444,38 @@ var devlogStatusCmd = &cobra.Command{
 
 		// Get stats
 		db := store.UnderlyingDB()
-		var sessionsCount, entitiesCount, relationshipsCount int
-		
+		var sessionsCount, entitiesCount, relationshipsCount, ghostCount int
+
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessionsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entitiesCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps").Scan(&relationshipsCount)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghostCount)
 
 		fmt.Printf("\nDatabase Statistics:\n")
 		fmt.Printf("  Sessions:      %d\n", sessionsCount)
+		if ghostCount > 0 {
+			fmt.Printf("  Ghosts:        %d (run 'bd doctor --fix' to prune)\n", ghostCount)
+		}
 		fmt.Printf("  Entities:      %d\n", entitiesCount)
 		fmt.Printf("  Relationships: %d\n", relationshipsCount)
 
+		// Enrichment Stats
+		var optimized, pending, failed int
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 2").Scan(&optimized)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 1").Scan(&pending)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 3").Scan(&failed)
+
+		fmt.Printf("\nEnrichment Status (AI):\n")
+		fmt.Printf("  ● Optimized: %d\n", optimized)
+		if pending > 0 {
+			fmt.Printf("  ○ Pending:   %d (in queue)\n", pending)
+		}
+		if failed > 0 {
+			fmt.Printf("  ✖ Failed:    %d\n", failed)
+		}
+		if pending == 0 && failed == 0 && optimized > 0 {
+			fmt.Printf("  ✨ All memory optimized\n")
+		}
 		// Check hooks
 		fmt.Printf("\nGit Hooks:\n")
 		hooks := []string{"post-commit", "post-merge"}
@@ -1503,7 +1677,8 @@ var devlogVerifyCmd = &cobra.Command{
 		fix, _ := cmd.Flags().GetBool("fix")
 		fixRegex, _ := cmd.Flags().GetBool("fix-regex")
 		fixAI, _ := cmd.Flags().GetBool("fix-ai")
-		
+		idStability, _ := cmd.Flags().GetBool("id-stability")
+
 		// Priority: fix-ai > fix-regex > fix
 		forceRegex := true // Default to regex for --fix
 		if fixAI {
@@ -1539,6 +1714,10 @@ var devlogVerifyCmd = &cobra.Command{
 			normalizePathsInternal(store, indexPath, false)
 		}
 
+		// 0.1 ID Stability (Backfill IDs into index links)
+		if idStability && target == "" {
+			backfillIDsInternal(store, indexPath, false)
+		}
 		// 1. Orphaned Files Detection (Disk vs Index)
 		// ... (Orphan detection logic remains, but we skip it if targeting a specific session ID)
 		var orphans []string
@@ -1765,7 +1944,10 @@ var devlogRecordCmd = &cobra.Command{
 		// 3. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
-		// 4. Get Branch Info
+		// 4. Generate Session ID (for stability)
+		sessionID := fmt.Sprintf("sess-%s", hashID(subject+date))
+
+		// 5. Get Branch Info
 		branchInfo := "N/A"
 		if config.GetBool("devlog.branch-tracking") {
 			// Get current branch
@@ -1782,12 +1964,13 @@ var devlogRecordCmd = &cobra.Command{
 			}
 		}
 
-		// 5. Format Row
+		// 6. Format Row
 		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+		// We append ?id=sess-xxx to the devlog link for future stability
 		fileName := filepath.Base(file)
-		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName)
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s?id=%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName, sessionID)
 
-		// 6. Append to File
+		// 7. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			fmt.Printf("Error opening index: %v\n", err)
@@ -1968,6 +2151,68 @@ func normalizePathsInternal(store *sqlite.SQLiteStorage, indexPath string, quiet
 	return normalizedCount
 }
 
+func backfillIDsInternal(store *sqlite.SQLiteStorage, indexPath string, quiet bool) int {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		return 0
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	backfilledCount := 0
+	inTable := false
+
+	db := store.UnderlyingDB()
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "| Subject | Problems |") {
+			inTable = true
+			newLines = append(newLines, line)
+			continue
+		}
+
+		if inTable && strings.HasPrefix(trimmed, "|") && !strings.HasPrefix(trimmed, "|---") {
+			parts := strings.Split(trimmed, "|")
+			if len(parts) >= 5 {
+				subj := strings.TrimSpace(parts[1])
+				// Devlog link is always the last column
+				lastIdx := len(parts) - 2
+				fileCol := strings.TrimSpace(parts[lastIdx])
+
+				if strings.Contains(fileCol, "](") && !strings.Contains(fileCol, "?id=") {
+					start := strings.Index(fileCol, "](") + 2
+					end := strings.Index(fileCol[start:], ")")
+					if end != -1 {
+						rawPath := fileCol[start : start+end]
+						cleanPath := rawPath
+						// Lookup ID in DB
+						var sessionID string
+						err := db.QueryRow("SELECT id FROM sessions WHERE filename = ? AND title = ?", cleanPath, subj).Scan(&sessionID)
+						if err == nil {
+							// Found! Append ID to link
+							newPath := fmt.Sprintf("%s?id=%s", cleanPath, sessionID)
+							newFileCol := strings.Replace(fileCol, rawPath, newPath, 1)
+							parts[lastIdx] = " " + newFileCol + " "
+							line = strings.Join(parts, "|")
+							backfilledCount++
+						}
+					}
+				}
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if backfilledCount > 0 {
+		err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
+		if err == nil && !quiet {
+			fmt.Printf("  %s Backfilled %d explicit IDs into %s\n", ui.RenderPass("✓"), backfilledCount, indexPath)
+		}
+	}
+	return backfilledCount
+}
+
 var devlogMigrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Migrate devlog index to new format",
@@ -2055,6 +2300,7 @@ func init() {
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
 	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
+	devlogGraphCmd.Flags().String("type", "", "Filter by relationship type (e.g., uses, contains)")
 
 	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogImpactCmd.Flags().Int("limit", 25, "Max matching entities to show")
@@ -2063,13 +2309,21 @@ func init() {
 	devlogSearchCmd.Flags().Bool("text-only", false, "Disable entity expansion (BM25 only)")
 	devlogSearchCmd.Flags().Int("limit", 25, "Max results to return")
 	devlogSearchCmd.Flags().String("author", "", "Filter search results by author")
+	devlogSearchCmd.Flags().Bool("preview", false, "Show first 3 lines of narrative in results")
+	devlogSearchCmd.Flags().Bool("explain", false, "Show score breakdown for matches")
 
 	devlogListCmd.Flags().String("type", "", "Filter by session type")
 	devlogListCmd.Flags().String("author", "", "Filter by author")
+	devlogListCmd.Flags().Bool("preview", false, "Show snippets of the session narrative")
+
+	entitiesCmd.Flags().String("sort", "relationships", "Sort by 'relationships' or 'mentions'")
+	entitiesCmd.Flags().Int("limit", 20, "Max entities to show")
+	entitiesCmd.Flags().Int("min-rels", 1, "Minimum relationships for an entity to be shown")
 
 	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (Fast Regex only)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
 	devlogVerifyCmd.Flags().Bool("fix-ai", false, "Force AI extraction for backfilling (slow, higher quality)")
+	devlogVerifyCmd.Flags().Bool("id-stability", false, "Append explicit session IDs to devlog links in _index.md")
 
 	devlogEnrichCmd.Flags().Bool("all", false, "Schedule all sessions for enrichment")
 
@@ -2086,6 +2340,7 @@ func init() {
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
+	devlogCmd.AddCommand(devlogPathCmd)
 	devlogCmd.AddCommand(devlogListCmd)
 	devlogCmd.AddCommand(entitiesCmd)
 	devlogCmd.AddCommand(devlogShowCmd)
@@ -2110,10 +2365,18 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 	items := make([]ui.SearchResultItem, len(results))
 	for i, r := range results {
 		items[i] = ui.SearchResultItem{
-			ID:        r.ID,
-			Title:     r.Title,
-			Narrative: r.Narrative,
-			Reason:    r.Reason,
+			ID:              r.ID,
+			Title:           r.Title,
+			Date:            r.Date,
+			Narrative:       r.Narrative,
+			Reason:          r.Reason,
+			Score:           r.Score,
+			BM25:            r.BM25,
+			PhraseBonus:     r.PhraseBonus,
+			NearBonus:       r.NearBonus,
+			EntityBonus:     r.EntityBonus,
+			RecencyBonus:    r.RecencyBonus,
+			IsLowConfidence: r.IsLowConfidence,
 		}
 	}
 	return items

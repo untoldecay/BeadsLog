@@ -100,9 +100,7 @@ This index provides a concise record of all development work for easy scanning a
 
 | [adopt] _refactor agent onboarding tool limitations | Automatically adopted during verify | untoldecay | Gemini CLI | 2026-01-15 00:00 | N/A | [2026-01-15_refactor-agent-onboarding-tool-limitations.md](2026-01-15_refactor-agent-onboarding-tool-limitations.md) |
 
-| [adopt] _orphaned test | Automatically adopted during verify | untoldecay | Gemini CLI | 2026-01-26 00:00 | N/A | [2026-01-26_orphaned-test.md](2026-01-26_orphaned-test.md) |
 
-| [test] background | enrichment test | untoldecay | Gemini CLI | 2026-01-27 00:00 | N/A | [2026-01-27_background-test.md](2026-01-27_background-test.md) |
 
 | [fix] Devlog show usability | Fixed ID lookup and timestamp matching in show command | untoldecay | Gemini CLI | 2026-02-07 00:00 | N/A | [2026-02-07_fix-devlog-show-usability.md](2026-02-07_fix-devlog-show-usability.md) |
 
@@ -139,3 +137,10 @@ This index provides a concise record of all development work for easy scanning a
 | [test] Attribution and Branch | Testing new devlog metadata | Gemini-Test-Agent | Unknown | 2026-05-05 01:16 | main | [2026-05-04_test-attribution.md](2026-05-04_test-attribution.md) |
 | [test] Local Branch | Testing local-only branch context | Gemini-Test-Agent | Unknown | 2026-05-05 01:19 | local-test-branch (local) | [2026-05-04_local-branch.md](2026-05-04_local-branch.md) |
 | [feature] Devlog Attribution and Branch Tracking | Static attribution and missing branch context in devlogs | Gemini-Test-Agent | Unknown | 2026-05-05 05:18 | main | [2026-05-04_devlog-attribution-and-branch.md](2026-05-04_devlog-attribution-and-branch.md) |
+| [feature] Intelligence Layer Evolution: Phase 1 & 2 | Naive search ranking and empty architectural graphs | Gemini-Test-Agent | Unknown | 2026-05-09 22:55 | dev/intelligence-layer-01 (local) | [2026-05-09_intelligence-layer-evolution.md](2026-05-09_intelligence-layer-evolution.md) |
+| [test] Intelligence Layer E2E Verification | Verifying full feature lifecycle in sandbox | Gemini-Test-Agent | Unknown | 2026-05-09 23:00 | dev/intelligence-layer-01 (local) | [2026-05-09_intelligence-layer-e2e-verification.md](2026-05-09_intelligence-layer-e2e-verification.md) |
+| [test] Finalizing Intelligence Layer | Incomplete pathfinding and undocumented intelligence features | Gemini-Test-Agent | Unknown | 2026-05-09 23:06 | dev/intelligence-layer-01 (local) | [2026-05-09_intelligence-layer-finalization.md](2026-05-09_intelligence-layer-finalization.md) |
+| [test] Intelligence Layer Polish | Counter-intuitive scoring display and incomplete path docs | untoldecay | Unknown | 2026-05-09 23:19 | dev/intelligence-layer-01 (local) | [2026-05-09_intelligence-layer-polish.md](2026-05-09_intelligence-layer-polish.md) |
+| [feature] Intelligence Layer Final Wrap-up | Inconsistent preview support and open epic | untoldmini | Unknown | 2026-05-09 23:29 | dev/intelligence-layer-01 (local) | [2026-05-10_intelligence-layer-wrapup.md](2026-05-10_intelligence-layer-wrapup.md) |
+| [feature] Intelligence Layer Tuning: Precision & Stability | Strict entity resolution and noisy architectural discovery | untoldecay | Unknown | 2026-05-10 21:06 | dev/intelligence-layer-tuning (local) | [2026-05-10_intelligence-layer-tuning.md](2026-05-10_intelligence-layer-tuning.md?id=sess-ecb2be) |
+| [enhance] Agent Guidance Hints | Discoverability of limit and preview flags | untoldecay | Unknown | 2026-05-10 21:43 | dev/intelligence-layer-tuning (local) | [2026-05-10_guidance-hints.md](2026-05-10_guidance-hints.md?id=sess-190bbe) |

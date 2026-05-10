@@ -14,7 +14,8 @@ bd devlog verify --fix # Check graph integrity
 Before using `ls`, `grep`, or `glob`, you MUST query the architectural graph:
 - **Entities:** `bd devlog entities` (Identify key components)
 - **Relationships:** `bd devlog graph "Subject"` (See dependencies)
-- **History:** `bd devlog search "Keywords"` (Find past solutions)
+- **Connective Tissue:** `bd devlog path "EntityA" "EntityB"` (Find historical links)
+- **History:** `bd devlog search "Keywords" --preview` (Ranked retrieval with snippets)
 
 ## 3. 🎯 Select and Claim Task
 - List ready work: `bd ready`
