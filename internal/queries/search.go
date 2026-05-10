@@ -7,11 +7,13 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 type SearchResult struct {
 	ID        string  `json:"id"`
 	Title     string  `json:"title"`
+	Date      string  `json:"date"`
 	Narrative string  `json:"narrative"` // Snippet or Preview
 	Score     float64 `json:"score"`
 	Reason    string  `json:"reason"`    // e.g. "text match", "entity:Modal"
@@ -152,6 +154,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		SELECT 
 			s.id, 
 			s.title, 
+			s.timestamp,
 			h.snippet,
 			s.narrative,
 			h.bm25_score,
@@ -180,12 +183,20 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 	var results []SearchResult
 	for rows.Next() {
 		var r SearchResult
-		var fullNarrative string
+		var fullNarrative, timestamp string
 		var ageDays float64
 		var snippet string
 		
-		if err := rows.Scan(&r.ID, &r.Title, &snippet, &fullNarrative, &r.BM25, &ageDays); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays); err != nil {
 			continue
+		}
+
+		// Format Date
+		r.Date = timestamp
+		if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+			r.Date = t.Format("2006-01-02")
+		} else if len(timestamp) >= 10 {
+			r.Date = timestamp[:10]
 		}
 
 		// Calculate Bonuses in Go for more flexibility

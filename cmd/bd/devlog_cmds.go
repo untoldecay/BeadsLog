@@ -677,6 +677,7 @@ This includes:
 		depth, _ := cmd.Flags().GetInt("depth")
 		strict, _ := cmd.Flags().GetBool("strict")
 		limit, _ := cmd.Flags().GetInt("limit")
+		relType, _ := cmd.Flags().GetString("type")
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -725,7 +726,7 @@ This includes:
 		var matches []graphMatch
 
 		for _, t := range targets {
-			graph, _ := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth)
+			graph, _ := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth, relType)
 			co, _ := queries.GetRelatedEntitiesByCooccurrence(rootCtx, db, t.ID, 5)
 			
 			if (graph != nil && len(graph.Nodes) > 0) || len(co) > 0 {
@@ -759,8 +760,8 @@ var devlogPathCmd = &cobra.Command{
 	Short: "Find historical path between two entities via devlog sessions",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		start := args[0]
-		end := args[1]
+		termA := args[0]
+		termB := args[1]
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -770,15 +771,38 @@ var devlogPathCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
-		targetsA, _ := queries.ResolveEntities(rootCtx, db, start, 1)
-		targetsB, _ := queries.ResolveEntities(rootCtx, db, end, 1)
+		resolveWithSuggestions := func(term string) (string, string) {
+			targets, _ := queries.ResolveEntities(rootCtx, db, term, 1)
+			if len(targets) > 0 {
+				return targets[0].ID, targets[0].Name
+			}
+			
+			// Suggestions if not found
+			suggestions, _ := queries.SuggestEntities(rootCtx, db, term)
+			if len(suggestions) > 0 {
+				fmt.Printf("No exact match for '%s'. Did you mean?\n", term)
+				for _, s := range suggestions {
+					fmt.Printf("- %s\n", s.Name)
+				}
+			} else {
+				fmt.Printf("No entity found matching '%s'.\n", term)
+			}
+			return "", ""
+		}
 
-		if len(targetsA) == 0 || len(targetsB) == 0 {
-			fmt.Println("One or both entities not found.")
+		idA, nameA := resolveWithSuggestions(termA)
+		if idA == "" {
 			return
 		}
 
-		path, err := queries.GetPathBetweenEntities(rootCtx, db, targetsA[0].ID, targetsB[0].ID)
+		idB, nameB := resolveWithSuggestions(termB)
+		if idB == "" {
+			return
+		}
+
+		fmt.Printf("Finding path from %s to %s...\n", ui.RenderAccent(nameA), ui.RenderAccent(nameB))
+
+		path, err := queries.GetPathBetweenEntities(rootCtx, db, idA, idB)
 		if err != nil {
 			fmt.Printf("Error finding path: %v\n", err)
 			return
@@ -888,18 +912,55 @@ var devlogListCmd = &cobra.Command{
 
 var entitiesCmd = &cobra.Command{
 	Use:   "entities",
-	Short: "List top entities by mention count",
+	Short: "List top entities ranked by architectural significance",
+	Long: `List top entities. By default, ranks by degree centrality (number of unique relationships).
+Noise terms like CSS properties and common generic verbs are automatically filtered.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		sortBy, _ := cmd.Flags().GetString("sort")
+		limit, _ := cmd.Flags().GetInt("limit")
+		minRels, _ := cmd.Flags().GetInt("min-rels")
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
 			os.Exit(1)
 		}
 		defer store.Close()
+		db := store.UnderlyingDB()
 
-		rows, err := store.UnderlyingDB().QueryContext(rootCtx, "SELECT name, mention_count FROM entities ORDER BY mention_count DESC LIMIT 20")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", err)
+		var query string
+		if sortBy == "mentions" {
+			query = `
+				SELECT name, mention_count 
+				FROM entities 
+				WHERE name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
+				  AND name NOT LIKE 'border-%' AND name NOT LIKE 'padding-%' AND name NOT LIKE 'margin-%'
+				ORDER BY mention_count DESC 
+				LIMIT ?`
+		} else {
+			// Default: sort by unique relationship count (centrality)
+			query = `
+				SELECT e.name, COUNT(DISTINCT ed.relationship || ed.to_entity || ed.from_entity) as rel_count
+				FROM entities e
+				JOIN entity_deps ed ON (e.id = ed.from_entity OR e.id = ed.to_entity)
+				WHERE e.name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
+				  AND e.name NOT LIKE 'border-%' AND e.name NOT LIKE 'padding-%' AND e.name NOT LIKE 'margin-%'
+				GROUP BY e.id
+				HAVING rel_count >= ?
+				ORDER BY rel_count DESC, e.mention_count DESC
+				LIMIT ?`
+		}
+
+		var rows *sql.Rows
+		var qErr error
+		if sortBy == "mentions" {
+			rows, qErr = db.QueryContext(rootCtx, query, limit)
+		} else {
+			rows, qErr = db.QueryContext(rootCtx, query, minRels, limit)
+		}
+
+		if qErr != nil {
+			fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", qErr)
 			os.Exit(1)
 		}
 		defer rows.Close()
@@ -909,18 +970,21 @@ var entitiesCmd = &cobra.Command{
 			var name string
 			var count int
 			if err := rows.Scan(&name, &count); err != nil {
-				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
 			entities = append(entities, []string{name, fmt.Sprintf("%d", count)})
 		}
 
 		if len(entities) > 0 {
-			fmt.Println(ui.RenderEntitiesTable(entities, ui.GetWidth()))
+			title := "Top Architectural Entities (by Relationships)"
+			if sortBy == "mentions" {
+				title = "Top Mentioned Entities"
+			}
+			fmt.Println(ui.RenderEntitiesTable(title, entities, ui.GetWidth()))
 		} else {
-			fmt.Println("No entities found.")
+			fmt.Println("No significant entities found.")
 		}
-		fmt.Printf("\n%s Tip: Use --help for command options.\n", ui.RenderAccent("💡"))
+		fmt.Printf("\n%s Tip: Use --sort=mentions to see raw frequency, or --limit to see more.\n", ui.RenderAccent("💡"))
 	},
 }
 
@@ -1106,7 +1170,7 @@ Examples:
 			var graphNeighbors []string
 			if len(response.RelatedEntities) > 0 {
 				primaryEntity := response.RelatedEntities[0]
-				graph, err := queries.GetEntityGraphExact(rootCtx, db, primaryEntity, 1) // Depth 1 for neighbors
+				graph, err := queries.GetEntityGraphExact(rootCtx, db, primaryEntity, 1, "") // Depth 1 for neighbors
 				if err == nil && graph != nil {
 					for _, node := range graph.Nodes {
 						// Only show direct neighbors (depth 1), not the root or deeper
@@ -1613,7 +1677,8 @@ var devlogVerifyCmd = &cobra.Command{
 		fix, _ := cmd.Flags().GetBool("fix")
 		fixRegex, _ := cmd.Flags().GetBool("fix-regex")
 		fixAI, _ := cmd.Flags().GetBool("fix-ai")
-		
+		idStability, _ := cmd.Flags().GetBool("id-stability")
+
 		// Priority: fix-ai > fix-regex > fix
 		forceRegex := true // Default to regex for --fix
 		if fixAI {
@@ -1649,6 +1714,10 @@ var devlogVerifyCmd = &cobra.Command{
 			normalizePathsInternal(store, indexPath, false)
 		}
 
+		// 0.1 ID Stability (Backfill IDs into index links)
+		if idStability && target == "" {
+			backfillIDsInternal(store, indexPath, false)
+		}
 		// 1. Orphaned Files Detection (Disk vs Index)
 		// ... (Orphan detection logic remains, but we skip it if targeting a specific session ID)
 		var orphans []string
@@ -1875,7 +1944,10 @@ var devlogRecordCmd = &cobra.Command{
 		// 3. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
-		// 4. Get Branch Info
+		// 4. Generate Session ID (for stability)
+		sessionID := fmt.Sprintf("sess-%s", hashID(subject+date))
+
+		// 5. Get Branch Info
 		branchInfo := "N/A"
 		if config.GetBool("devlog.branch-tracking") {
 			// Get current branch
@@ -1892,12 +1964,13 @@ var devlogRecordCmd = &cobra.Command{
 			}
 		}
 
-		// 5. Format Row
+		// 6. Format Row
 		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+		// We append ?id=sess-xxx to the devlog link for future stability
 		fileName := filepath.Base(file)
-		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName)
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s?id=%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName, sessionID)
 
-		// 6. Append to File
+		// 7. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			fmt.Printf("Error opening index: %v\n", err)
@@ -2078,6 +2151,68 @@ func normalizePathsInternal(store *sqlite.SQLiteStorage, indexPath string, quiet
 	return normalizedCount
 }
 
+func backfillIDsInternal(store *sqlite.SQLiteStorage, indexPath string, quiet bool) int {
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		return 0
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	backfilledCount := 0
+	inTable := false
+
+	db := store.UnderlyingDB()
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "| Subject | Problems |") {
+			inTable = true
+			newLines = append(newLines, line)
+			continue
+		}
+
+		if inTable && strings.HasPrefix(trimmed, "|") && !strings.HasPrefix(trimmed, "|---") {
+			parts := strings.Split(trimmed, "|")
+			if len(parts) >= 5 {
+				subj := strings.TrimSpace(parts[1])
+				// Devlog link is always the last column
+				lastIdx := len(parts) - 2
+				fileCol := strings.TrimSpace(parts[lastIdx])
+
+				if strings.Contains(fileCol, "](") && !strings.Contains(fileCol, "?id=") {
+					start := strings.Index(fileCol, "](") + 2
+					end := strings.Index(fileCol[start:], ")")
+					if end != -1 {
+						rawPath := fileCol[start : start+end]
+						cleanPath := rawPath
+						// Lookup ID in DB
+						var sessionID string
+						err := db.QueryRow("SELECT id FROM sessions WHERE filename = ? AND title = ?", cleanPath, subj).Scan(&sessionID)
+						if err == nil {
+							// Found! Append ID to link
+							newPath := fmt.Sprintf("%s?id=%s", cleanPath, sessionID)
+							newFileCol := strings.Replace(fileCol, rawPath, newPath, 1)
+							parts[lastIdx] = " " + newFileCol + " "
+							line = strings.Join(parts, "|")
+							backfilledCount++
+						}
+					}
+				}
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if backfilledCount > 0 {
+		err = os.WriteFile(indexPath, []byte(strings.Join(newLines, "\n")), 0644)
+		if err == nil && !quiet {
+			fmt.Printf("  %s Backfilled %d explicit IDs into %s\n", ui.RenderPass("✓"), backfilledCount, indexPath)
+		}
+	}
+	return backfilledCount
+}
+
 var devlogMigrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Migrate devlog index to new format",
@@ -2165,6 +2300,7 @@ func init() {
 	devlogGraphCmd.Flags().Int("depth", 3, "Depth of graph traversal")
 	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
+	devlogGraphCmd.Flags().String("type", "", "Filter by relationship type (e.g., uses, contains)")
 
 	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogImpactCmd.Flags().Int("limit", 25, "Max matching entities to show")
@@ -2180,9 +2316,14 @@ func init() {
 	devlogListCmd.Flags().String("author", "", "Filter by author")
 	devlogListCmd.Flags().Bool("preview", false, "Show snippets of the session narrative")
 
+	entitiesCmd.Flags().String("sort", "relationships", "Sort by 'relationships' or 'mentions'")
+	entitiesCmd.Flags().Int("limit", 20, "Max entities to show")
+	entitiesCmd.Flags().Int("min-rels", 1, "Minimum relationships for an entity to be shown")
+
 	devlogVerifyCmd.Flags().Bool("fix", false, "Adopt orphans and backfill missing metadata (Fast Regex only)")
 	devlogVerifyCmd.Flags().Bool("fix-regex", false, "Force regex-only extraction (faster, skips AI)")
 	devlogVerifyCmd.Flags().Bool("fix-ai", false, "Force AI extraction for backfilling (slow, higher quality)")
+	devlogVerifyCmd.Flags().Bool("id-stability", false, "Append explicit session IDs to devlog links in _index.md")
 
 	devlogEnrichCmd.Flags().Bool("all", false, "Schedule all sessions for enrichment")
 
@@ -2226,6 +2367,7 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 		items[i] = ui.SearchResultItem{
 			ID:              r.ID,
 			Title:           r.Title,
+			Date:            r.Date,
 			Narrative:       r.Narrative,
 			Reason:          r.Reason,
 			Score:           r.Score,

@@ -12,6 +12,7 @@ import (
 type SearchResultItem struct {
 	ID        string
 	Title     string
+	Date      string
 	Narrative string
 	Reason    string
 	
@@ -81,6 +82,9 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 		for i, r := range results {
 			// ID column
 			idCol := fmt.Sprintf("%d. [%s]", i+1, r.ID)
+			if r.Date != "" {
+				idCol += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Date)
+			}
 			
 			// Content column (Title + Narrative + Explain)
 			title := r.Title
@@ -234,10 +238,10 @@ func RenderImpactTable(target string, deps []string, width int) string {
 		String()
 }
 
-// RenderEntitiesTable renders a list of entities and their mention counts
-func RenderEntitiesTable(entities [][]string, width int) string {
+// RenderEntitiesTable renders a list of entities and their counts
+func RenderEntitiesTable(title string, entities [][]string, width int) string {
 	return table.New().
-		Headers("Top Entities", "Mentions").
+		Headers(title, "Count").
 		Rows(entities...).
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(ColorMuted)).

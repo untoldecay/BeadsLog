@@ -18,7 +18,7 @@ type EntityGraph struct {
 	Nodes []EntityNode
 }
 
-func GetEntityGraphExact(ctx context.Context, db *sql.DB, entityName string, depth int) (*EntityGraph, error) {
+func GetEntityGraphExact(ctx context.Context, db *sql.DB, entityName string, depth int, relType string) (*EntityGraph, error) {
 	query := `
 	WITH RECURSIVE graph(id, name, rel_type, depth, path) AS (
 		SELECT e.id, e.name, '', 0, e.name
@@ -30,12 +30,14 @@ func GetEntityGraphExact(ctx context.Context, db *sql.DB, entityName string, dep
 		FROM entities e 
 		JOIN entity_deps ed ON e.id = ed.to_entity 
 		JOIN graph g ON ed.from_entity = g.id
-		WHERE g.depth < ? AND g.path NOT LIKE '%' || e.name || '%'
+		WHERE g.depth < ? 
+		  AND g.path NOT LIKE '%' || e.name || '%'
+		  AND (? = '' OR ed.relationship = ?)
 	)
 	SELECT id, name, rel_type, depth, path FROM graph ORDER BY depth;
 	`
 
-	rows, err := db.QueryContext(ctx, query, entityName, depth)
+	rows, err := db.QueryContext(ctx, query, entityName, depth, relType, relType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query entity graph: %w", err)
 	}

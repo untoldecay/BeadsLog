@@ -19,6 +19,7 @@ import (
 )
 
 type IndexRow struct {
+	ID          string // Explicit ID if present in the link (e.g. file.md?id=sess-abc)
 	Subject     string
 	Problem     string
 	Author      string
@@ -35,16 +36,23 @@ type IndexRow struct {
 func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	db := store.UnderlyingDB()
 
-	// 1. Lookup-by-Filename-and-Title Strategy (ID Stability)
-	// Check if this specific subject in this file is already tracked
+	// 1. Session ID Resolution Strategy
 	var sessionID string
-	err := db.QueryRow("SELECT id FROM sessions WHERE filename = ? AND title = ?", row.Filename, row.Subject).Scan(&sessionID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// New entry: Generate legacy hash-based ID
-			sessionID = fmt.Sprintf("sess-%s", hashID(row.Subject+row.Date))
-		} else {
-			return false, fmt.Errorf("failed to lookup session: %w", err)
+	var err error
+	
+	if row.ID != "" {
+		// Use explicit ID from index link
+		sessionID = row.ID
+	} else {
+		// Lookup-by-Filename-and-Title Strategy (Fallback for implicit rows)
+		err = db.QueryRow("SELECT id FROM sessions WHERE filename = ? AND title = ?", row.Filename, row.Subject).Scan(&sessionID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// New entry: Generate legacy hash-based ID
+				sessionID = fmt.Sprintf("sess-%s", hashID(row.Subject+row.Date))
+			} else {
+				return false, fmt.Errorf("failed to lookup session: %w", err)
+			}
 		}
 	}
 
@@ -255,79 +263,73 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 			}
 
 			parts := strings.Split(line, "|")
-			if pipeCount == 8 {
-				// 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
-				filenamePart := strings.TrimSpace(parts[7])
-				if strings.Contains(filenamePart, "](") {
-					start := strings.Index(filenamePart, "](") + 2
-					end := strings.Index(filenamePart[start:], ")")
-					if end != -1 {
-						filenamePart = filenamePart[start : start+end]
-					}
-				}
-				// Normalize: Strip Dir prefix if present (prevent double-path bug)
-				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
-					filenamePart = filenamePart[len(dir)+1:]
-				}
+			var row IndexRow
+			var filenamePart string
 
-				rows = append(rows, IndexRow{
-					Subject:  strings.TrimSpace(parts[1]),
-					Problem:  strings.TrimSpace(parts[2]),
-					Author:   strings.TrimSpace(parts[3]),
-					Agent:    strings.TrimSpace(parts[4]),
-					Date:     strings.TrimSpace(parts[5]),
-					Branch:   strings.TrimSpace(parts[6]),
-					Filename: filenamePart,
-					Dir:      dir,
-				})
-			} else if pipeCount == 7 {
-				// 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
-				// 5-column format: | Subject | Problems | Author | Date | Devlog |
-				filenamePart := strings.TrimSpace(parts[5])
-				if strings.Contains(filenamePart, "](") {
-					start := strings.Index(filenamePart, "](") + 2
-					end := strings.Index(filenamePart[start:], ")")
-					if end != -1 {
-						filenamePart = filenamePart[start : start+end]
-					}
+			switch pipeCount {
+			case 8: // 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+				filenamePart = strings.TrimSpace(parts[7])
+				row = IndexRow{
+					Subject: strings.TrimSpace(parts[1]),
+					Problem: strings.TrimSpace(parts[2]),
+					Author:  strings.TrimSpace(parts[3]),
+					Agent:   strings.TrimSpace(parts[4]),
+					Date:    strings.TrimSpace(parts[5]),
+					Branch:  strings.TrimSpace(parts[6]),
+					Dir:     dir,
 				}
-				// Normalize: Strip Dir prefix if present
-				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
-					filenamePart = filenamePart[len(dir)+1:]
+			case 7: // 6-column format: | Subject | Problems | Author | Agent | Date | Devlog |
+				filenamePart = strings.TrimSpace(parts[6])
+				row = IndexRow{
+					Subject: strings.TrimSpace(parts[1]),
+					Problem: strings.TrimSpace(parts[2]),
+					Author:  strings.TrimSpace(parts[3]),
+					Agent:   strings.TrimSpace(parts[4]),
+					Date:    strings.TrimSpace(parts[5]),
+					Dir:     dir,
 				}
-
-				rows = append(rows, IndexRow{
-					Subject:  strings.TrimSpace(parts[1]),
-					Problem:  strings.TrimSpace(parts[2]),
-					Author:   strings.TrimSpace(parts[3]),
-					Date:     strings.TrimSpace(parts[4]),
-					Filename: filenamePart,
-					Dir:      dir,
-				})
-			} else if pipeCount == 5 {
-				// Legacy 4-column format: | Subject | Problems | Date | Devlog |
-				filenamePart := strings.TrimSpace(parts[4])
-				// Extract filename from markdown link [name](file)
-				if strings.Contains(filenamePart, "](") {
-					start := strings.Index(filenamePart, "](") + 2
-					end := strings.Index(filenamePart[start:], ")")
-					if end != -1 {
-						filenamePart = filenamePart[start : start+end]
-					}
+			case 6: // 5-column format: | Subject | Problems | Author | Date | Devlog |
+				filenamePart = strings.TrimSpace(parts[5])
+				row = IndexRow{
+					Subject: strings.TrimSpace(parts[1]),
+					Problem: strings.TrimSpace(parts[2]),
+					Author:  strings.TrimSpace(parts[3]),
+					Date:    strings.TrimSpace(parts[4]),
+					Dir:     dir,
 				}
-				// Normalize: Strip Dir prefix if present
-				if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
-					filenamePart = filenamePart[len(dir)+1:]
+			case 5: // 4-column format: | Subject | Problems | Date | Devlog |
+				filenamePart = strings.TrimSpace(parts[4])
+				row = IndexRow{
+					Subject: strings.TrimSpace(parts[1]),
+					Problem: strings.TrimSpace(parts[2]),
+					Date:    strings.TrimSpace(parts[3]),
+					Dir:     dir,
 				}
-
-				rows = append(rows, IndexRow{
-					Subject:  strings.TrimSpace(parts[1]),
-					Problem:  strings.TrimSpace(parts[2]),
-					Date:     strings.TrimSpace(parts[3]),
-					Filename: filenamePart,
-					Dir:      dir,
-				})
 			}
+
+			// Extract filename from markdown link [name](file)
+			if strings.Contains(filenamePart, "](") {
+				start := strings.Index(filenamePart, "](") + 2
+				end := strings.Index(filenamePart[start:], ")")
+				if end != -1 {
+					filenamePart = filenamePart[start : start+end]
+				}
+			}
+
+			// Extract explicit ID if present (file.md?id=sess-abc)
+			if strings.Contains(filenamePart, "?id=") {
+				idx := strings.Index(filenamePart, "?id=")
+				row.ID = filenamePart[idx+4:]
+				filenamePart = filenamePart[:idx]
+			}
+
+			// Normalize: Strip Dir prefix if present (prevent double-path bug)
+			if dir != "" && strings.HasPrefix(filenamePart, dir+string(filepath.Separator)) {
+				filenamePart = filenamePart[len(dir)+1:]
+			}
+			row.Filename = filenamePart
+
+			rows = append(rows, row)
 		}
 	}
 	return rows, nil
