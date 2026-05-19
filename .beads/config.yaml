@@ -66,3 +66,5 @@ eval.session_id: "eval-1775244538-59536"
 eval.scenario_id: "test-redact"
 
 devlog.author: "Gemini-Test-Agent"
+
+last-seen-changelog-version: 0.50.0

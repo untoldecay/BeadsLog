@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/changelog"
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -41,6 +43,16 @@ var AgentToolCandidates = []AgentTool{
 	{Name: "Gemini", Files: []string{"GEMINI.md"}},
 	{Name: "Codebase", Files: []string{"CODEBASE.md"}},
 	{Name: "GitHub Copilot", Files: []string{".github/copilot-instructions.md", ".github/COPILOT-INSTRUCTIONS.md"}},
+}
+
+func maybeShowChangelog() {
+	lastSeen := config.GetString("last-seen-changelog-version")
+	current := changelog.CurrentVersion
+
+	if changelog.IsNewer(current, lastSeen) {
+		fmt.Println(changelog.RenderLatest())
+		_ = config.SetYamlConfig("last-seen-changelog-version", current)
+	}
 }
 
 // finalizeOnboarding unlocks the environment by installing the Full Bootloader.
@@ -114,6 +126,7 @@ func finalizeOnboarding(ctx context.Context, store storage.Storage) {
 	if found {
 		_ = store.SetConfig(ctx, "onboarding_finalized", "true")
 		fmt.Printf("\n%s Session Initialized. Agent instructions updated with full project context.\n", ui.RenderPass("✅"))
+		maybeShowChangelog()
 	}
 }
 
@@ -133,6 +146,9 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 
 	// Ensure agent rules are configured (inject bootstrap trigger if missing)
 	configureAgentRules(false, true, Candidates)
+
+	// Show tool updates if any
+	maybeShowChangelog()
 
 	// Refresh devlog instructions if config changed
 	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {

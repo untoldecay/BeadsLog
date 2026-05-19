@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/rpc"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/types"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -208,6 +211,10 @@ This is useful for agents executing molecules to see which steps can run next.`,
 				}
 				fmt.Println()
 			}
+
+			// Suggest catchup if new activity detected
+			maybeSuggestCatchup(rootCtx, store)
+
 			return
 		}
 		// Direct mode
@@ -301,8 +308,30 @@ This is useful for agents executing molecules to see which steps can run next.`,
 
 		// Show tip after successful ready (direct mode only)
 		maybeShowTip(store)
+
+		// Suggest catchup if new activity detected
+		maybeSuggestCatchup(rootCtx, store)
 	},
 }
+
+func maybeSuggestCatchup(ctx context.Context, store storage.Storage) {
+	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+		lastCatchupStr, _ := sqliteStore.GetMetadata(ctx, "last_catchup_time")
+		since := time.Now().Add(-24 * time.Hour) // Default to 24h ago
+		if lastCatchupStr != "" {
+			if t, err := time.Parse(time.RFC3339, lastCatchupStr); err == nil {
+				since = t
+			}
+		}
+
+		delta, err := queries.GetCatchupDelta(ctx, sqliteStore.UnderlyingDB(), since)
+		if err == nil && (len(delta.Sessions) > 0 || len(delta.ClosedIssues) > 0 || len(delta.StateChanges) > 0) {
+			fmt.Printf("\n%s New activity detected since your last catchup (%s).\n", ui.RenderAccent("👋"), since.Format("2006-01-02 15:04"))
+			fmt.Printf("   Run %s to see what you missed.\n", ui.RenderAccent("bd catchup"))
+		}
+	}
+}
+
 var blockedCmd = &cobra.Command{
 	Use:   "blocked",
 	Short: "Show blocked issues",

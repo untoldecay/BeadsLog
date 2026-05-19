@@ -72,6 +72,8 @@ var YamlOnlyKeys = map[string]bool{
 	"devlog.author":            true,
 	"devlog.branch-tracking":    true,
 
+	"last-seen-changelog-version": true,
+
 	// Hierarchy settings (GH#995)
 	"hierarchy.max-depth": true,
 }
