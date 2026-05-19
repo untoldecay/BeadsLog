@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/types"
@@ -183,6 +184,21 @@ This is useful for agents executing molecules to see which steps can run next.`,
 						ui.RenderPriority(issue.Priority),
 						ui.RenderType(string(issue.IssueType)),
 						ui.RenderID(issue.ID), issue.Title)
+
+					// Check for proximity warnings
+					if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+						warnings, _ := queries.CheckProximityWarnings(rootCtx, sqliteStore.UnderlyingDB(), types.ScopeTask, issue.ID)
+						for _, w := range warnings {
+							badge := ""
+							if w.State == types.StatePaused {
+								badge = ui.TableWarningStyle.Render("[⏸ PAUSED]")
+							} else if w.State == types.StateAbandoned {
+								badge = ui.TableFailStyle.Render("[🚫 ABANDONED]")
+							}
+							fmt.Printf("   ⚠️  %s This task overlaps with %s work: %s\n", badge, w.State, w.ShortReason)
+						}
+					}
+
 					if issue.EstimatedMinutes != nil {
 						fmt.Printf("   Estimate: %d min\n", *issue.EstimatedMinutes)
 					}
@@ -258,6 +274,21 @@ This is useful for agents executing molecules to see which steps can run next.`,
 					ui.RenderPriority(issue.Priority),
 					ui.RenderType(string(issue.IssueType)),
 					ui.RenderID(issue.ID), issue.Title)
+
+				// Check for proximity warnings
+				if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+					warnings, _ := queries.CheckProximityWarnings(rootCtx, sqliteStore.UnderlyingDB(), types.ScopeTask, issue.ID)
+					for _, w := range warnings {
+						badge := ""
+						if w.State == types.StatePaused {
+							badge = ui.TableWarningStyle.Render("[⏸ PAUSED]")
+						} else if w.State == types.StateAbandoned {
+							badge = ui.TableFailStyle.Render("[🚫 ABANDONED]")
+						}
+						fmt.Printf("   ⚠️  %s This task overlaps with %s work: %s\n", badge, w.State, w.ShortReason)
+					}
+				}
+
 				if issue.EstimatedMinutes != nil {
 					fmt.Printf("   Estimate: %d min\n", *issue.EstimatedMinutes)
 				}

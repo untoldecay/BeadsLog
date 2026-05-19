@@ -20,6 +20,7 @@ import (
 
 type IndexRow struct {
 	ID          string // Explicit ID if present in the link (e.g. file.md?id=sess-abc)
+	CommitSHA   string // Explicit SHA if present in the link (e.g. file.md?sha=abc)
 	Subject     string
 	Problem     string
 	Author      string
@@ -57,9 +58,9 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	}
 
 	// Check if session exists and get current state
-	var currentFilename, currentHash, currentAuthor, currentAuthorEmail, currentAgent, currentBranch string
+	var currentFilename, currentHash, currentAuthor, currentAuthorEmail, currentAgent, currentBranch, currentSHA string
 	var currentMissing, currentGhost bool
-	err = db.QueryRow("SELECT filename, file_hash, is_missing, is_ghost, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, ''), COALESCE(branch, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentGhost, &currentAuthor, &currentAuthorEmail, &currentAgent, &currentBranch)
+	err = db.QueryRow("SELECT filename, file_hash, is_missing, is_ghost, COALESCE(author, ''), COALESCE(author_email, ''), COALESCE(agent, ''), COALESCE(branch, ''), COALESCE(commit_sha, '') FROM sessions WHERE id = ?", sessionID).Scan(&currentFilename, &currentHash, &currentMissing, &currentGhost, &currentAuthor, &currentAuthorEmail, &currentAgent, &currentBranch, &currentSHA)
 	
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
@@ -109,7 +110,8 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 		currentAuthor != row.Author ||
 		currentAuthorEmail != row.AuthorEmail ||
 		currentAgent != row.Agent ||
-		currentBranch != row.Branch
+		currentBranch != row.Branch ||
+		currentSHA != row.CommitSHA
 
 	if !needsUpdate {
 		return false, nil // No changes
@@ -118,15 +120,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	// Perform update/insert
 	if !exists {
 		_, err = db.Exec(`
-			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, is_ghost, enrichment_status, author, author_email, agent, branch)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch)
+			INSERT INTO sessions (id, title, timestamp, status, type, filename, narrative, file_hash, is_missing, is_ghost, enrichment_status, author, author_email, agent, branch, commit_sha)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+		`, sessionID, row.Subject, parseDate(row.Date), "closed", extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch, row.CommitSHA)
 	} else {
 		_, err = db.Exec(`
 			UPDATE sessions 
-			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, is_ghost = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?, branch = ?
+			SET title = ?, timestamp = ?, type = ?, filename = ?, narrative = ?, file_hash = ?, is_missing = ?, is_ghost = ?, enrichment_status = MAX(enrichment_status, 1), author = ?, author_email = ?, agent = ?, branch = ?, commit_sha = ?
 			WHERE id = ?
-		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch, sessionID)
+		`, row.Subject, parseDate(row.Date), extractType(row.Subject), row.Filename, narrative, contentHash, isMissing, isGhost, row.Author, row.AuthorEmail, row.Agent, row.Branch, row.CommitSHA, sessionID)
 	}
 
 	if err != nil {
@@ -316,11 +318,20 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 				}
 			}
 
-			// Extract explicit ID if present (file.md?id=sess-abc)
-			if strings.Contains(filenamePart, "?id=") {
-				idx := strings.Index(filenamePart, "?id=")
-				row.ID = filenamePart[idx+4:]
+			// Extract explicit ID and SHA if present (file.md?id=sess-abc&sha=123)
+			if strings.Contains(filenamePart, "?") {
+				idx := strings.Index(filenamePart, "?")
+				query := filenamePart[idx+1:]
 				filenamePart = filenamePart[:idx]
+				
+				params := strings.Split(query, "&")
+				for _, p := range params {
+					if strings.HasPrefix(p, "id=") {
+						row.ID = strings.TrimPrefix(p, "id=")
+					} else if strings.HasPrefix(p, "sha=") {
+						row.CommitSHA = strings.TrimPrefix(p, "sha=")
+					}
+				}
 			}
 
 			// Normalize: Strip Dir prefix if present (prevent double-path bug)

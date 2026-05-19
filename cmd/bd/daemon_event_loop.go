@@ -139,6 +139,24 @@ func runEventDrivenLoop(
 		}()
 	}
 
+	// Background Git Fact Reconciliation worker
+	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
+		go func() {
+			// Small delay before starting first check
+			time.Sleep(10 * time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					_ = ReconcileGitFacts(ctx, sqliteStore, &log)
+					// Run deep check every 15 minutes
+					time.Sleep(15 * time.Minute)
+				}
+			}
+		}()
+	}
+
 	// Dropped events safety net (faster recovery than health check)
 	droppedEventsTicker := time.NewTicker(1 * time.Second)
 	defer droppedEventsTicker.Stop()

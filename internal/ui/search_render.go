@@ -25,6 +25,11 @@ type SearchResultItem struct {
 	RecencyBonus float64
 	
 	IsLowConfidence bool
+
+	// Lifecycle fields
+	LifecycleStatus string
+	StatusReason    string
+	IsValidated     bool
 }
 
 // renderSingleTable renders a simple list into a 1-column table with a header
@@ -88,6 +93,14 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 			
 			// Content column (Title + Narrative + Explain)
 			title := r.Title
+			if r.LifecycleStatus == "paused" {
+				title = lipgloss.NewStyle().Foreground(ColorWarn).Render("[⏸ PAUSED]") + " " + title
+			} else if r.LifecycleStatus == "abandoned" {
+				title = lipgloss.NewStyle().Foreground(ColorFail).Render("[🚫 ABANDONED]") + " " + title
+			} else if r.IsValidated {
+				title = lipgloss.NewStyle().Foreground(ColorPass).Render("[🟢 VALIDATED]") + " " + title
+			}
+
 			var contentLines []string
 
 			if explain {
@@ -97,6 +110,14 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 				contentLines = append(contentLines, fmt.Sprintf("%s (Relevance: %.2f)", title, displayScore))
 			} else {
 				contentLines = append(contentLines, title)
+			}
+
+			if r.StatusReason != "" {
+				reasonStyle := lipgloss.NewStyle().Foreground(ColorWarn).Italic(true)
+				if r.LifecycleStatus == "abandoned" {
+					reasonStyle = lipgloss.NewStyle().Foreground(ColorFail).Italic(true)
+				}
+				contentLines = append(contentLines, reasonStyle.Render("   Reason: "+r.StatusReason))
 			}
 			
 			if r.Narrative != "" {

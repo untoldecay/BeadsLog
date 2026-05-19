@@ -15,9 +15,12 @@ Before using `ls`, `grep`, or `glob`, you MUST query the architectural graph:
 - **Entities:** `bd devlog entities` (Identify key components)
 - **Relationships:** `bd devlog graph "Subject"` (See dependencies)
 - **Connective Tissue:** `bd devlog path "EntityA" "EntityB"` (Find historical links)
-- **History:** `bd devlog search "Keywords" --preview` (Ranked retrieval with snippets)
+- History: `bd devlog search "Keywords" --preview` (Ranked retrieval with snippets)
+  - **CHECK:** Observe lifecycle status in search results ([🟢 VALIDATED], [⏸ PAUSED], [🚫 ABANDONED])
+  - **PAUSED/ABANDONED:** Read reason FIRST. Do NOT assume side-branch code is in baseline truth.
 
 ## 3. 🎯 Select and Claim Task
+
 - List ready work: `bd ready`
 - Claim task: `bd update <id> --status in_progress`
 - Resume context: `bd devlog resume --last 1`

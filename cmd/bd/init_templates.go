@@ -176,6 +176,8 @@ Context: _rules/_orchestration/PROJECT_CONTEXT.md (PRD, Tech Stack, Conventions)
 CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
 1. RESUME: Run bd devlog resume --last 1 to load last session context
 2. MAP: Run bd devlog graph "component" OR bd devlog search "topic/error" (graph/history BEFORE code)
+   - CHECK: Observe lifecycle status in search results ([🟢 VALIDATED], [⏸ PAUSED], [🚫 ABANDONED])
+   - PAUSED/ABANDONED: Read reason FIRST. Do NOT assume side-branch code is in baseline truth.
 3. TASK: Run bd ready → bd update "id" --status in-progress --json (claim work)
 4. IMPLEMENT: Code changes → Tests → bd devlog record --subject "[fix] message" --problem "desc" --file "path/to/log.md"
 5. CLOSE: Run bd close "id" --reason "Done" → bd sync → bd devlog sync (persist everything)

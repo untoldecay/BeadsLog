@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
 type SearchResult struct {
@@ -22,17 +24,25 @@ type SearchResult struct {
 	BM25        float64 `json:"bm25"`
 	PhraseBonus float64 `json:"phrase_bonus"`
 	NearBonus   float64 `json:"near_bonus"`
-	EntityBonus float64 `json:"entity_bonus"`
+	EntityBonus  float64 `json:"entity_bonus"`
 	RecencyBonus float64 `json:"recency_bonus"`
-	
+
 	IsLowConfidence bool `json:"is_low_confidence"`
-}
+
+	// Lifecycle fields
+	LifecycleStatus types.LifecycleState `json:"lifecycle_status"`
+	StatusReason    string               `json:"status_reason"`
+	IsValidated     bool                 `json:"is_validated"`
+	Branch          string               `json:"branch"`
+	}
+
 
 type SearchOptions struct {
-	Query    string
-	Author   string
-	Limit    int
-	Strict   bool // If true, only BM25 on sessions, no expansion
+	Query         string
+	Author        string
+	CurrentBranch string
+	Limit         int
+	Strict        bool // If true, only BM25 on sessions, no expansion
 	TextOnly bool // If true, only BM25, no entity lookup
 	Preview  bool // If true, show first 3 lines instead of snippet
 	Explain  bool // If true, show score breakdown
@@ -158,9 +168,19 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			h.snippet,
 			s.narrative,
 			h.bm25_score,
-			(julianday('now') - julianday(s.timestamp)) as age_days
+			(julianday('now') - julianday(s.timestamp)) as age_days,
+			COALESCE(s.branch, 'N/A'),
+			bs.state,
+			bs.short_reason,
+			COALESCE(bc.is_merged, 0),
+			COALESCE(bc.is_deleted, 0)
 		FROM hits h
 		JOIN sessions s ON s.rowid = h.rowid
+		LEFT JOIN branch_states bs ON (bs.scope_type = 'branch' AND (bs.scope_ref = s.branch OR bs.scope_ref = REPLACE(s.branch, ' (local)', ''))) 
+			 OR (bs.scope_type = 'session' AND bs.scope_ref = s.id)
+			 OR (bs.scope_type = 'entity' AND s.id IN (SELECT session_id FROM session_entities WHERE entity_id = bs.scope_ref))
+			 OR (bs.full_reason_ref = s.id)
+		LEFT JOIN branch_cache bc ON bc.branch_name = s.branch OR bc.branch_name = REPLACE(s.branch, ' (local)', '')
 	`, snippetFunc)
 
 	var args []interface{}
@@ -186,9 +206,34 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		var fullNarrative, timestamp string
 		var ageDays float64
 		var snippet string
+		var state sql.NullString
+		var reason sql.NullString
+		var isMerged, isDeleted int
 		
-		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &state, &reason, &isMerged, &isDeleted); err != nil {
 			continue
+		}
+
+		// Lifecycle Logic
+		cleanBranch := strings.TrimSuffix(r.Branch, " (local)")
+		if state.Valid {
+			r.LifecycleStatus = types.LifecycleState(state.String)
+			r.StatusReason = reason.String
+		} else {
+			// Automatic derivation
+			if isMerged == 1 {
+				r.LifecycleStatus = types.StateActive
+				r.IsValidated = true
+			} else if isDeleted == 1 {
+				r.LifecycleStatus = types.StatePaused
+			} else if opts.CurrentBranch != "" && cleanBranch == opts.CurrentBranch {
+				r.LifecycleStatus = types.StateActive
+			} else if cleanBranch != "main" && cleanBranch != "develop" && cleanBranch != "master" {
+				// Off-branch and not validated -> effectively paused
+				r.LifecycleStatus = types.StatePaused
+			} else {
+				r.LifecycleStatus = types.StateActive
+			}
 		}
 
 		// Format Date
@@ -258,4 +303,37 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 	}
 
 	return results, nil
+}
+
+type ProximityWarning struct {
+	State        types.LifecycleState
+	ScopeType    types.ScopeType
+	ScopeRef     string
+	ShortReason  string
+	FullReasonID string
+}
+
+// CheckProximityWarnings checks if the given scope overlaps with any paused or abandoned states
+func CheckProximityWarnings(ctx context.Context, db *sql.DB, scopeType types.ScopeType, scopeRef string) ([]ProximityWarning, error) {
+	query := `
+		SELECT state, scope_type, scope_ref, short_reason, full_reason_ref
+		FROM branch_states
+		WHERE (scope_type = ? AND scope_ref = ?)
+		   OR (scope_type = 'branch' AND scope_ref = (SELECT branch FROM sessions WHERE id = ? OR filename LIKE ? LIMIT 1))
+	`
+	
+	rows, err := db.QueryContext(ctx, query, scopeType, scopeRef, scopeRef, "%"+scopeRef+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var warnings []ProximityWarning
+	for rows.Next() {
+		var w ProximityWarning
+		if err := rows.Scan(&w.State, &w.ScopeType, &w.ScopeRef, &w.ShortReason, &w.FullReasonID); err == nil {
+			warnings = append(warnings, w)
+		}
+	}
+	return warnings, nil
 }

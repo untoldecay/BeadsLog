@@ -21,6 +21,9 @@ var (
 	TableSuccessStyle = lipgloss.NewStyle().
 		Foreground(ColorPass)
 
+	TableFailStyle = lipgloss.NewStyle().
+		Foreground(ColorFail)
+
 	TableHintStyle = lipgloss.NewStyle().
 		Foreground(ColorMuted)
 

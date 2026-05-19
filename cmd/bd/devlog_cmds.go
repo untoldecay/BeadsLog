@@ -15,6 +15,7 @@ import (
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+	"github.com/untoldecay/BeadsLog/internal/types"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
@@ -580,6 +581,13 @@ Since Background AI Enrichment is DISABLED, manually append relationships at the
 ## persona:
 Meticulous technical writer documenting the learning journey.
 
+## ⏸ LIFECYCLE MANAGEMENT:
+- **PAUSE:** If you must pivot away from a task before completion, run:
+  ` + "`bd devlog pause --scope branch:name --message \"Reason for pivot\"`" + `
+- **ABANDON:** If an approach is found to be flawed (memory leaks, regression, rejected PRD), run:
+  ` + "`bd devlog abandon --scope branch:name --message \"Reason why this failed\"`" + `
+- **WHY:** Mandatory reason strings prevent future agents from repeating your failed experiments.
+
 ## File Handling:
 1.  **Check for Existing Log:** Find today's file in ` + "`_rules/_devlog/`" + `.
 2.  **Update or Create:** Append to today's log or create ` + "`_rules/_devlog/[YYYY-MM-DD]_[title].md`" + `.
@@ -603,6 +611,13 @@ Background AI Enrichment is ENABLED. Focus strictly on the technical narrative.
 
 ## persona:
 Meticulous technical writer documenting the learning journey.
+
+## ⏸ LIFECYCLE MANAGEMENT:
+- **PAUSE:** If you must pivot away from a task before completion, run:
+  ` + "`bd devlog pause --scope branch:name --message \"Reason for pivot\"`" + `
+- **ABANDON:** If an approach is found to be flawed (memory leaks, regression, rejected PRD), run:
+  ` + "`bd devlog abandon --scope branch:name --message \"Reason why this failed\"`" + `
+- **WHY:** Mandatory reason strings prevent future agents from repeating your failed experiments.
 
 ## File Handling:
 1.  **Check for Existing Log:** Find today's file in ` + "`_rules/_devlog/`" + `.
@@ -646,21 +661,10 @@ func refreshDevlogPrompt(store *sqlite.SQLiteStorage) {
 		return
 	}
 
-	// Check if header matches (first line is usually enough to distinguish)
-	firstLine := ""
-	if lines := strings.Split(string(content), "\n"); len(lines) > 0 {
-		firstLine = strings.TrimSpace(lines[0])
-	}
-
-	expectedFirstLine := ""
-	if lines := strings.Split(expectedTemplate, "\n"); len(lines) > 0 {
-		expectedFirstLine = strings.TrimSpace(lines[0])
-	}
-
-	if firstLine != expectedFirstLine {
-		// Outdated! Update it.
+	// Update if outdated (missing Lifecycle Management)
+	if !strings.Contains(string(content), "⏸ LIFECYCLE MANAGEMENT") {
 		_ = os.WriteFile(promptPath, []byte(expectedTemplate), 0644)
-		fmt.Printf("  ✨ Updated devlog instructions to match config (%s)\n", firstLine)
+		fmt.Printf("  ✨ Updated devlog instructions to include lifecycle management\n")
 	}
 }
 
@@ -1142,15 +1146,20 @@ Examples:
 		defer store.Close()
 		db := store.UnderlyingDB()
 
+		// Get current branch
+		branchOut, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+		currentBranch := strings.TrimSpace(string(branchOut))
+
 		// Tier 1: HybridSearch (Exact Match + Entity Expansion)
 		opts := queries.SearchOptions{
-			Query:    query,
-			Author:   author,
-			Limit:    limit,
-			Strict:   strict,
-			TextOnly: textOnly,
-			Preview:  preview,
-			Explain:  explain,
+			Query:         query,
+			Author:        author,
+			CurrentBranch: currentBranch,
+			Limit:         limit,
+			Strict:        strict,
+			TextOnly:      textOnly,
+			Preview:       preview,
+			Explain:       explain,
 		}
 		response, err := queries.HybridSearch(rootCtx, db, opts)
 		if err != nil {
@@ -1353,6 +1362,26 @@ var devlogResumeCmd = &cobra.Command{
 
 		query := args[0]
 		fmt.Printf("Resuming context for: %s\n", query)
+
+		// Check for proximity warnings
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err == nil {
+			defer store.Close()
+			db := store.UnderlyingDB()
+			warnings, _ := queries.CheckProximityWarnings(rootCtx, db, types.ScopeSession, query)
+			for _, w := range warnings {
+				badge := ""
+				if w.State == types.StatePaused {
+					badge = ui.TableWarningStyle.Render("[⏸ PAUSED]")
+				} else if w.State == types.StateAbandoned {
+					badge = ui.TableFailStyle.Render("[🚫 ABANDONED]")
+				}
+				fmt.Printf("\n⚠️  %s This work is %s: %s\n", badge, w.State, w.ShortReason)
+				fmt.Printf("   Scope: %s:%s\n", w.ScopeType, w.ScopeRef)
+				fmt.Printf("   Reasoning session: %s\n\n", w.FullReasonID)
+			}
+		}
+
 		// Search sessions and show latest
 		devlogSearchCmd.Run(cmd, args)
 		fmt.Printf("\n%s Tip: Use --help to customize context window size.\n", ui.RenderAccent("💡"))
@@ -1947,8 +1976,9 @@ var devlogRecordCmd = &cobra.Command{
 		// 4. Generate Session ID (for stability)
 		sessionID := fmt.Sprintf("sess-%s", hashID(subject+date))
 
-		// 5. Get Branch Info
+		// 5. Get Branch & Commit Info
 		branchInfo := "N/A"
+		commitSHA := ""
 		if config.GetBool("devlog.branch-tracking") {
 			// Get current branch
 			branchOut, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
@@ -1962,13 +1992,23 @@ var devlogRecordCmd = &cobra.Command{
 					branchInfo = branchName + " (local)"
 				}
 			}
+
+			// Get current commit
+			commitOut, _ := exec.Command("git", "rev-parse", "HEAD").Output()
+			commitSHA = strings.TrimSpace(string(commitOut))
 		}
 
 		// 6. Format Row
 		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
-		// We append ?id=sess-xxx to the devlog link for future stability
+		// We append ?id=sess-xxx&sha=abc to the devlog link for future stability and reachability
 		fileName := filepath.Base(file)
-		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s?id=%s) |\n", subject, problem, author, agent, date, branchInfo, fileName, fileName, sessionID)
+		devlogLink := fmt.Sprintf("[%s](%s?id=%s", fileName, fileName, sessionID)
+		if commitSHA != "" {
+			devlogLink += "&sha=" + commitSHA
+		}
+		devlogLink += ")"
+		
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", subject, problem, author, agent, date, branchInfo, devlogLink)
 
 		// 7. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -1989,6 +2029,166 @@ var devlogRecordCmd = &cobra.Command{
 		fmt.Println("→ Syncing devlog...")
 		devlogSyncCmd.Run(cmd, []string{})
 	},
+}
+
+var devlogPauseCmd = &cobra.Command{
+	Use:   "pause",
+	Short: "Pause work on a specific scope (branch, entity, file, task)",
+	Run: func(cmd *cobra.Command, args []string) {
+		handleStateChange(cmd, types.StatePaused)
+	},
+}
+
+var devlogAbandonCmd = &cobra.Command{
+	Use:   "abandon",
+	Short: "Abandon work on a specific scope (branch, entity, file, task)",
+	Run: func(cmd *cobra.Command, args []string) {
+		handleStateChange(cmd, types.StateAbandoned)
+	},
+}
+
+func handleStateChange(cmd *cobra.Command, state types.LifecycleState) {
+	scope, _ := cmd.Flags().GetString("scope")
+	message, _ := cmd.Flags().GetString("message")
+
+	if scope == "" || message == "" {
+		fmt.Println("Error: --scope and --message are mandatory.")
+		os.Exit(1)
+	}
+
+	scopeType, scopeRef, err := parseScope(scope)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	store, err := sqlite.New(rootCtx, dbPath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	// 1. Create special devlog entry
+	devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+	if devlogDir == "" {
+		devlogDir = "_rules/_devlog"
+	}
+
+	date := time.Now().Format("2006-01-02 15:04")
+	subject := fmt.Sprintf("[%s] %s: %s", state, scopeType, scopeRef)
+	sessionID := fmt.Sprintf("sess-state-%s-%x", state, hashID(subject+date+message))
+
+	fileName := fmt.Sprintf("%s_%s_%s_%s.md", time.Now().Format("2006-01-02"), state, scopeType, strings.ReplaceAll(scopeRef, "/", "-"))
+	filePath := filepath.Join(devlogDir, fileName)
+
+	// Get Author
+	author := config.GetString("devlog.author")
+	if author == "" {
+		author = os.Getenv("BD_ACTOR")
+	}
+	if author == "" {
+		out, _ := exec.Command("git", "config", "user.name").Output()
+		author = strings.TrimSpace(string(out))
+	}
+
+	// Get Agent
+	agent := os.Getenv("BD_AGENT_NAME")
+	if agent == "" {
+		agent = "Unknown"
+	}
+
+	// Get Branch
+	branchOut, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	branchName := strings.TrimSpace(string(branchOut))
+
+	// Get Commit SHA
+	commitOut, _ := exec.Command("git", "rev-parse", "HEAD").Output()
+	commitSHA := strings.TrimSpace(string(commitOut))
+
+	// Write devlog file
+	content := fmt.Sprintf(`# State Change: %s
+
+**Date:** %s
+**Actor:** %s
+**Scope:** %s:%s
+**Reason:** %s
+
+### **Details**
+This devlog entry records an explicit state change for the specified scope.
+
+---
+
+### **Context**
+- **Commit:** %s
+- **Branch:** %s
+`, strings.ToUpper(string(state)), date, author, scopeType, scopeRef, message, commitSHA, branchName)
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		fmt.Printf("Error writing devlog file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 2. Add to _index.md
+	indexPath := filepath.Join(devlogDir, "_index.md")
+	devlogLink := fmt.Sprintf("[%s](%s?id=%s", fileName, fileName, sessionID)
+	if commitSHA != "" {
+		devlogLink += "&sha=" + commitSHA
+	}
+	devlogLink += ")"
+	row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", subject, message, author, agent, date, branchName, devlogLink)
+
+	f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Printf("Error opening index: %v\n", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(row); err != nil {
+		fmt.Printf("Error writing to index: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 3. Update branch_states table
+	branchState := types.BranchState{
+		State:         state,
+		ScopeType:     scopeType,
+		ScopeRef:      scopeRef,
+		ShortReason:   message,
+		FullReasonRef: sessionID,
+		Actor:         author,
+		CommitSHA:     commitSHA,
+		BranchRef:     branchName,
+	}
+
+	if err := store.SetBranchState(rootCtx, branchState); err != nil {
+		fmt.Printf("Error updating database: %v\n", err)
+		// We don't exit here because the file was already written
+	}
+
+	fmt.Printf("✓ %s work on %s:%s\n", strings.Title(string(state)), scopeType, scopeRef)
+	fmt.Printf("  Reason: %s\n", message)
+	fmt.Printf("  Recorded as: %s\n", sessionID)
+
+	// 4. Sync
+	fmt.Println("→ Syncing devlog...")
+	devlogSyncCmd.Run(cmd, []string{})
+}
+
+func parseScope(scope string) (types.ScopeType, string, error) {
+	parts := strings.SplitN(scope, ":", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid scope format. Use <type>:<ref> (e.g. branch:feature-x)")
+	}
+
+	stype := types.ScopeType(parts[0])
+	switch stype {
+	case types.ScopeBranch, types.ScopeEntity, types.ScopeFile, types.ScopeTask, types.ScopeSession:
+		return stype, parts[1], nil
+	default:
+		return "", "", fmt.Errorf("invalid scope type: %s. Valid types: branch, entity, file, task, session", parts[0])
+	}
 }
 
 func migrateIndexInternal(indexPath string, quiet bool) int {
@@ -2333,6 +2533,12 @@ func init() {
 	devlogRecordCmd.Flags().String("author", "", "Author name (overrides git config)")
 	devlogRecordCmd.Flags().String("agent", "", "Agent name (overrides detected name)")
 
+	devlogPauseCmd.Flags().String("scope", "", "Scope to pause (branch:name, entity:id, file:path, task:id, session:id)")
+	devlogPauseCmd.Flags().String("message", "", "Short reason for pausing")
+
+	devlogAbandonCmd.Flags().String("scope", "", "Scope to abandon (branch:name, entity:id, file:path, task:id, session:id)")
+	devlogAbandonCmd.Flags().String("message", "", "Short reason for abandoning")
+
 	devlogMigrateCmd.Flags().Bool("format-index", false, "Upgrade _index.md to 5-column format")
 
 	devlogCmd.AddCommand(devlogInitCmd)
@@ -2353,6 +2559,8 @@ func init() {
 	devlogCmd.AddCommand(devlogExtractCmd)
 	devlogCmd.AddCommand(devlogEnrichCmd)
 	devlogCmd.AddCommand(devlogRecordCmd)
+	devlogCmd.AddCommand(devlogPauseCmd)
+	devlogCmd.AddCommand(devlogAbandonCmd)
 	devlogCmd.AddCommand(devlogMigrateCmd)
 	devlogCmd.AddCommand(devlogAuthorsCmd)
 	
@@ -2377,6 +2585,9 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 			EntityBonus:     r.EntityBonus,
 			RecencyBonus:    r.RecencyBonus,
 			IsLowConfidence: r.IsLowConfidence,
+			LifecycleStatus: string(r.LifecycleStatus),
+			StatusReason:    r.StatusReason,
+			IsValidated:     r.IsValidated,
 		}
 	}
 	return items
