@@ -118,7 +118,7 @@ check_release_files_only() {
     fi
 
     # List of expected release files
-    local release_files="CHANGELOG.md cmd/bd/info.go"
+    local release_files="CHANGELOG.md cmd/bd/info.go internal/changelog/changelog.go"
 
     for file in $changed_files; do
         local is_release_file=false
@@ -281,19 +281,19 @@ main() {
     PRE_STAGED_RELEASE_FILES=false
     if ! git diff-index --quiet HEAD --; then
         if [ "$ALLOW_STAGED" = true ] && check_release_files_only; then
-            # Pre-staged release files (CHANGELOG.md, info.go) - this is expected workflow
-            echo -e "${GREEN}✓ Detected pre-staged release files (CHANGELOG.md and/or info.go)${NC}"
+            # Pre-staged release files - this is expected workflow
+            echo -e "${GREEN}✓ Detected pre-staged release files${NC}"
             PRE_STAGED_RELEASE_FILES=true
         else
             echo -e "${YELLOW}Warning: You have uncommitted changes${NC}"
             if [ "$AUTO_COMMIT" = true ]; then
                 if [ "$ALLOW_STAGED" = true ]; then
-                    echo -e "${RED}Error: --allow-staged only permits CHANGELOG.md and info.go${NC}"
+                    echo -e "${RED}Error: --allow-staged only permits CHANGELOG.md, info.go and changelog.go${NC}"
                     echo "Changed files:"
                     git diff --name-only HEAD
                 else
                     echo -e "${RED}Error: Cannot auto-commit with existing uncommitted changes${NC}"
-                    echo -e "${YELLOW}Tip: Use --allow-staged if changes are to CHANGELOG.md/info.go${NC}"
+                    echo -e "${YELLOW}Tip: Use --allow-staged if changes are to release notes files${NC}"
                 fi
                 exit 1
             fi
