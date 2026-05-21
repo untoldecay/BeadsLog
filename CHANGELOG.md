@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-05-21
+
+### Added
+- **Session Lifecycle States** - `bd devlog pause` and `bd devlog abandon` to mark specific branch/task status.
+- **Proximity Warnings** - Proactive warnings in `bd ready` and `bd devlog resume` to prevent agents from retrying abandoned work.
+- **Reachability Tracking** - Daemon uses `git merge-base` and `git patch-id` (for squash-merges) to derive `[🟢 VALIDATED]` badges.
+- **Tool Changelog** - High-visibility binary-embedded changelogs to notify agents/users of new features during `bd onboard` / `bd ready`.
+- **Project Catchup** - `bd catchup` to view and acknowledge project activity (new sessions, closed issues, state changes).
+- **Release Orchestrator** - Interactive wrapper `scripts/cut-release.sh` to automate bump, changelog prep via AI prompt, and publish.
+
+### Changed
+- `bd onboard` now displays the binary changelog if outdated.
+- `bd ready` now suggests running `bd catchup` when new activity is detected since the last check.
+- Deprecated failing GitHub Action workflows.
+
+### Fixed
+- Devlog index file no longer missing `commit_sha`.
+- Corrected double paths and prefix mismatches in synchronization.
+
 ## [0.47.0] - 2026-01-11
 
 ## [0.47.0] - 2026-01-11

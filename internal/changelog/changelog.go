@@ -19,15 +19,18 @@ const CurrentVersion = "0.50.0"
 var entries = []Entry{
 	{
 		Version: "0.50.0",
-		Date:    "2026-05-19",
+		Date:    "2026-05-21",
 		Features: []string{
 			"Session Lifecycle States: Use 'bd devlog pause' or 'bd devlog abandon' to mark branch/task status.",
 			"Proximity Warnings: Proactive warnings in 'bd ready' and 'bd resume' when working on abandoned scopes.",
 			"Reachability Tracking: Native commit_sha tracking for reliable history even after squash-merges.",
+			"Tool Changelog: Binary-embedded feature announcements on 'bd onboard'.",
+			"Project Catchup: 'bd catchup' command to get a summary of what you missed (sessions, closed issues, states).",
 		},
 		Protocol: []string{
 			"Agents MUST check lifecycle status ([⏸ PAUSED], [🚫 ABANDONED]) in search results before assuming code is baseline.",
 			"Always read the 'Reason' for abandoned paths to avoid repeating failed historical experiments.",
+			"Agents should use '_rules/_devlog/_generate-catchup.md' to summarize activity when requested.",
 		},
 	},
 }
