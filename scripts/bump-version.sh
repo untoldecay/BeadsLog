@@ -313,6 +313,12 @@ main() {
         "Version = \"$CURRENT_VERSION\"" \
         "Version = \"$NEW_VERSION\""
 
+    # 1b. Update internal/changelog/changelog.go
+    echo "  • internal/changelog/changelog.go"
+    update_file "internal/changelog/changelog.go" \
+        "const CurrentVersion = \"$CURRENT_VERSION\"" \
+        "const CurrentVersion = \"$NEW_VERSION\""
+
     # 2. Update claude-plugin/.claude-plugin/plugin.json
     echo "  • claude-plugin/.claude-plugin/plugin.json"
     update_file "claude-plugin/.claude-plugin/plugin.json" \
@@ -383,6 +389,7 @@ main() {
     echo "Verifying version consistency..."
     VERSIONS=(
         "$(grep 'Version = ' cmd/bd/version.go | sed 's/.*"\(.*\)".*/\1/')"
+        "$(grep 'const CurrentVersion = ' internal/changelog/changelog.go | sed 's/.*"\(.*\)".*/\1/')"
         "$(jq -r '.version' claude-plugin/.claude-plugin/plugin.json)"
         "$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)"
         "$(grep 'version = ' integrations/beads-mcp/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
