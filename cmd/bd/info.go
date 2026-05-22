@@ -297,6 +297,25 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.51.0",
+		Date:    "2026-05-21",
+		Changes: []string{
+			"NEW: Team-Aware Catchup - bd catchup now includes Author/Actor metadata",
+			"NEW: Grouped Summary Prompt - updated catchup prompt to mandatory group by team member",
+		},
+	},
+	{
+		Version: "0.50.0",
+		Date:    "2026-05-21",
+		Changes: []string{
+			"NEW: Session Lifecycle States - bd devlog pause and abandon for status management",
+			"NEW: Proximity Warnings - proactive alerts in ready/resume for dead paths",
+			"NEW: Tool Changelog - feature announcements during onboarding",
+			"NEW: Project Catchup - bd catchup to see teammate activity",
+			"NEW: Reachability Tracking - validated badges for squashed/merged code",
+		},
+	},
+	{
 		Version: "0.47.0",
 		Date:    "2026-01-11",
 		Changes: []string{

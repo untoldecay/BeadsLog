@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-05-22
+
+### Added
+- **Team-Aware Catchup** - `bd catchup` now includes Author/Actor metadata for all items.
+- **Grouped Summary Prompt** - Updated `_generate-catchup.md` to mandatory group project activity by team member.
+
 ## [0.50.0] - 2026-05-21
 
 ### Added
