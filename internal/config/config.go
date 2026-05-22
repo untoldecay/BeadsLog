@@ -86,6 +86,7 @@ func Initialize() error {
 	v.SetDefault("issue-prefix", "")
 	v.SetDefault("lock-timeout", "30s")
 	v.SetDefault("last-seen-changelog-version", "0.0.0")
+	v.SetDefault("last-remote-version-check", "0001-01-01T00:00:00Z")
 
 	// Additional environment variables (not prefixed with BD_)
 	// These are bound explicitly for backward compatibility

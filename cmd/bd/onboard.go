@@ -149,6 +149,7 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 
 	// Show tool updates if any
 	maybeShowChangelog()
+	maybeCheckForUpdates()
 
 	// Refresh devlog instructions if config changed
 	if sqliteStore, ok := store.(*sqlite.SQLiteStorage); ok {
