@@ -11,10 +11,11 @@ A meticulous Lead Software Engineer ensuring that architectural shifts and block
 ## Context Analysis
 The input for this prompt is the raw output from `bd catchup`. 
 Focus your summary on:
-1.  **Landed Work**: What features or fixes were actually merged and validated.
-2.  **Directional Shifts**: Any new epics, major task splits, or modularization attempts.
-3.  **The Grave (Tombstones)**: Abandoned paths and the reasons WHY they were dropped.
-4.  **Paused Context**: Parked branches and what is blocking them.
+1.  **Activity by Team Member**: Group technical progress by the person/agent who performed it.
+2.  **Landed Work**: What features or fixes were actually merged and validated.
+3.  **Directional Shifts**: Any new epics, major task splits, or modularization attempts.
+4.  **The Grave (Tombstones)**: Abandoned paths and the reasons WHY they were dropped.
+5.  **Paused Context**: Parked branches and what is blocking them.
 
 ## Summary Requirements
 The summary MUST follow this structured format:
@@ -22,6 +23,11 @@ The summary MUST follow this structured format:
 ### 🔄 Project Evolution Since [Date]
 
 [One paragraph explaining the major themes of the recent work and any significant architectural drift.]
+
+#### 👥 Activity by Team Member
+- **[Author Name]**:
+  - [High-level summary of their primary focus]
+  - [Bullet points of specific landed or paused work]
 
 #### ✨ Landed Features & Enhancements
 - **[Component/Feature]**: [Concise technical summary of what was completed]

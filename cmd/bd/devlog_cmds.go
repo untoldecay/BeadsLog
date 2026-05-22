@@ -2608,6 +2608,7 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 			LifecycleStatus: string(r.LifecycleStatus),
 			StatusReason:    r.StatusReason,
 			IsValidated:     r.IsValidated,
+			Author:          r.Author,
 		}
 	}
 	return items

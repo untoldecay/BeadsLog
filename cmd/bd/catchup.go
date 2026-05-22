@@ -75,14 +75,14 @@ func renderCatchupFeed(delta *queries.CatchupDelta) {
 	if len(delta.ClosedIssues) > 0 {
 		fmt.Printf("\n✅ %d Closed Issues:\n", len(delta.ClosedIssues))
 		for _, i := range delta.ClosedIssues {
-			fmt.Printf("  • %s: %s (%s)\n", i.ID, i.Title, i.CloseReason)
+			fmt.Printf("  • %s: %s (%s) (by %s)\n", i.ID, i.Title, i.CloseReason, i.Owner)
 		}
 	}
 
 	if len(delta.Sessions) > 0 {
 		fmt.Printf("\n📄 %d New Sessions:\n", len(delta.Sessions))
 		for _, s := range delta.Sessions {
-			fmt.Printf("  • [%s] %s (Branch: %s)\n", s.ID, s.Title, s.Branch)
+			fmt.Printf("  • [%s] %s (Branch: %s) (by %s)\n", s.ID, s.Title, s.Branch, s.Author)
 		}
 	}
 }

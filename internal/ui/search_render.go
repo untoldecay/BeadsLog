@@ -30,6 +30,7 @@ type SearchResultItem struct {
 	LifecycleStatus string
 	StatusReason    string
 	IsValidated     bool
+	Author          string
 }
 
 // renderSingleTable renders a simple list into a 1-column table with a header

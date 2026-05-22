@@ -34,8 +34,8 @@ type SearchResult struct {
 	StatusReason    string               `json:"status_reason"`
 	IsValidated     bool                 `json:"is_validated"`
 	Branch          string               `json:"branch"`
+	Author          string               `json:"author"`
 	}
-
 
 type SearchOptions struct {
 	Query         string
@@ -170,6 +170,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			h.bm25_score,
 			(julianday('now') - julianday(s.timestamp)) as age_days,
 			COALESCE(s.branch, 'N/A'),
+			COALESCE(s.author, 'Unknown'),
 			bs.state,
 			bs.short_reason,
 			COALESCE(bc.is_merged, 0),
@@ -210,7 +211,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		var reason sql.NullString
 		var isMerged, isDeleted int
 		
-		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &state, &reason, &isMerged, &isDeleted); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &r.Author, &state, &reason, &isMerged, &isDeleted); err != nil {
 			continue
 		}
 

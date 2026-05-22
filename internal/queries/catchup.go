@@ -23,7 +23,7 @@ func GetCatchupDelta(ctx context.Context, db *sql.DB, since time.Time) (*Catchup
 
 	// 1. Fetch new sessions
 	sessionRows, err := db.QueryContext(ctx, `
-		SELECT s.id, s.title, s.timestamp, s.narrative, COALESCE(s.branch, 'N/A')
+		SELECT s.id, s.title, s.timestamp, s.narrative, COALESCE(s.branch, 'N/A'), COALESCE(s.author, 'Unknown')
 		FROM sessions s
 		WHERE s.timestamp > ?
 		ORDER BY s.timestamp ASC
@@ -36,7 +36,7 @@ func GetCatchupDelta(ctx context.Context, db *sql.DB, since time.Time) (*Catchup
 	for sessionRows.Next() {
 		var r SearchResult
 		var timestamp string
-		if err := sessionRows.Scan(&r.ID, &r.Title, &timestamp, &r.Narrative, &r.Branch); err == nil {
+		if err := sessionRows.Scan(&r.ID, &r.Title, &timestamp, &r.Narrative, &r.Branch, &r.Author); err == nil {
 			r.Date = timestamp
 			delta.Sessions = append(delta.Sessions, r)
 		}
@@ -44,7 +44,7 @@ func GetCatchupDelta(ctx context.Context, db *sql.DB, since time.Time) (*Catchup
 
 	// 2. Fetch closed issues
 	issueRows, err := db.QueryContext(ctx, `
-		SELECT id, title, status, issue_type, priority, COALESCE(closed_at, updated_at), COALESCE(close_reason, '')
+		SELECT id, title, status, issue_type, priority, COALESCE(closed_at, updated_at), COALESCE(close_reason, ''), COALESCE(actor, owner)
 		FROM issues
 		WHERE status = 'closed' AND (closed_at > ? OR (closed_at IS NULL AND updated_at > ?))
 		ORDER BY closed_at ASC
@@ -57,7 +57,9 @@ func GetCatchupDelta(ctx context.Context, db *sql.DB, since time.Time) (*Catchup
 	for issueRows.Next() {
 		var i types.Issue
 		var closedAt string
-		if err := issueRows.Scan(&i.ID, &i.Title, &i.Status, &i.IssueType, &i.Priority, &closedAt, &i.CloseReason); err == nil {
+		var actor string
+		if err := issueRows.Scan(&i.ID, &i.Title, &i.Status, &i.IssueType, &i.Priority, &closedAt, &i.CloseReason, &actor); err == nil {
+			i.Owner = actor // Using Owner field to store the actor for catchup display
 			delta.ClosedIssues = append(delta.ClosedIssues, i)
 		}
 	}
