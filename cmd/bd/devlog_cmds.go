@@ -1933,6 +1933,26 @@ var devlogRecordCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Verify file existence (prevent agent confusion)
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			// Try relative to devlogDir
+			store, _ := sqlite.New(rootCtx, dbPath)
+			dDir := ""
+			if store != nil {
+				dDir, _ = store.GetConfig(rootCtx, "devlog_dir")
+				store.Close()
+			}
+			if dDir == "" {
+				dDir = "_rules/_devlog"
+			}
+			
+			if _, err := os.Stat(filepath.Join(dDir, file)); os.IsNotExist(err) {
+				fmt.Printf("Error: Devlog file not found: %s\n", file)
+				fmt.Println("Hint: You must create the markdown file BEFORE running 'bd devlog record'.")
+				os.Exit(1)
+			}
+		}
+
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
