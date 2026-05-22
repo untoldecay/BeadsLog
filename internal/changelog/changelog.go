@@ -14,9 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.50.0"
+const CurrentVersion = "0.51.0"
+
 
 var entries = []Entry{
+	{
+		Version: "0.51.0",
+		Date:    "2026-05-21",
+		Features: []string{
+			"Team-Aware Catchup: 'bd catchup' now displays Author/Actor for all activity items.",
+			"Improved Summaries: Catchup prompt now groups activity by team member for better clarity.",
+		},
+		Protocol: []string{
+			"Agents MUST group project activity by team member when generating catchup summaries.",
+		},
+	},
 	{
 		Version: "0.50.0",
 		Date:    "2026-05-21",
