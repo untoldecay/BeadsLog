@@ -26,10 +26,26 @@ BeadsLog is designed to eliminate the "context gap" that occurs between an agent
 2. See a list of every service, job, and UI component that semantically relies on it.
 3. Plan the migration with full visibility of the "blast radius."
 
-## 4. Team Synchronization
-**Scenario:** A team member is out, and you need to take over their feature.
-**Traditional Way:** Read commit messages like "fix: updated types".
+## 4. Team Activity Alignment
+**Scenario:** You return to work after a weekend and need to know what your human teammates and AI agents completed.
+**Traditional Way:** Scroll through dozens of Git commits or read a Slack channel.
 **BeadsLog Way:**
-1. Run `bd devlog resume --last 3`.
-2. Read the narrative stories of their last three sessions.
-3. Understand the decisions, the roadblocks they hit, and what they intended to do next.
+1. Run `bd catchup`.
+2. See a raw delta of every new session and closed issue.
+3. Ask your agent to summarize: *"Analyze the catchup feed and give me a high-signal technical brief."*
+
+## 5. Avoiding "The Grave" (Abandoned Paths)
+**Scenario:** You are about to attempt a complex modularization of a monolithic file.
+**Traditional Way:** Spend 4 hours refactoring only to realize it creates a circular dependency that someone else already hit.
+**BeadsLog Way:**
+1. Run `bd devlog resume --file "LargeFile.vue"`.
+2. BeadsLog prints a warning: `⚠️ CAUTION: This file overlaps with ABANDONED sess-abc ("Failed because of circular imports in Vue 3").`
+3. You read the reason, save 4 hours of wasted work, and try a different approach.
+
+## 6. Proving the Baseline
+**Scenario:** An agent reads a devlog that claims "Modularization Phase 4 complete" and assumes it can start Phase 5.
+**Traditional Way:** The agent guesses if the code is actually merged or just sitting on a dead branch.
+**BeadsLog Way:**
+1. The agent checks the search result badge.
+2. If it sees `[🟢 VALIDATED]`, it knows the code has landed in the main branch.
+3. If it sees `[⏸ PAUSED]`, it knows to check the reasoning session before assuming the code is present.
