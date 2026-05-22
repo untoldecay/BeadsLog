@@ -21,22 +21,23 @@ bd onboard
 
 ## 🛠 Useful commands
 
-Your agents handle the heavy lifting. As a human, you only need to know a few commands. [Check all commands here](docs/COMMANDS.md).
+Your agents handle the heavy lifting. As a human, you only need to know one command:
 
 - **Stay aligned:** `bd catchup` (See what your team/agents completed since last checked)
-- **Update tool:** `bd upgrade check` (Interactive update from main repo)
-- **Check health:** `bd devlog status`
 
 ## 🔄 The Agent Workflow
 
-BeadsLog provides agents with dynamic context so they don't have to guess or brute-force the repo.
+BeadsLog provides agents with dynamic context and architectural awareness, eliminating the need to guess or brute-force the repository.
 
-| Phase | Tooling / Action |
-|---|---|
-| **Probing** | `bd devlog search \| impact \| entities` |
-| **Implementing** | Standard dev loop |
-| **Recording** | `bd devlog record` (Permanent technical memory) |
-| **Pivoting** | `bd devlog pause \| abandon` (Managing intent) |
+### Semantic Search & Exploration
+Agents use specialized tools to map the project's evolution and dependencies:
+- **`search`**: FTS5-powered retrieval of historical decisions and narratives.
+- **`impact`**: Identifies all components semantically dependent on a target entity.
+- **`entities`**: Discovers the most significant architectural components by relationship density.
+- **`path`**: Traces the chain of events and sessions linking two disparate entities.
+
+### Stateful Iteration
+Acquire context → Implement → Iterate → Record.
 
 ## 🎯 Use Cases
 
