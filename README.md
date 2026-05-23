@@ -21,7 +21,7 @@ bd onboard
 
 ## 🛠 Useful commands
 
-Your agents handle the heavy lifting. As a human, you only need to know one command:
+Your agents handle the heavy lifting. As a human, you only need to know one command: [Check all commands here](docs/COMMANDS.md).
 
 - **Stay aligned:** `bd catchup` (See what your team/agents completed since last checked)
 
