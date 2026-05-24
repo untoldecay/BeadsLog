@@ -48,6 +48,21 @@ The entities from both Regex and Ollama are merged (Ollama gets higher confidenc
 **Proposed Solution:**
 -   **Daemon Re-anchoring:** We recently built the `ReconcileGitFacts` daemon worker which uses `git patch-id` to detect if squashed code survived in the `HEAD`. We can extend this worker to automatically update the `commit_sha` in the `sessions` table to the new squash commit SHA once a match is found.
 
-## 3. Recommended Next Steps
+## 3. Product Principle & Revised Priority Matrix
 
-For our next implementation phase, I recommend we prioritize **Gap 2 (Entity Aliasing)**. It is a high-leverage feature that will immediately clean up the architectural graph noise caused by the regex extractor, restoring the utility of `bd devlog graph` and `impact` commands.
+**Core Principle:** *Structured human intent beats heuristic inference, and heuristic inference beats nothing.*
+
+Based on this principle, our implementation sequence must prefer explicit markdown edges first, then careful extraction, then alias consolidation.
+
+### Phase 1: Source Integrity (The Foundation)
+*   ✅ **File Existence Validation:** Completed (Gap 1 & 4). `bd devlog record` strictly enforces disk artifacts.
+*   *Pending:* Ensure session validity and exact commit/session linkage remain resilient.
+
+### Phase 2: Graph Correctness (Stopping Noise Upstream)
+Instead of starting with Aliasing (which treats the symptom), we must address the root cause of the noise:
+1.  **Promote Explicit Edges (Gap 3):** Make the `### Architectural Relationships` markdown block the absolute strongest source of truth, aggressively outranking any inferred entities.
+2.  **Conservative Regex (Gap 2):** Tighten the `RegexExtractor` so it only creates entities when confidence is high or the token is clearly intentional, rather than splitting indiscriminately on hyphens/camelCase.
+3.  **Manual Curation (Gap 2):** *After* the upstream noise is reduced, implement **Entity Aliasing** (`bd devlog alias`) as a manual curation tool for legacy noise and unavoidable naming drift.
+
+### Phase 3: History Recovery
+*   **Git Re-anchoring (Gap 5):** Extend the daemon's `patch-id` logic to re-anchor squashed or rebased sessions to their new SHAs, solving history integrity independent of graph cleanliness.
