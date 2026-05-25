@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.2] - 2026-05-25
+
+### Fixed
+- **Database Migration** - Added missing `confidence` and `source` columns to the `entity_deps` table for existing databases, resolving write errors in version 0.51.1.
+
 ## [0.51.1] - 2026-05-25
 
 ### Added

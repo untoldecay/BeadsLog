@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.1"
+const CurrentVersion = "0.51.2"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.2",
+		Date:    "2026-05-25",
+		Features: []string{
+			"Database Migration: Added missing 'confidence' and 'source' columns to 'entity_deps' table for existing databases.",
+		},
+		Protocol: []string{
+			"Agents SHOULD run 'bd devlog verify --fix' after upgrading to backfill relationship metadata.",
+		},
+	},
 	{
 		Version: "0.51.1",
 		Date:    "2026-05-25",
