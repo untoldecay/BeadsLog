@@ -14,10 +14,25 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.0"
+const CurrentVersion = "0.51.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.1",
+		Date:    "2026-05-25",
+		Features: []string{
+			"Graph Aliasing: Collapse fragmented regex entities using 'bd devlog alias'.",
+			"Opportunistic Discovery: Automatic hinting in search/graph outputs for potential entity merges.",
+			"Extraction Hardening: More conservative Regex extractor with noise blacklist and confidence levels.",
+			"Explicit Edge Promotion: Manual relationships in '### Architectural Relationships' are now gold-standard (1.0 confidence).",
+			"Git-Based History Recovery: Automated re-anchoring of devlog sessions to new SHAs after squash-merges using patch-id.",
+		},
+		Protocol: []string{
+			"Agents SHOULD verify '💡 OPPORTUNITY' hints in search results and run 'alias' command to maintain graph cleanliness.",
+			"Prioritize manual architectural relationships (Markdown arrows) over AI-inferred ones.",
+		},
+	},
 	{
 		Version: "0.51.0",
 		Date:    "2026-05-21",

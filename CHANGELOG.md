@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.1] - 2026-05-25
+
+### Added
+- **Graph Aliasing** - `bd devlog alias` command to collapse fragmented regex entities into canonical nodes.
+- **Opportunistic Discovery** - Jaccard-based session overlap detection with proactive `💡 OPPORTUNITY` hints in search/graph.
+- **Extraction Hardening** - Conservative `RegexExtractor` with noise blacklist and length-based confidence levels.
+- **Explicit Edge Promotion** - Relationships in `### Architectural Relationships` are prioritized with 1.0 confidence.
+- **History Recovery** - Daemon now automatically re-anchors devlog sessions to new SHAs after squash-merges using `git patch-id`.
+
+### Changed
+- Standardized Search UI with clear Author, Agent (🤖), and Branch metadata.
+- Improved Narrative Snippets with increased context length and Lipgloss-native highlighting.
+
 ## [0.51.0] - 2026-05-22
 
 ### Added
