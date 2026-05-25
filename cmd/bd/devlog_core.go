@@ -403,6 +403,11 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 		if err == nil {
 			entityID = actualID
 		}
+		
+		// STICKY ALIAS: Check if this name is aliased to something else
+		if canonicalID := resolveAlias(store, entity.Name); canonicalID != "" {
+			entityID = canonicalID
+		}
 
 		// Link session -> entity
 		_, err = db.Exec(`
@@ -419,6 +424,14 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 		// Ensure both entities exist and get their IDs
 		fromID := ensureEntityExists(store, rel.FromEntity)
 		toID := ensureEntityExists(store, rel.ToEntity)
+
+		// STICKY ALIAS: Respect registry
+		if alias := resolveAlias(store, rel.FromEntity); alias != "" {
+			fromID = alias
+		}
+		if alias := resolveAlias(store, rel.ToEntity); alias != "" {
+			toID = alias
+		}
 
 		// Link them using IDs
 		// Use ON CONFLICT to update confidence if a higher one is found
@@ -453,6 +466,16 @@ func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
 		return actualID
 	}
 	return entityID
+}
+
+func resolveAlias(store *sqlite.SQLiteStorage, name string) string {
+	db := store.UnderlyingDB()
+	var canonicalID string
+	err := db.QueryRow("SELECT canonical_id FROM entity_aliases WHERE alias_name = ?", strings.ToLower(name)).Scan(&canonicalID)
+	if err == nil {
+		return canonicalID
+	}
+	return ""
 }
 
 func hashID(s string) string {

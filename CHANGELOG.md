@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.3] - 2026-05-25
+
+### Added
+- **Sticky Aliases** - Aliases are now stored in a persistent registry, ensuring they survive `bd devlog sync` and `verify` operations.
+- **Undo Support** - Added `bd devlog unalias <name>` to remove an alias mapping and restore the original entity link on next sync.
+
 ## [0.51.2] - 2026-05-25
 
 ### Fixed

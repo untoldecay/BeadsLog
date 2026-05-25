@@ -69,6 +69,7 @@ var migrationsList = []Migration{
 	{"branch_states_table", migrations.MigrateBranchStatesTable},
 	{"devlog_commit_sha", migrations.MigrateDevlogCommitSHA},
 	{"entity_deps_hardening", migrations.MigrateEntityDepsHardening},
+	{"entity_alias_registry", migrations.MigrateEntityAliasRegistry},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -145,6 +146,7 @@ func getMigrationDescription(name string) string {
 		"branch_states_table":          "Adds branch_states and branch_cache tables for session lifecycle tracking",
 		"devlog_commit_sha":            "Adds commit_sha column to sessions table for reachability tracking",
 		"entity_deps_hardening":        "Adds confidence and source columns to entity_deps table for extraction hardening",
+		"entity_alias_registry":        "Adds entity_aliases table to support sticky and reversible aliasing",
 	}
 
 	if desc, ok := descriptions[name]; ok {

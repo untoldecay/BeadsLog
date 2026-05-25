@@ -7,16 +7,17 @@ import (
 )
 
 // AliasEntities collapses one or more alias entities into a target canonical entity.
-// It merges all relationships and session mentions in a single transaction.
-func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []string) error {
+// It merges all relationships and session mentions in a single transaction and 
+// records the mapping in the registry.
+func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliases []ResolvedEntity) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	for _, aliasID := range aliasIDs {
-		if aliasID == targetID {
+	for _, alias := range aliases {
+		if alias.ID == targetID {
 			continue
 		}
 
@@ -24,11 +25,11 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []
 		_, err = tx.ExecContext(ctx, `
 			INSERT OR IGNORE INTO session_entities (session_id, entity_id, relevance)
 			SELECT session_id, ?, relevance FROM session_entities WHERE entity_id = ?
-		`, targetID, aliasID)
+		`, targetID, alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to merge session_entities: %w", err)
 		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM session_entities WHERE entity_id = ?", aliasID)
+		_, err = tx.ExecContext(ctx, "DELETE FROM session_entities WHERE entity_id = ?", alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to cleanup alias session_entities: %w", err)
 		}
@@ -37,7 +38,7 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []
 		_, err = tx.ExecContext(ctx, `
 			INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
 			SELECT ?, to_entity, relationship, discovered_in FROM entity_deps WHERE from_entity = ?
-		`, targetID, aliasID)
+		`, targetID, alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to merge outgoing entity_deps: %w", err)
 		}
@@ -46,12 +47,12 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []
 		_, err = tx.ExecContext(ctx, `
 			INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
 			SELECT from_entity, ?, relationship, discovered_in FROM entity_deps WHERE to_entity = ?
-		`, targetID, aliasID)
+		`, targetID, alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to merge incoming entity_deps: %w", err)
 		}
 
-		_, err = tx.ExecContext(ctx, "DELETE FROM entity_deps WHERE from_entity = ? OR to_entity = ?", aliasID, aliasID)
+		_, err = tx.ExecContext(ctx, "DELETE FROM entity_deps WHERE from_entity = ? OR to_entity = ?", alias.ID, alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to cleanup alias entity_deps: %w", err)
 		}
@@ -59,7 +60,7 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []
 		// 4. Update Target Entity Stats
 		var aliasMentions int
 		var aliasFirstSeen string
-		err = tx.QueryRowContext(ctx, "SELECT mention_count, first_seen FROM entities WHERE id = ?", aliasID).Scan(&aliasMentions, &aliasFirstSeen)
+		err = tx.QueryRowContext(ctx, "SELECT mention_count, first_seen FROM entities WHERE id = ?", alias.ID).Scan(&aliasMentions, &aliasFirstSeen)
 		if err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("failed to get alias stats: %w", err)
 		}
@@ -76,14 +77,29 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliasIDs []
 			}
 		}
 
-		// 5. Delete Alias Entity
-		_, err = tx.ExecContext(ctx, "DELETE FROM entities WHERE id = ?", aliasID)
+		// 5. Record in Registry
+		_, err = tx.ExecContext(ctx, `
+			INSERT OR REPLACE INTO entity_aliases (alias_name, canonical_id)
+			VALUES (?, ?)
+		`, alias.Name, targetID)
+		if err != nil {
+			return fmt.Errorf("failed to record alias in registry: %w", err)
+		}
+
+		// 6. Delete Alias Entity
+		_, err = tx.ExecContext(ctx, "DELETE FROM entities WHERE id = ?", alias.ID)
 		if err != nil {
 			return fmt.Errorf("failed to delete alias entity: %w", err)
 		}
 	}
 
 	return tx.Commit()
+}
+
+// UnaliasEntity removes a mapping from the registry.
+func UnaliasEntity(ctx context.Context, db *sql.DB, aliasName string) error {
+	_, err := db.ExecContext(ctx, "DELETE FROM entity_aliases WHERE alias_name = ?", aliasName)
+	return err
 }
 
 type AliasSuggestion struct {

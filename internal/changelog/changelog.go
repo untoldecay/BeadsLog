@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.2"
+const CurrentVersion = "0.51.3"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.3",
+		Date:    "2026-05-25",
+		Features: []string{
+			"Sticky Aliases: Entities merged via 'bd devlog alias' now stay merged even after a sync.",
+			"Reversible Aliasing: New 'bd devlog unalias <name>' command to remove an alias and restore the original entity.",
+		},
+		Protocol: []string{
+			"Use 'bd devlog unalias' to undo mistaken merges.",
+		},
+	},
 	{
 		Version: "0.51.2",
 		Date:    "2026-05-25",

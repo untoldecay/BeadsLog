@@ -2087,7 +2087,7 @@ Example:
 		target := targets[0]
 
 		var aliasIDs []string
-		var resolvedAliases []string
+		var resolvedAliases []queries.ResolvedEntity
 		for _, name := range aliasNames {
 			trimmed := strings.TrimSpace(name)
 			if trimmed == "" {
@@ -2102,7 +2102,7 @@ Example:
 				continue
 			}
 			aliasIDs = append(aliasIDs, aliases[0].ID)
-			resolvedAliases = append(resolvedAliases, aliases[0].Name)
+			resolvedAliases = append(resolvedAliases, aliases[0])
 		}
 
 		if len(aliasIDs) == 0 {
@@ -2110,14 +2110,42 @@ Example:
 			return
 		}
 
-		fmt.Printf("Aliasing %s → %s...\n", strings.Join(resolvedAliases, ", "), target.Name)
+		var names []string
+		for _, a := range resolvedAliases {
+			names = append(names, a.Name)
+		}
+		fmt.Printf("Aliasing %s → %s...\n", strings.Join(names, ", "), target.Name)
 
-		if err := queries.AliasEntities(rootCtx, db, target.ID, aliasIDs); err != nil {
+		if err := queries.AliasEntities(rootCtx, db, target.ID, resolvedAliases); err != nil {
 			fmt.Fprintf(os.Stderr, "Error aliasing entities: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("✅ Entities collapsed successfully.")
+		fmt.Println("✅ Entities collapsed successfully. Aliases are now sticky.")
+	},
+}
+
+var devlogUnaliasCmd = &cobra.Command{
+	Use:   "unalias [alias_name]",
+	Short: "Remove an alias mapping and restore the original entity on next sync",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		aliasName := strings.ToLower(strings.TrimSpace(args[0]))
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		if err := queries.UnaliasEntity(rootCtx, db, aliasName); err != nil {
+			fmt.Fprintf(os.Stderr, "Error removing alias: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✅ Alias '%s' removed. Run 'bd devlog verify --fix' to restore the original entity links.\n", aliasName)
 	},
 }
 
@@ -2635,6 +2663,7 @@ func init() {
 	devlogCmd.AddCommand(devlogOnboardCmd)
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogAliasCmd)
+	devlogCmd.AddCommand(devlogUnaliasCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
 	devlogCmd.AddCommand(devlogPathCmd)
