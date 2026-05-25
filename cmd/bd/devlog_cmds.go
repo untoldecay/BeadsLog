@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -755,6 +756,7 @@ This includes:
 		} else {
 			fmt.Println("No graph or co-occurrence data found.")
 		}
+		showAliasHints(rootCtx, db)
 		fmt.Printf("\n%s Tip: Use --help for depth and filtering options.\n", ui.RenderAccent("💡"))
 	},
 }
@@ -1196,6 +1198,7 @@ Examples:
 
 			// Found direct results (sessions and/or related entities)
 			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth(), response.Strategy, explain))
+			showAliasHints(rootCtx, db)
 			fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 			return
 		}
@@ -1217,6 +1220,7 @@ Examples:
 
 				if err == nil && len(correctedResponse.Results) > 0 {
 					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
+					showAliasHints(rootCtx, db)
 					fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
@@ -1230,11 +1234,13 @@ Examples:
 				suggestionNames[i] = s.Name
 			}
 			fmt.Println(ui.RenderNoResults(query, suggestionNames, ui.GetWidth()))
+			showAliasHints(rootCtx, db)
 			fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 			return
 		}
 
 		fmt.Println(ui.RenderNoResults(query, nil, ui.GetWidth()))
+		showAliasHints(rootCtx, db)
 		fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 	},
 }
@@ -2051,6 +2057,70 @@ var devlogRecordCmd = &cobra.Command{
 	},
 }
 
+var devlogAliasCmd = &cobra.Command{
+	Use:   "alias [target] [alias1,alias2,...]",
+	Short: "Collapse fragmented entities into a single canonical entity",
+	Long: `Collapse one or more fragmented entities into a target canonical entity.
+This merges all session mentions and architectural relationships in the database.
+
+Example:
+  bd devlog alias AuthService auth-service,auth-provider`,
+	Args:  cobra.MinimumNArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		targetName := args[0]
+		aliasNames := strings.Split(strings.Join(args[1:], ","), ",")
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		// Resolve target
+		targets, _ := queries.ResolveEntities(rootCtx, db, targetName, 1)
+		if len(targets) == 0 {
+			fmt.Printf("Error: target entity '%s' not found.\n", targetName)
+			return
+		}
+		target := targets[0]
+
+		var aliasIDs []string
+		var resolvedAliases []string
+		for _, name := range aliasNames {
+			trimmed := strings.TrimSpace(name)
+			if trimmed == "" {
+				continue
+			}
+			aliases, _ := queries.ResolveEntities(rootCtx, db, trimmed, 1)
+			if len(aliases) == 0 {
+				fmt.Printf("Warning: alias entity '%s' not found, skipping.\n", trimmed)
+				continue
+			}
+			if aliases[0].ID == target.ID {
+				continue
+			}
+			aliasIDs = append(aliasIDs, aliases[0].ID)
+			resolvedAliases = append(resolvedAliases, aliases[0].Name)
+		}
+
+		if len(aliasIDs) == 0 {
+			fmt.Println("No valid aliases found to merge.")
+			return
+		}
+
+		fmt.Printf("Aliasing %s → %s...\n", strings.Join(resolvedAliases, ", "), target.Name)
+
+		if err := queries.AliasEntities(rootCtx, db, target.ID, aliasIDs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error aliasing entities: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("✅ Entities collapsed successfully.")
+	},
+}
+
 var devlogPauseCmd = &cobra.Command{
 	Use:   "pause",
 	Short: "Pause work on a specific scope (branch, entity, file, task)",
@@ -2564,6 +2634,7 @@ func init() {
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)
 	devlogCmd.AddCommand(devlogSyncCmd)
+	devlogCmd.AddCommand(devlogAliasCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
 	devlogCmd.AddCommand(devlogPathCmd)
@@ -2612,4 +2683,22 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 		}
 	}
 	return items
+}
+
+func showAliasHints(ctx context.Context, db *sql.DB) {
+	// Only show hints in terminal
+	if !ui.IsTerminal() {
+		return
+	}
+
+	suggestions, err := queries.GetAliasSuggestions(ctx, db, 0.8)
+	if err != nil || len(suggestions) == 0 {
+		return
+	}
+
+	for _, s := range suggestions {
+		fmt.Printf("\n%s OPPORTUNITY: '%s' and '%s' appear to be the same (%.0f%% session overlap).\n", 
+			ui.RenderAccent("💡"), s.EntityA, s.EntityB, s.Similarity*100)
+		fmt.Printf("   Run 'bd devlog alias %s %s' after verification.\n", s.EntityA, s.EntityB)
+	}
 }
