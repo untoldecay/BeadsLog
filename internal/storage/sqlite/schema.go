@@ -130,10 +130,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     author TEXT,
     author_email TEXT,
     agent TEXT,
-    branch TEXT
+    branch TEXT,
+    commit_sha TEXT
 );
 
-CREATE TABLE IF NOT EXISTS entities (
+    CREATE TABLE IF NOT EXISTS entities (
     id TEXT PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     type TEXT DEFAULT 'component',
@@ -141,18 +142,18 @@ CREATE TABLE IF NOT EXISTS entities (
     mention_count INTEGER DEFAULT 1,
     confidence REAL DEFAULT 1.0,
     source TEXT DEFAULT 'regex'
-);
+    );
 
-CREATE TABLE IF NOT EXISTS session_entities (
+    CREATE TABLE IF NOT EXISTS session_entities (
     session_id TEXT,
     entity_id TEXT,
     relevance TEXT DEFAULT 'mentioned',
     PRIMARY KEY(session_id, entity_id),
     FOREIGN KEY(session_id) REFERENCES sessions(id),
     FOREIGN KEY(entity_id) REFERENCES entities(id)
-);
+    );
 
-CREATE TABLE IF NOT EXISTS entity_deps (
+    CREATE TABLE IF NOT EXISTS entity_deps (
     from_entity TEXT,
     to_entity TEXT,
     relationship TEXT,
@@ -163,6 +164,30 @@ CREATE TABLE IF NOT EXISTS entity_deps (
     FOREIGN KEY(from_entity) REFERENCES entities(id),
     FOREIGN KEY(to_entity) REFERENCES entities(id),
     FOREIGN KEY(discovered_in) REFERENCES sessions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS branch_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    state TEXT NOT NULL,           -- active, paused, abandoned
+    scope_type TEXT NOT NULL,      -- branch, entity, file, task, session
+    scope_ref TEXT NOT NULL,       -- the actual reference (e.g. branch name, entity ID)
+    short_reason TEXT,
+    full_reason_ref TEXT,          -- link to the special devlog entry ID
+    actor TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    commit_sha TEXT,
+    branch_ref TEXT,
+    UNIQUE(scope_type, scope_ref)
+    );
+
+    CREATE TABLE IF NOT EXISTS branch_cache (
+    branch_name TEXT PRIMARY KEY,
+    last_validated_sha TEXT,
+    is_merged INTEGER DEFAULT 0,
+    is_deleted INTEGER DEFAULT 0,
+    last_checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
 );
 
 CREATE TABLE IF NOT EXISTS extraction_log (

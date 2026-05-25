@@ -82,14 +82,23 @@ func reconcileBranch(ctx context.Context, store *sqlite.SQLiteStorage, branch st
 
 	// 3. Deep check if branch is deleted but code landed (Squash-Merge survival)
 	if !isMerged && !exists {
-		// Find any session on this branch that has a commit_sha
-		var lastSHA string
-		err := store.UnderlyingDB().QueryRowContext(ctx, "SELECT commit_sha FROM sessions WHERE branch LIKE ? AND commit_sha IS NOT NULL AND commit_sha != '' ORDER BY timestamp DESC LIMIT 1", branch+"%").Scan(&lastSHA)
-		if err == nil && lastSHA != "" {
-			found, _ := findPatchInHead(lastSHA)
-			if found {
-				isMerged = true
-				log.log("Branch %s was squashed/rebased into HEAD (found via patch-id)", branch)
+		// Find all sessions on this branch that have a commit_sha
+		rows, err := store.UnderlyingDB().QueryContext(ctx, "SELECT id, commit_sha FROM sessions WHERE branch LIKE ? AND commit_sha IS NOT NULL AND commit_sha != ''", branch+"%")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var sessionID, oldSHA string
+				if err := rows.Scan(&sessionID, &oldSHA); err == nil {
+					found, newSHA, _ := findPatchInHead(oldSHA)
+					if found && newSHA != "" {
+						isMerged = true
+						// RE-ANCHOR: Update the session with the new SHA found in HEAD
+						_, err = store.UnderlyingDB().ExecContext(ctx, "UPDATE sessions SET commit_sha = ? WHERE id = ?", newSHA, sessionID)
+						if err == nil {
+							log.log("Re-anchored session %s: %s -> %s (squash-merge survivor)", sessionID, oldSHA[:8], newSHA[:8])
+						}
+					}
+				}
 			}
 		}
 	}
@@ -107,31 +116,39 @@ func reconcileBranch(ctx context.Context, store *sqlite.SQLiteStorage, branch st
 	}
 }
 
-// findPatchInHead checks if a commit logic exists in HEAD even if branch was squashed/deleted
-func findPatchInHead(commitSHA string) (bool, error) {
+// findPatchInHead checks if a commit logic exists in HEAD even if branch was squashed/deleted.
+// Returns (found, newSHA, error)
+func findPatchInHead(commitSHA string) (bool, string, error) {
 	if commitSHA == "" {
-		return false, nil
+		return false, "", nil
 	}
 
 	// git patch-id of the target commit
 	patchIDCmd := exec.Command("sh", "-c", fmt.Sprintf("git show %s | git patch-id", commitSHA))
 	output, err := patchIDCmd.Output()
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	
 	parts := strings.Fields(string(output))
 	if len(parts) < 1 {
-		return false, fmt.Errorf("invalid patch-id output")
+		return false, "", fmt.Errorf("invalid patch-id output")
 	}
 	targetPatchID := parts[0]
 
 	// Check if this patch-id exists in HEAD (last 100 commits for performance)
-	// This is still slow. We might want to optimize this.
-	checkCmd := exec.Command("sh", "-c", fmt.Sprintf("git log -n 100 --format=%%H | while read sha; do git show $sha | git patch-id; done | grep ^%s", targetPatchID))
-	if err := checkCmd.Run(); err == nil {
-		return true, nil
+	// We use 'git log' to iterate and 'git show | git patch-id' to compare
+	// Format: <patch-id> <commit-hash>
+	checkCmd := exec.Command("sh", "-c", fmt.Sprintf("git log -n 100 --format=%%H | while read sha; do patch=$(git show $sha | git patch-id); echo \"$patch $sha\"; done | grep ^%s", targetPatchID))
+	out, err := checkCmd.Output()
+	if err == nil {
+		line := strings.TrimSpace(string(out))
+		fields := strings.Fields(line)
+		if len(fields) >= 3 {
+			// fields[0] is patch-id, fields[1] is the inner patch-id, fields[2] is the commit hash
+			return true, fields[2], nil
+		}
 	}
 
-	return false, nil
+	return false, "", nil
 }
