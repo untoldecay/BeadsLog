@@ -31,6 +31,9 @@ type SearchResultItem struct {
 	StatusReason    string
 	IsValidated     bool
 	Author          string
+	AuthorEmail     string
+	Agent           string
+	Branch          string
 }
 
 // renderSingleTable renders a simple list into a 1-column table with a header
@@ -92,7 +95,7 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 				idCol += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Date)
 			}
 			
-			// Content column (Title + Narrative + Explain)
+			// Content column (Title + Metadata + Narrative + Explain)
 			title := r.Title
 			if r.LifecycleStatus == "paused" {
 				title = lipgloss.NewStyle().Foreground(ColorWarn).Render("[⏸ PAUSED]") + " " + title
@@ -105,13 +108,21 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 			var contentLines []string
 
 			if explain {
-				// Invert scores for display: BM25 is usually negative, so -r.BM25 is positive.
-				// Final score should be shown as "Higher is better" for human intuition.
 				displayScore := -r.Score 
 				contentLines = append(contentLines, fmt.Sprintf("%s (Relevance: %.2f)", title, displayScore))
 			} else {
 				contentLines = append(contentLines, title)
 			}
+
+			// Add Metadata (Author, Agent, Branch)
+			metaParts := []string{fmt.Sprintf("   👤 %s", lipgloss.NewStyle().Foreground(ColorAccent).Render(r.Author))}
+			if r.Agent != "" && r.Agent != "Unknown" {
+				metaParts = append(metaParts, fmt.Sprintf("🤖 %s", lipgloss.NewStyle().Foreground(ColorPass).Render(r.Agent)))
+			}
+			if r.Branch != "" && r.Branch != "N/A" {
+				metaParts = append(metaParts, fmt.Sprintf(" %s", lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Branch)))
+			}
+			contentLines = append(contentLines, strings.Join(metaParts, "  "))
 
 			if r.StatusReason != "" {
 				reasonStyle := lipgloss.NewStyle().Foreground(ColorWarn).Italic(true)
@@ -122,13 +133,36 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 			}
 			
 			if r.Narrative != "" {
-				narrative := strings.ReplaceAll(r.Narrative, "\n", " ")
-				// Truncate narrative if too long for a single line in table
-				maxNarrativeWidth := width - 20
-				if len(narrative) > maxNarrativeWidth {
-					narrative = narrative[:maxNarrativeWidth-3] + "..."
+				// For snippets (like FTS <b> highlights), we keep them as is but ensure they are indented
+				// and don't break the table.
+				narrative := r.Narrative
+				
+				// Highlighted snippets: convert <b> to lipgloss bold/color
+				// We do this surgically to avoid messing up the rest of the string
+				if strings.Contains(narrative, "<b>") {
+					narrative = strings.ReplaceAll(narrative, "<b>", lipgloss.NewStyle().Bold(true).Foreground(ColorAccent).Render(""))
+					narrative = strings.ReplaceAll(narrative, "</b>", lipgloss.NewStyle().Bold(false).Foreground(lipgloss.NoColor{}).Render(""))
 				}
-				contentLines = append(contentLines, narrative)
+
+				// Handle multi-line previews by indenting each line
+				lines := strings.Split(narrative, "\n")
+				lineCount := 0
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line == "" {
+						continue
+					}
+					// Truncate line if too long for table
+					maxLineLen := width - 18
+					if len(line) > maxLineLen {
+						line = line[:maxLineLen-3] + "..."
+					}
+					contentLines = append(contentLines, "   "+line)
+					lineCount++
+					if lineCount >= 3 { // Limit to 3 lines of snippet for cleaner list
+						break
+					}
+				}
 			}
 			
 			if explain {

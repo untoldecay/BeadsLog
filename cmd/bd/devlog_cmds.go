@@ -2680,6 +2680,9 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 			StatusReason:    r.StatusReason,
 			IsValidated:     r.IsValidated,
 			Author:          r.Author,
+			AuthorEmail:     r.AuthorEmail,
+			Agent:           r.Agent,
+			Branch:          r.Branch,
 		}
 	}
 	return items

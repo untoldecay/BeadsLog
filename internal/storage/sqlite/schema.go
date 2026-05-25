@@ -186,8 +186,6 @@ CREATE TABLE IF NOT EXISTS sessions (
     is_merged INTEGER DEFAULT 0,
     is_deleted INTEGER DEFAULT 0,
     last_checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
 );
 
 CREATE TABLE IF NOT EXISTS extraction_log (

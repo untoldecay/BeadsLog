@@ -35,7 +35,9 @@ type SearchResult struct {
 	IsValidated     bool                 `json:"is_validated"`
 	Branch          string               `json:"branch"`
 	Author          string               `json:"author"`
-	}
+	AuthorEmail     string               `json:"author_email"`
+	Agent           string               `json:"agent"`
+}
 
 type SearchOptions struct {
 	Query         string
@@ -147,7 +149,7 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
 
 func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuery string, tokens []string, opts SearchOptions) ([]SearchResult, error) {
 	// snippet column is index 2 (narrative)
-	snippetFunc := "snippet(sessions_fts, 2, '<b>', '</b>', '...', 64)"
+	snippetFunc := "snippet(sessions_fts, 2, '<b>', '</b>', '...', 128)"
 
 	// Hybrid Scoring Formula Implementation
 	// weights: id(0.0), title(10.0), narrative(1.0), author(0.5), agent(0.5), branch(0.5)
@@ -171,6 +173,8 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			(julianday('now') - julianday(s.timestamp)) as age_days,
 			COALESCE(s.branch, 'N/A'),
 			COALESCE(s.author, 'Unknown'),
+			COALESCE(s.author_email, ''),
+			COALESCE(s.agent, 'Unknown'),
 			bs.state,
 			bs.short_reason,
 			COALESCE(bc.is_merged, 0),
@@ -211,7 +215,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		var reason sql.NullString
 		var isMerged, isDeleted int
 		
-		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &r.Author, &state, &reason, &isMerged, &isDeleted); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &r.Author, &r.AuthorEmail, &r.Agent, &state, &reason, &isMerged, &isDeleted); err != nil {
 			continue
 		}
 
