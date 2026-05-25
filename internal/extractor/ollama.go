@@ -187,6 +187,8 @@ Required Output Format:
 				FromEntity: strings.ToLower(r.From),
 				ToEntity:   strings.ToLower(r.To),
 				Type:       r.Type,
+				Confidence: 0.9, // High confidence, but outranked by explicit markdown arrows (1.0)
+				Source:     "ollama",
 			})
 		}
 	}

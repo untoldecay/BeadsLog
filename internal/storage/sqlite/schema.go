@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS entity_deps (
     to_entity TEXT,
     relationship TEXT,
     discovered_in TEXT,
+    confidence REAL DEFAULT 1.0,
+    source TEXT DEFAULT 'manual',
     PRIMARY KEY(from_entity, to_entity, relationship),
     FOREIGN KEY(from_entity) REFERENCES entities(id),
     FOREIGN KEY(to_entity) REFERENCES entities(id),

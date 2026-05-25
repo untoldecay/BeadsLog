@@ -42,7 +42,7 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	start := time.Now()
 	
 	allEntities := make(map[string]Entity)
-	allRelationships := make([]Relationship, 0)
+	allRelationships := make(map[string]Relationship)
 	usedExtractors := make([]string, 0)
 	
 	for _, ext := range p.extractors {
@@ -67,13 +67,27 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 			}
 		}
 		
-		// Merge Relationships (simple append for now, duplicates handled by DB UNIQUE constraint or ignored)
-		allRelationships = append(allRelationships, relationships...)
+		// Merge Relationships
+		for _, r := range relationships {
+			key := fmt.Sprintf("%s|%s|%s", r.FromEntity, r.ToEntity, r.Type)
+			if existing, ok := allRelationships[key]; ok {
+				if r.Confidence > existing.Confidence {
+					allRelationships[key] = r
+				}
+			} else {
+				allRelationships[key] = r
+			}
+		}
 	}
 	
 	resultEntities := make([]Entity, 0, len(allEntities))
 	for _, e := range allEntities {
 		resultEntities = append(resultEntities, e)
+	}
+
+	resultRelationships := make([]Relationship, 0, len(allRelationships))
+	for _, r := range allRelationships {
+		resultRelationships = append(resultRelationships, r)
 	}
 	
 	// Note: We don't call ExtractRelationships separately anymore, it's part of RegexExtractor
@@ -93,7 +107,7 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	
 	return &ExtractionResult{
 		Entities:      resultEntities,
-		Relationships: allRelationships,
+		Relationships: resultRelationships,
 		Duration:      time.Since(start),
 		Extractor:     extractorName,
 	}, nil

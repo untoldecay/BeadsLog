@@ -53,3 +53,30 @@ Also changed nginx.conf settings.
 		t.Errorf("Expected 2 relationships, got %d", len(result.Relationships))
 	}
 }
+
+func TestRelationshipPrioritization(t *testing.T) {
+	// We want to verify that manual relationships (confidence 1.0)
+	// outrank inferred ones if they share the same key.
+	
+	pipeline := NewPipeline("")
+	text := `
+- A -> B (uses)
+`
+	result, err := pipeline.Run(context.Background(), text)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	found := false
+	for _, r := range result.Relationships {
+		if r.FromEntity == "a" && r.ToEntity == "b" {
+			found = true
+			if r.Source != "manual" || r.Confidence != 1.0 {
+				t.Errorf("Expected manual relationship with 1.0 confidence, got %s and %f", r.Source, r.Confidence)
+			}
+		}
+	}
+	if !found {
+		t.Error("Relationship A -> B not found")
+	}
+}

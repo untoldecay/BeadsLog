@@ -421,10 +421,15 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 		toID := ensureEntityExists(store, rel.ToEntity)
 
 		// Link them using IDs
+		// Use ON CONFLICT to update confidence if a higher one is found
 		_, err := db.Exec(`
-			INSERT OR IGNORE INTO entity_deps (from_entity, to_entity, relationship, discovered_in)
-			VALUES (?, ?, ?, ?)
-		`, fromID, toID, rel.Type, sessionID)
+			INSERT INTO entity_deps (from_entity, to_entity, relationship, discovered_in, confidence, source)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(from_entity, to_entity, relationship) DO UPDATE SET
+				confidence = MAX(confidence, excluded.confidence),
+				source = CASE WHEN excluded.confidence > confidence THEN excluded.source ELSE source END,
+				discovered_in = CASE WHEN excluded.confidence > confidence THEN excluded.discovered_in ELSE discovered_in END
+		`, fromID, toID, rel.Type, sessionID, rel.Confidence, rel.Source)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error linking entities: %v\n", err)
 		}

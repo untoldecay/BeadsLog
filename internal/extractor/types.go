@@ -19,4 +19,6 @@ type Relationship struct {
 	FromEntity string
 	ToEntity   string
 	Type       string
+	Confidence float64
+	Source     string // "regex" or "ollama"
 }
