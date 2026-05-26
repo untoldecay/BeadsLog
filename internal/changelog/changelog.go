@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.3"
+const CurrentVersion = "0.51.4"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.4",
+		Date:    "2026-05-25",
+		Features: []string{
+			"Shared Alias Registry: Aliases are now stored in '.beads/aliases.jsonl' and shared via Git.",
+			"Reproducible Graphs: Database reconstruction (bd init) now restores all aliases from the repo.",
+		},
+		Protocol: []string{
+			"Aliases are now a shared source of truth in the repository.",
+		},
+	},
 	{
 		Version: "0.51.3",
 		Date:    "2026-05-25",

@@ -2063,6 +2063,12 @@ var devlogAliasCmd = &cobra.Command{
 	Long: `Collapse one or more fragmented entities into a target canonical entity.
 This merges all session mentions and architectural relationships in the database.
 
+Sticky Aliasing:
+The mapping is saved in a persistent registry inside the BeadsLog database. 
+This means the alias will survive 'bd devlog sync' and 'verify --fix' operations.
+However, because this is a database-level mapping, if you completely delete the 
+.beads/beads.db file and re-initialize the workspace, the aliases will be lost.
+
 Example:
   bd devlog alias AuthService auth-service,auth-provider`,
 	Args:  cobra.MinimumNArgs(2),
@@ -2128,6 +2134,11 @@ Example:
 var devlogUnaliasCmd = &cobra.Command{
 	Use:   "unalias [alias_name]",
 	Short: "Remove an alias mapping and restore the original entity on next sync",
+	Long: `Remove an alias mapping from the persistent registry.
+
+Once removed, you must run 'bd devlog verify --fix' to re-parse the 
+underlying Markdown devlogs. This will extract the original entity name 
+from the text and restore its session links and architectural dependencies.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		aliasName := strings.ToLower(strings.TrimSpace(args[0]))

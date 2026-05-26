@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/debug"
@@ -143,6 +144,40 @@ func importFromJSONLInline(ctx context.Context, jsonlPath string, renameOnImport
 	}
 	fmt.Fprintf(os.Stderr, "\n")
 
+	// Import aliases
+	beadsDir := filepath.Dir(jsonlPath)
+	aliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
+	if _, err := os.Stat(aliasesPath); err == nil {
+		if err := importAliasesFromJSONL(ctx, aliasesPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to import aliases: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "Imported entity aliases from registry.\n")
+		}
+	}
+
+	return nil
+}
+
+func importAliasesFromJSONL(ctx context.Context, aliasesPath string) error {
+	f, err := os.Open(aliasesPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var aliases []types.AliasRecord
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		var a types.AliasRecord
+		if err := json.Unmarshal(scanner.Bytes(), &a); err != nil {
+			continue
+		}
+		aliases = append(aliases, a)
+	}
+
+	if len(aliases) > 0 {
+		return store.SaveAliases(ctx, aliases)
+	}
 	return nil
 }
 

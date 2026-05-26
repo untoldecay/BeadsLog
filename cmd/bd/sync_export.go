@@ -99,6 +99,14 @@ func exportToJSONL(ctx context.Context, jsonlPath string) error {
 	if err != nil {
 		return err
 	}
+	
+	// Also export aliases
+	beadsDir := filepath.Dir(jsonlPath)
+	aliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
+	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to export aliases: %v\n", err)
+	}
+
 	// Immediately finalize for backward compatibility
 	finalizeExport(ctx, result)
 	return nil
@@ -230,6 +238,12 @@ func exportToJSONLDeferred(ctx context.Context, jsonlPath string) (*ExportResult
 		return nil, fmt.Errorf("failed to replace JSONL file: %w", err)
 	}
 
+	// Export aliases as well
+	aliasesPath := filepath.Join(dir, "aliases.jsonl")
+	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to export aliases: %v\n", err)
+	}
+
 	// Set appropriate file permissions (0600: rw-------)
 	if err := os.Chmod(jsonlPath, 0600); err != nil {
 		// Non-fatal warning
@@ -253,6 +267,53 @@ func exportToJSONLDeferred(ctx context.Context, jsonlPath string) (*ExportResult
 // Returns an error if validation.on-sync is "error" and issues fail validation.
 // Prints warnings if validation.on-sync is "warn".
 // Does nothing if validation.on-sync is "none" (default).
+func exportAliasesToJSONL(ctx context.Context, aliasesPath string) error {
+	// Ensure store is active
+	if err := ensureStoreActive(); err != nil {
+		return fmt.Errorf("failed to initialize store for alias export: %w", err)
+	}
+
+	aliases, err := store.GetAllAliases(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get aliases from DB: %w", err)
+	}
+
+	if len(aliases) == 0 {
+		// If no aliases in DB, and file exists, we might want to keep it or delete it.
+		// For now, if DB is empty, we don't overwrite if file exists to prevent accidental loss
+		// unless we are sure. But usually if registry is empty, file should be empty too.
+		return nil
+	}
+
+	// Create temp file for atomic write
+	dir := filepath.Dir(aliasesPath)
+	base := filepath.Base(aliasesPath)
+	tempFile, err := os.CreateTemp(dir, base+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+	}()
+
+	encoder := json.NewEncoder(tempFile)
+	for _, a := range aliases {
+		if err := encoder.Encode(a); err != nil {
+			return fmt.Errorf("failed to encode alias %s: %w", a.AliasName, err)
+		}
+	}
+
+	_ = tempFile.Close()
+
+	if err := os.Rename(tempPath, aliasesPath); err != nil {
+		return fmt.Errorf("failed to replace aliases file: %w", err)
+	}
+
+	return nil
+}
+
 func validateOpenIssuesForSync(ctx context.Context) error {
 	validationMode := config.GetString("validation.on-sync")
 	if validationMode == "none" || validationMode == "" {

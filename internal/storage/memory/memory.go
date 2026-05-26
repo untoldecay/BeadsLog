@@ -1812,3 +1812,29 @@ func (m *MemoryStorage) MarkIssueDirty(ctx context.Context, issueID string) erro
 	m.dirty[issueID] = true
 	return nil
 }
+
+// Devlog Operations (Stubs for MemoryStorage)
+
+func (m *MemoryStorage) GetAllAliases(ctx context.Context) ([]types.AliasRecord, error) {
+	return nil, nil
+}
+
+func (m *MemoryStorage) SaveAliases(ctx context.Context, aliases []types.AliasRecord) error {
+	return nil
+}
+
+func (m *MemoryStorage) SetBranchState(ctx context.Context, state types.BranchState) error {
+	return nil
+}
+
+func (m *MemoryStorage) GetBranchState(ctx context.Context, scopeType types.ScopeType, scopeRef string) (*types.BranchState, error) {
+	return nil, nil
+}
+
+func (m *MemoryStorage) UpdateBranchCache(ctx context.Context, cache types.BranchCache) error {
+	return nil
+}
+
+func (m *MemoryStorage) GetBranchCache(ctx context.Context, branchName string) (*types.BranchCache, error) {
+	return nil, nil
+}

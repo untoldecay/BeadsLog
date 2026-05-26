@@ -415,10 +415,20 @@ With --stealth: configures per-repository git settings for invisible beads usage
 					}
 					// Non-fatal - continue with empty database
 				} else if !quiet && issueCount > 0 {
-					fmt.Fprintf(os.Stderr, "✓ Imported %d issues from local %s\n\n", issueCount, localJSONLPath)
+					fmt.Fprintf(os.Stderr, "✓ Imported %d issues from local %s\n", issueCount, localJSONLPath)
 				}
 			} else if !quiet {
 				fmt.Fprintf(os.Stderr, "Warning: --from-jsonl specified but %s not found\n", localJSONLPath)
+			}
+
+			// Also import aliases from local file
+			localAliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
+			if _, err := os.Stat(localAliasesPath); err == nil {
+				if err := importAliasesFromJSONL(ctx, localAliasesPath); err == nil {
+					if !quiet {
+						fmt.Fprintf(os.Stderr, "✓ Imported entity aliases from local %s\n", localAliasesPath)
+					}
+				}
 			}
 		} else {
 			// Default: import from git history
@@ -435,7 +445,22 @@ With --stealth: configures per-repository git settings for invisible beads usage
 					}
 					// Non-fatal - continue with empty database
 				} else if !quiet {
-					fmt.Fprintf(os.Stderr, "✓ Successfully imported %d issues from git.\n\n", issueCount)
+					fmt.Fprintf(os.Stderr, "✓ Successfully imported %d issues from git.\n", issueCount)
+				}
+
+				// Also import aliases from git history
+				aliasesPath := filepath.Join(filepath.Dir(jsonlPath), "aliases.jsonl")
+				if aliasesContent, err := readFromGitRef(aliasesPath, gitRef); err == nil {
+					// Use a temporary file to leverage importAliasesFromJSONL
+					tmpFile, _ := os.CreateTemp("", "aliases.*.jsonl")
+					tmpPath := tmpFile.Name()
+					_, _ = tmpFile.Write(aliasesContent)
+					_ = tmpFile.Close()
+					defer os.Remove(tmpPath)
+
+					if err := importAliasesFromJSONL(ctx, tmpPath); err == nil && !quiet {
+						fmt.Fprintf(os.Stderr, "✓ Successfully imported entity aliases from git.\n")
+					}
 				}
 			}
 		}

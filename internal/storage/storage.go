@@ -169,6 +169,14 @@ type Storage interface {
 	RenameDependencyPrefix(ctx context.Context, oldPrefix, newPrefix string) error
 	RenameCounterPrefix(ctx context.Context, oldPrefix, newPrefix string) error
 
+	// Devlog Operations
+	GetAllAliases(ctx context.Context) ([]types.AliasRecord, error)
+	SaveAliases(ctx context.Context, aliases []types.AliasRecord) error
+	SetBranchState(ctx context.Context, state types.BranchState) error
+	GetBranchState(ctx context.Context, scopeType types.ScopeType, scopeRef string) (*types.BranchState, error)
+	UpdateBranchCache(ctx context.Context, cache types.BranchCache) error
+	GetBranchCache(ctx context.Context, branchName string) (*types.BranchCache, error)
+
 	// Transactions
 	//
 	// RunInTransaction executes a function within a database transaction.

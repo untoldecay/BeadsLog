@@ -44,3 +44,9 @@ type BranchCache struct {
 	IsDeleted        bool      `json:"is_deleted"`
 	LastCheckedAt    time.Time `json:"last_checked_at"`
 }
+
+// AliasRecord represents a sticky entity alias for repository-wide sharing
+type AliasRecord struct {
+	AliasName     string `json:"alias_name"`
+	CanonicalName string `json:"canonical_name"`
+}

@@ -148,3 +148,9 @@ This index provides a concise record of all development work for easy scanning a
 | [abandoned] entity: OldComponent | Replaced by NewComponent | untoldecay | Unknown | 2026-05-19 01:27 | feature/branch-state | [2026-05-19_abandoned_entity_OldComponent.md](2026-05-19_abandoned_entity_OldComponent.md?id=sess-state-abandoned-346232336365) |
 | [test] Temp work | none | untoldecay | Unknown | 2026-05-19 01:44 | feature/branch-state (local) | [temp.md](temp.md?id=sess-ce161e&sha=741afa6ad1eecff1e94191690ee7635461790fb5) |
 | [abandoned] task: BeadsLog-a76.2 | Ranking logic is too complex for now | untoldecay | Unknown | 2026-05-19 01:53 | feature/branch-state | [2026-05-19_abandoned_task_BeadsLog-a76.2.md](2026-05-19_abandoned_task_BeadsLog-a76.2.md?id=sess-state-abandoned-326338373134&sha=741afa6ad1eecff1e94191690ee7635461790fb5) |
+
+| [adopt] _finalize abc eval harness | Automatically adopted during verify | 2026-02-10 | [2026-02-10_finalize-abc-eval-harness.md](2026-02-10_finalize-abc-eval-harness.md) |
+
+| [adopt] _interactive ollama and progressive disclosure | Automatically adopted during verify | 2026-03-06 | [2026-03-06_interactive-ollama-and-progressive-disclosure.md](2026-03-06_interactive-ollama-and-progressive-disclosure.md) |
+
+| [adopt] _test alias | Automatically adopted during verify | 2026-05-25 | [2026-05-25_test-alias.md](2026-05-25_test-alias.md) |
