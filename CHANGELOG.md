@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.9] - 2026-05-26
+
+### Fixed
+- **Catchup Design Bug** - `bd catchup` now defaults to a 7-day window (instead of 24 hours) when no previous `--ack` checkpoint is found. It also provides a clear status message when falling back to this default.
+
 ## [0.51.8] - 2026-05-26
 
 ### Added

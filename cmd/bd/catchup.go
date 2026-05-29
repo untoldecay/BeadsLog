@@ -29,10 +29,16 @@ Use --ack to mark these changes as seen and update your catchup timestamp.`,
 
 		// 1. Get last catchup time
 		lastCatchupStr, _ := store.GetMetadata(rootCtx, "last_catchup_time")
-		since := time.Now().Add(-24 * time.Hour) // Default to 24h ago
-		if lastCatchupStr != "" {
+		
+		isFirstCatchup := false
+		since := time.Now().Add(-7 * 24 * time.Hour) // Default to 7 days ago (safer than 24h)
+		if lastCatchupStr == "" {
+			isFirstCatchup = true
+		} else {
 			if t, err := time.Parse(time.RFC3339, lastCatchupStr); err == nil {
 				since = t
+			} else {
+				isFirstCatchup = true
 			}
 		}
 
@@ -44,6 +50,10 @@ Use --ack to mark these changes as seen and update your catchup timestamp.`,
 		}
 
 		// 3. Render feed
+		if isFirstCatchup {
+			fmt.Printf("\n%s No previous catchup found. Showing last 7 days of activity.\n", ui.RenderAccent("💡"))
+			fmt.Printf("   Run 'bd catchup --ack' to set your first checkpoint.\n\n")
+		}
 		renderCatchupFeed(delta)
 
 		// 4. Update timestamp if ack

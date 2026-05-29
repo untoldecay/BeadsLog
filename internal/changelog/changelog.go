@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.8"
+const CurrentVersion = "0.51.9"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.9",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Catchup Fix: Default 'since' window increased to 7 days (from 24h) when no previous check exists.",
+			"Improved UX: New message informing users when 'bd catchup' falls back to default window.",
+		},
+		Protocol: []string{
+			"Run 'bd catchup --ack' regularly to maintain a sliding window of team activity.",
+		},
+	},
 	{
 		Version: "0.51.8",
 		Date:    "2026-05-26",
