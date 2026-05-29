@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.6] - 2026-05-26
+
+### Added
+- **Success Trap Prevention** - `bd devlog record` now issues a high-signal AI Directive to ensure agents don't forget to finalize Markdown content.
+- **Stub Detection** - `bd devlog verify` now proactively identifies and warns about unfinalized devlog templates (containing placeholders).
+
 ## [0.51.5] - 2026-05-26
 
 ### Added

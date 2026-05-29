@@ -1813,7 +1813,7 @@ var devlogVerifyCmd = &cobra.Command{
 
 		// 2. Sessions without entities OR relationships (INCOMPLETE)
 		query := `
-			SELECT DISTINCT id, title, filename 
+			SELECT DISTINCT id, title, filename, narrative
 			FROM sessions 
 			WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
 			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
@@ -1833,10 +1833,18 @@ var devlogVerifyCmd = &cobra.Command{
 		defer rows.Close()
 
 		var incomplete []struct{ ID, Title, Filename string }
+		var stubs []string
 		for rows.Next() {
-			var s struct{ ID, Title, Filename string }
-			rows.Scan(&s.ID, &s.Title, &s.Filename)
-			incomplete = append(incomplete, s)
+			var s struct{ ID, Title, Filename, Narrative string }
+			rows.Scan(&s.ID, &s.Title, &s.Filename, &s.Narrative)
+			
+			// Detect unfinalized stubs (placeholders)
+			if strings.Contains(s.Narrative, "<!-- Describe the technical context -->") || 
+			   strings.Contains(s.Narrative, "- [ ] Task 1") {
+				stubs = append(stubs, s.ID)
+			}
+
+			incomplete = append(incomplete, struct{ ID, Title, Filename string }{s.ID, s.Title, s.Filename})
 		}
 
 		if len(incomplete) == 0 {
@@ -1852,6 +1860,15 @@ var devlogVerifyCmd = &cobra.Command{
 			fmt.Println("Sessions missing entities or architectural relationships:")
 			for _, s := range incomplete {
 				fmt.Printf("- [%s] %s (%s)\n", s.ID, s.Title, s.Filename)
+			}
+
+			if len(stubs) > 0 {
+				fmt.Printf("\n%s Found %d unfinalized stubs (placeholders still present):\n", ui.RenderFail("🚨"), len(stubs))
+				for _, sid := range stubs {
+					fmt.Printf("   - %s\n", sid)
+				}
+				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
+				fmt.Println("You MUST fill in the 'Work Done' and 'Architectural Relationships' for these files.")
 			}
 			fmt.Printf("\nFound %d sessions with missing metadata.\n", len(incomplete))
 			if len(orphans) > 0 {
@@ -1946,6 +1963,15 @@ var devlogVerifyCmd = &cobra.Command{
 			if len(orphans) == 0 && len(incomplete) == 0 {
 				fmt.Println("Nothing to fix.")
 			}
+
+			if len(stubs) > 0 {
+				fmt.Printf("\n%s Found %d unfinalized stubs (placeholders still present):\n", ui.RenderFail("🚨"), len(stubs))
+				for _, sid := range stubs {
+					fmt.Printf("   - %s\n", sid)
+				}
+				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
+				fmt.Println("You MUST fill in the 'Work Done' and 'Architectural Relationships' for these files.")
+			}
 		}
 	},
 }
@@ -2018,7 +2044,12 @@ var devlogRecordCmd = &cobra.Command{
 					fmt.Printf("Error creating stub: %v\n", err)
 					os.Exit(1)
 				}
-				fmt.Printf("✓ Created %s\n", targetFile)
+				fmt.Printf("✓ Created stub: %s\n", targetFile)
+				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
+				fmt.Println("The file above is only a TEMPLATE. You MUST now:")
+				fmt.Println("1. OPEN and READ the file.")
+				fmt.Println("2. FILL IN the 'Work Done' and 'Architectural Relationships' based on this session.")
+				fmt.Println("3. Your work is NOT logged until you finalize the content.")
 			} else {
 				targetFile = relPath
 			}

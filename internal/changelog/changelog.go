@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.5"
+const CurrentVersion = "0.51.6"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.6",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Success Trap Prevention: 'bd devlog record' now outputs a loud AI Directive when a stub is created.",
+			"Stub Detection: 'bd devlog verify' now detects and warns about unfinalized Markdown templates.",
+		},
+		Protocol: []string{
+			"Never assume 'bd devlog record' has logged your work; you MUST fill in the 'Work Done' section.",
+		},
+	},
 	{
 		Version: "0.51.5",
 		Date:    "2026-05-26",
