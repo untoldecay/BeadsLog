@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.52.0"
+const CurrentVersion = "0.52.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.52.1",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Safe Aliasing: Added '--dry-run' flag to 'bd devlog alias' to preview graph impact.",
+			"Impact Stats: Dry run displays the number of sessions and relationships to be merged.",
+		},
+		Protocol: []string{
+			"Use '--dry-run' when unsure about a potential entity merge.",
+		},
+	},
 	{
 		Version: "0.52.0",
 		Date:    "2026-05-26",

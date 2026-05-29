@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.52.0] - 2026-05-29
+## [0.52.1] - 2026-05-26
+
+### Added
+- **Alias Dry Run** - `bd devlog alias` now supports a `--dry-run` flag to preview how many sessions and relationships will be impacted by a merge.
+
+## [0.52.0] - 2026-05-26
+
 
 ## [0.52.0] - 2026-05-29
 

@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.52.1",
+		Date:    "2026-05-26",
+		Changes: []string{
+			"NEW: Alias Dry Run - added --dry-run flag to bd devlog alias to preview impact",
+			"NEW: Preview Stats - see sessions and relationships count before collapsing",
+		},
+	},
+	{
 		Version: "0.52.0",
 		Date:    "2026-05-26",
 		Changes: []string{

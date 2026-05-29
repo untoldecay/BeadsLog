@@ -2194,6 +2194,29 @@ Example:
 		for _, a := range resolvedAliases {
 			names = append(names, a.Name)
 		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		if dryRun {
+			fmt.Printf("\n%s Proposed Collapse (Dry Run):\n", ui.RenderAccent("🔍"))
+			fmt.Printf("   Target: %s\n", target.Name)
+			fmt.Printf("   Aliases to merge: %s\n", strings.Join(names, ", "))
+
+			// Show impact stats
+			var sessionsTotal, relsTotal int
+			for _, a := range resolvedAliases {
+				var sessions, rels int
+				_ = db.QueryRow("SELECT COUNT(*) FROM session_entities WHERE entity_id = ?", a.ID).Scan(&sessions)
+				_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps WHERE from_entity = ? OR to_entity = ?", a.ID, a.ID).Scan(&rels)
+				sessionsTotal += sessions
+				relsTotal += rels
+			}
+			fmt.Printf("\nImpact:\n")
+			fmt.Printf("  • %d session mentions will be moved to %s\n", sessionsTotal, target.Name)
+			fmt.Printf("  • %d architectural relationships will be moved to %s\n", relsTotal, target.Name)
+			fmt.Printf("\nRun without '--dry-run' to apply these changes.\n")
+			return
+		}
+
 		fmt.Printf("Aliasing %s → %s...\n", strings.Join(names, ", "), target.Name)
 
 		if err := queries.AliasEntities(rootCtx, db, target.ID, resolvedAliases); err != nil {
@@ -2776,6 +2799,8 @@ func init() {
 	devlogAbandonCmd.Flags().String("message", "", "Short reason for abandoning")
 
 	devlogMigrateCmd.Flags().Bool("format-index", false, "Upgrade _index.md to 5-column format")
+
+	devlogAliasCmd.Flags().Bool("dry-run", false, "Show what would be collapsed without making changes")
 
 	devlogCmd.AddCommand(devlogInitCmd)
 	devlogCmd.AddCommand(devlogOnboardCmd)
