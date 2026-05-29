@@ -135,3 +135,4 @@ _sandbox/Test-*/
 # Test repository in sandbox
 _sandbox/new_test_repo/eval/
 _rules/_evals/results/
+_sandbox/e2e_test_env

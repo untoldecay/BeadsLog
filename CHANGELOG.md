@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-05-26
+
+### Added
+- **Minor Release: Graph Hardening** - Comprehensive overhaul of how architectural entities and relationships are managed.
+- **Shared Alias Registry** - Aliases are now committed to `.beads/aliases.jsonl`, surviving database reconstruction and ensuring team-wide graph consistency.
+- **Atomic Record** - `bd devlog record` automatically creates a Markdown stub if the file is missing, with a loud AI directive to prevent "success traps."
+- **Preferred Casing** - Entity capitalization is now preserved throughout the UI while maintaining case-insensitive backend lookups.
+- **Prune Command** - New `bd devlog prune` (non-interactive) to purge ghost sessions from the database.
+
+### Changed
+- **Catchup Resilience** - Increased the default `bd catchup` window to 7 days for new checkpoints.
+- **Auto-Flush** - All devlog maintenance commands now automatically synchronize local changes to repository JSONL files.
+- **Status Visibility** - `bd devlog status` now prominently counts "Incomplete" sessions and unfinalized stubs.
+
 ## [0.51.9] - 2026-05-26
 
 ### Fixed

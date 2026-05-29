@@ -297,13 +297,19 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
-		Version: "0.51.0",
-		Date:    "2026-05-21",
+		Version: "0.52.0",
+		Date:    "2026-05-26",
 		Changes: []string{
-			"NEW: Team-Aware Catchup - bd catchup now includes Author/Actor metadata",
-			"NEW: Grouped Summary Prompt - updated catchup prompt to mandatory group by team member",
+			"NEW: Shared Alias Registry - Aliases survive DB reconstruction via .beads/aliases.jsonl",
+			"NEW: Atomic Record - bd devlog record auto-creates markdown stubs with AI directives",
+			"NEW: Agent-Proofing - Incomplete session counts in status and mandatory verify checks",
+			"NEW: Preferred Casing - UI preserves original entity capitalization for better readability",
+			"NEW: Prune Command - non-interactive bd devlog prune for ghost sessions",
+			"NEW: Catchup Resilience - default check window increased to 7 days",
 		},
 	},
+	{
+		Version: "0.51.0",
 	{
 		Version: "0.50.0",
 		Date:    "2026-05-21",

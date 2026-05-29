@@ -14,10 +14,26 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.9"
+const CurrentVersion = "0.52.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.52.0",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Graph Hardening (Minor): Major overhaul of entity extraction and relationship integrity.",
+			"Shared Alias Registry: Aliases now persist in '.beads/aliases.jsonl' for team-wide consistency.",
+			"Agent-Proofing: Atomic 'record' command with stub generation and 'verify' gatekeeping.",
+			"Improved Discovery: Jaccard-based session overlap hints and robust pathfinding.",
+			"Casing Preservation: UI now respects original entity capitalization (e.g. AuthService).",
+			"History Resilience: Automatic session re-anchoring after squash-merges via patch-id.",
+		},
+		Protocol: []string{
+			"Agents MUST verify '💡 OPPORTUNITY' hints and use 'bd devlog alias' for graph hygiene.",
+			"Mandatory 'bd devlog verify --fix' before closing sessions to adopt orphans.",
+		},
+	},
 	{
 		Version: "0.51.9",
 		Date:    "2026-05-26",
