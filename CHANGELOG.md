@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.8] - 2026-05-26
+
+### Added
+- **Status Visibility** - `bd devlog status` now prominently displays the count of incomplete or unfinalized devlog sessions, ensuring maintenance is visible.
+- **Maintenance Guidance** - Improved the `status` output to suggest `bd devlog prune` for ghost cleanup and `verify --fix` for incomplete sessions.
+
 ## [0.51.7] - 2026-05-26
 
 ### Fixed

@@ -1506,17 +1506,30 @@ var devlogStatusCmd = &cobra.Command{
 
 		// Get stats
 		db := store.UnderlyingDB()
-		var sessionsCount, entitiesCount, relationshipsCount, ghostCount int
+		var sessionsCount, entitiesCount, relationshipsCount, ghostCount, incompleteCount int
 
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessionsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entitiesCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps").Scan(&relationshipsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghostCount)
+		
+		// Count incomplete (missing metadata OR placeholders)
+		_ = db.QueryRow(`
+			SELECT COUNT(DISTINCT id) 
+			FROM sessions 
+			WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+			OR (narrative LIKE '%<!-- Describe the technical context -->%' 
+			OR narrative LIKE '%- [ ] Task 1%')
+		`).Scan(&incompleteCount)
 
 		fmt.Printf("\nDatabase Statistics:\n")
 		fmt.Printf("  Sessions:      %d\n", sessionsCount)
+		if incompleteCount > 0 {
+			fmt.Printf("  ○ Incomplete:  %d (run 'bd devlog verify --fix')\n", incompleteCount)
+		}
 		if ghostCount > 0 {
-			fmt.Printf("  Ghosts:        %d (run 'bd doctor --fix' to prune)\n", ghostCount)
+			fmt.Printf("  ✖ Ghosts:      %d (run 'bd devlog prune')\n", ghostCount)
 		}
 		fmt.Printf("  Entities:      %d\n", entitiesCount)
 		fmt.Printf("  Relationships: %d\n", relationshipsCount)

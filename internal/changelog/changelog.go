@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.7"
+const CurrentVersion = "0.51.8"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.8",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Visibility: 'bd devlog status' now displays the count of incomplete or unfinalized sessions.",
+			"Improved Grooming: Status now suggests 'bd devlog prune' for ghost sessions.",
+		},
+		Protocol: []string{
+			"Monitor 'bd status' to ensure no 'Incomplete' sessions remain before closing.",
+		},
+	},
 	{
 		Version: "0.51.7",
 		Date:    "2026-05-26",
