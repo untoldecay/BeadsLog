@@ -43,8 +43,9 @@ Before saying "done" or "complete", you MUST run this checklist:
 1. git status (Check what changed)
 2. git add <files> (Stage changes)
 3. git commit -m "..." (Commit code)
-4. bd sync && bd devlog sync (Persist Beads data)
-5. git push (Share with team)
+4. bd devlog verify --fix (Adopt orphans & align index)
+5. bd sync && bd devlog sync (Persist Beads data)
+6. git push (Share with team)
 
 NEVER:
 - Modify .beads/issues.jsonl manually (ALWAYS use bd)

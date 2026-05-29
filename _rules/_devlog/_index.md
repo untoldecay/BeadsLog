@@ -154,3 +154,5 @@ This index provides a concise record of all development work for easy scanning a
 | [adopt] _interactive ollama and progressive disclosure | Automatically adopted during verify | 2026-03-06 | [2026-03-06_interactive-ollama-and-progressive-disclosure.md](2026-03-06_interactive-ollama-and-progressive-disclosure.md) |
 
 | [adopt] _test alias | Automatically adopted during verify | 2026-05-25 | [2026-05-25_test-alias.md](2026-05-25_test-alias.md) |
+| [test] auto-stub | testing stub creation | Gemini-Test-Agent | Unknown | 2026-05-29 22:22 | feature/graph-hardening-aliasing | [2026-05-26_auto-stub.md](2026-05-26_auto-stub.md?id=sess-c5fac7&sha=5fa714e9f53e23641630bbd01a8a67169eca1e27) |
+| [test] prune-fix | testing prune fix | Gemini-Test-Agent | Unknown | 2026-05-29 22:23 | feature/graph-hardening-aliasing | [2026-05-26_prune-fix.md](2026-05-26_prune-fix.md?id=sess-27a09c&sha=5fa714e9f53e23641630bbd01a8a67169eca1e27) |

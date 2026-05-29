@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.5] - 2026-05-26
+
+### Added
+- **Atomic Record** - `bd devlog record` now automatically creates a Markdown stub if the target file is missing.
+- **Orphan Detection** - `bd devlog sync` proactively warns about `.md` files not yet registered in the index.
+- **Non-Interactive Prune** - Added `bd devlog prune` to quickly purge ghost sessions (dead file links) from the database.
+- **Preferred Casing** - Architectural entities now preserve their original casing in the UI for improved readability.
+
+### Changed
+- **Auto-Flush** - Maintenance commands now automatically synchronize changes to the `.beads/` JSONL files.
+- **Database Schema** - Added `preferred_name` and implemented manual cascades for cleaner maintenance.
+
 ## [0.51.4] - 2026-05-25
 
 ### Added

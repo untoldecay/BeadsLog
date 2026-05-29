@@ -279,9 +279,9 @@ func exportAliasesToJSONL(ctx context.Context, aliasesPath string) error {
 	}
 
 	if len(aliases) == 0 {
-		// If no aliases in DB, and file exists, we might want to keep it or delete it.
-		// For now, if DB is empty, we don't overwrite if file exists to prevent accidental loss
-		// unless we are sure. But usually if registry is empty, file should be empty too.
+		// If DB is empty, we must reflect this on disk (remove the file or empty it)
+		// Removing it is cleaner for Git.
+		_ = os.Remove(aliasesPath)
 		return nil
 	}
 

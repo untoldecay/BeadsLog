@@ -23,8 +23,15 @@ func setupTestDB(t *testing.T) *sql.DB {
 	CREATE TABLE entities (
 		id TEXT PRIMARY KEY,
 		name TEXT UNIQUE NOT NULL,
+		preferred_name TEXT,
 		mention_count INTEGER DEFAULT 1,
 		first_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE entity_aliases (
+		alias_name TEXT PRIMARY KEY,
+		canonical_id TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(canonical_id) REFERENCES entities(id) ON DELETE CASCADE
 	);
 	CREATE TABLE session_entities (
 		session_id TEXT,
@@ -74,7 +81,10 @@ func TestAliasEntities(t *testing.T) {
 	_, _ = db.Exec("INSERT INTO entity_deps (from_entity, to_entity, relationship, discovered_in) VALUES ('e2', 'some-other', 'uses', 's1')")
 	_, _ = db.Exec("INSERT INTO entity_deps (from_entity, to_entity, relationship, discovered_in) VALUES ('another', 'e3', 'calls', 's2')")
 
-	err := AliasEntities(ctx, db, "e1", []string{"e2", "e3"})
+	err := AliasEntities(ctx, db, "e1", []ResolvedEntity{
+		{ID: "e2", Name: "Alias1"},
+		{ID: "e3", Name: "Alias2"},
+	})
 	if err != nil {
 		t.Fatalf("AliasEntities failed: %v", err)
 	}

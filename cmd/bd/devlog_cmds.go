@@ -529,6 +529,16 @@ var devlogSyncCmd = &cobra.Command{
 		// Store last sync time
 		_ = store.SetMetadata(rootCtx, "last_devlog_sync", time.Now().Format(time.RFC3339))
 		
+		// ORPHAN DETECTION
+		orphans, _ := GetOrphanedFiles(devlogDir, rows)
+		if len(orphans) > 0 {
+			fmt.Printf("\n%s Found %d orphaned devlog file(s) not in index:\n", ui.RenderWarn("⚠️ "), len(orphans))
+			for _, o := range orphans {
+				fmt.Printf("   - %s\n", o)
+			}
+			fmt.Printf("   Run 'bd devlog verify --fix' to adopt them.\n")
+		}
+
 		if updatedCount > 0 {
 			if !noAutoFlush {
 				flushToJSONLWithState(flushState{forceDirty: true})
@@ -540,6 +550,23 @@ var devlogSyncCmd = &cobra.Command{
 		fmt.Printf("\n%s Tip: Use -v for detailed sync logs or --help for options.\n", ui.RenderAccent("💡"))
 	},
 }
+
+const devlogStubTemplate = `# %s
+**Date:** %s
+**Author:** %s
+
+## Problem
+%s
+
+## Context
+<!-- Describe the technical context and why this change is needed -->
+
+## Work Done
+- [ ] Task 1
+
+## Architectural Relationships
+<!-- Add explicit edges here: - EntityA -> EntityB (relationship) -->
+`
 
 const indexTemplate = `# Development Log Index
 
@@ -937,16 +964,16 @@ Noise terms like CSS properties and common generic verbs are automatically filte
 		var query string
 		if sortBy == "mentions" {
 			query = `
-				SELECT name, mention_count 
-				FROM entities 
+				SELECT COALESCE(preferred_name, name), mention_count
+				FROM entities
 				WHERE name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
 				  AND name NOT LIKE 'border-%' AND name NOT LIKE 'padding-%' AND name NOT LIKE 'margin-%'
-				ORDER BY mention_count DESC 
+				ORDER BY mention_count DESC
 				LIMIT ?`
 		} else {
 			// Default: sort by unique relationship count (centrality)
 			query = `
-				SELECT e.name, COUNT(DISTINCT ed.relationship || ed.to_entity || ed.from_entity) as rel_count
+				SELECT COALESCE(e.preferred_name, e.name), COUNT(DISTINCT ed.relationship || ed.to_entity || ed.from_entity) as rel_count
 				FROM entities e
 				JOIN entity_deps ed ON (e.id = ed.from_entity OR e.id = ed.to_entity)
 				WHERE e.name NOT IN ('used', 'using', 'service', 'component', 'implemented', 'updated', 'fixed', 'added')
@@ -956,7 +983,6 @@ Noise terms like CSS properties and common generic verbs are automatically filte
 				ORDER BY rel_count DESC, e.mention_count DESC
 				LIMIT ?`
 		}
-
 		var rows *sql.Rows
 		var qErr error
 		if sortBy == "mentions" {
@@ -1939,26 +1965,6 @@ var devlogRecordCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Verify file existence (prevent agent confusion)
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			// Try relative to devlogDir
-			store, _ := sqlite.New(rootCtx, dbPath)
-			dDir := ""
-			if store != nil {
-				dDir, _ = store.GetConfig(rootCtx, "devlog_dir")
-				store.Close()
-			}
-			if dDir == "" {
-				dDir = "_rules/_devlog"
-			}
-			
-			if _, err := os.Stat(filepath.Join(dDir, file)); os.IsNotExist(err) {
-				fmt.Printf("Error: Devlog file not found: %s\n", file)
-				fmt.Println("Hint: You must create the markdown file BEFORE running 'bd devlog record'.")
-				os.Exit(1)
-			}
-		}
-
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
@@ -1971,9 +1977,7 @@ var devlogRecordCmd = &cobra.Command{
 			devlogDir = "_rules/_devlog"
 		}
 
-		indexPath := filepath.Join(devlogDir, "_index.md")
-		
-		// 1. Get Author (The Human)
+		// Resolve Author/Agent early for possible stub creation
 		if author == "" {
 			author = config.GetString("devlog.author")
 		}
@@ -1988,7 +1992,6 @@ var devlogRecordCmd = &cobra.Command{
 			author = "Unknown"
 		}
 
-		// 2. Get Agent (The AI)
 		if agent == "" {
 			agent = os.Getenv("BD_AGENT_NAME")
 		}
@@ -1996,6 +1999,33 @@ var devlogRecordCmd = &cobra.Command{
 			agent = "Unknown"
 		}
 
+		// Verify file existence (prevent agent confusion)
+		targetFile := file
+		if _, err := os.Stat(targetFile); os.IsNotExist(err) {
+			// Try relative to devlogDir
+			relPath := filepath.Join(devlogDir, file)
+			if _, err := os.Stat(relPath); os.IsNotExist(err) {
+				// ATOMIC: File missing, create a stub!
+				fmt.Printf("File '%s' not found. Creating a new devlog stub...\n", targetFile)
+				
+				// Use the resolved relative path if it was inferred
+				if !strings.Contains(targetFile, string(filepath.Separator)) {
+					targetFile = relPath
+				}
+
+				stub := fmt.Sprintf(devlogStubTemplate, subject, time.Now().Format("2006-01-02"), author, problem)
+				if err := os.WriteFile(targetFile, []byte(stub), 0644); err != nil {
+					fmt.Printf("Error creating stub: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("✓ Created %s\n", targetFile)
+			} else {
+				targetFile = relPath
+			}
+		}
+
+		indexPath := filepath.Join(devlogDir, "_index.md")
+		
 		// 3. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
@@ -2026,8 +2056,7 @@ var devlogRecordCmd = &cobra.Command{
 
 		// 6. Format Row
 		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
-		// We append ?id=sess-xxx&sha=abc to the devlog link for future stability and reachability
-		fileName := filepath.Base(file)
+		fileName := filepath.Base(targetFile)
 		devlogLink := fmt.Sprintf("[%s](%s?id=%s", fileName, fileName, sessionID)
 		if commitSHA != "" {
 			devlogLink += "&sha=" + commitSHA
@@ -2051,7 +2080,7 @@ var devlogRecordCmd = &cobra.Command{
 
 		fmt.Printf("✓ Recorded session: %s\n", subject)
 
-		// 5. Sync
+		// 8. Sync
 		fmt.Println("→ Syncing devlog...")
 		devlogSyncCmd.Run(cmd, []string{})
 	},
@@ -2128,6 +2157,7 @@ Example:
 		}
 
 		fmt.Println("✅ Entities collapsed successfully. Aliases are now sticky.")
+		flushMetadata(rootCtx)
 	},
 }
 
@@ -2157,6 +2187,38 @@ from the text and restore its session links and architectural dependencies.`,
 		}
 
 		fmt.Printf("✅ Alias '%s' removed. Run 'bd devlog verify --fix' to restore the original entity links.\n", aliasName)
+		flushMetadata(rootCtx)
+	},
+}
+
+var devlogPruneCmd = &cobra.Command{
+	Use:   "prune",
+	Short: "Remove ghost sessions that no longer exist on disk",
+	Run: func(cmd *cobra.Command, args []string) {
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		// Manual cleanup to ensure it works on databases without cascades
+		_, _ = db.Exec("DELETE FROM session_entities WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
+		_, _ = db.Exec("DELETE FROM extraction_log WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
+		_, _ = db.Exec("DELETE FROM entity_deps WHERE discovered_in IN (SELECT id FROM sessions WHERE is_ghost = 1)")
+
+		res, err := db.Exec("DELETE FROM sessions WHERE is_ghost = 1")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error pruning ghosts: %v\n", err)
+			os.Exit(1)
+		}
+
+		count, _ := res.RowsAffected()
+		fmt.Printf("✅ Pruned %d ghost session(s).\n", count)
+		
+		// Flush cleanup
+		flushMetadata(rootCtx)
 	},
 }
 
@@ -2675,6 +2737,7 @@ func init() {
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogAliasCmd)
 	devlogCmd.AddCommand(devlogUnaliasCmd)
+	devlogCmd.AddCommand(devlogPruneCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
 	devlogCmd.AddCommand(devlogPathCmd)
@@ -2743,5 +2806,32 @@ func showAliasHints(ctx context.Context, db *sql.DB) {
 		fmt.Printf("\n%s OPPORTUNITY: '%s' and '%s' appear to be the same (%.0f%% session overlap).\n", 
 			ui.RenderAccent("💡"), s.EntityA, s.EntityB, s.Similarity*100)
 		fmt.Printf("   Run 'bd devlog alias %s %s' after verification.\n", s.EntityA, s.EntityB)
+	}
+}
+
+func flushMetadata(ctx context.Context) {
+	if config.GetBool("storage.no-auto-flush") {
+		return
+	}
+	
+	store, err := sqlite.New(ctx, dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+
+	// 1. Export Issues (Issues + Status)
+	jsonlPath := config.GetString("storage.jsonl_path")
+	if jsonlPath == "" {
+		jsonlPath = filepath.Join(config.GetString("beads.dir"), "issues.jsonl")
+	}
+	if err := exportToJSONL(ctx, jsonlPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: auto-flush issues failed: %v\n", err)
+	}
+
+	// 2. Export Aliases
+	aliasesPath := filepath.Join(config.GetString("beads.dir"), "aliases.jsonl")
+	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: auto-flush aliases failed: %v\n", err)
 	}
 }

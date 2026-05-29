@@ -346,6 +346,33 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 	return rows, nil
 }
 
+// GetOrphanedFiles returns a list of .md files in the devlog directory that are NOT in the index
+func GetOrphanedFiles(dir string, indexedRows []IndexRow) ([]string, error) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	indexed := make(map[string]bool)
+	for _, row := range indexedRows {
+		indexed[filepath.Base(row.Filename)] = true
+	}
+
+	var orphans []string
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		name := f.Name()
+		if strings.HasSuffix(name, ".md") && name != "_index.md" && name != "index.md" && name != "_generate-devlog.md" && name != "_generate-catchup.md" {
+			if !indexed[name] {
+				orphans = append(orphans, name)
+			}
+		}
+	}
+	return orphans, nil
+}
+
 type ExtractionOptions struct {
 	ForceRegex bool
 }
@@ -385,13 +412,14 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 		// For now, we just increment mention count. 
 		// Future: update confidence if new confidence > old confidence
 		_, err := db.Exec(`
-			INSERT INTO entities (id, name, type, mention_count, confidence, source)
-			VALUES (?, ?, ?, 1, ?, ?)
+			INSERT INTO entities (id, name, preferred_name, type, mention_count, confidence, source)
+			VALUES (?, ?, ?, ?, 1, ?, ?)
 			ON CONFLICT(name) DO UPDATE SET 
 				mention_count = mention_count + 1,
 				source = CASE WHEN excluded.confidence > confidence THEN excluded.source ELSE source END,
-				confidence = MAX(confidence, excluded.confidence)
-		`, entityID, entity.Name, entity.Type, entity.Confidence, entity.Source)
+				confidence = MAX(confidence, excluded.confidence),
+				preferred_name = CASE WHEN excluded.confidence >= confidence THEN excluded.preferred_name ELSE preferred_name END
+		`, entityID, strings.ToLower(entity.Name), entity.Name, entity.Type, entity.Confidence, entity.Source)
 		
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error upserting entity: %v\n", err)

@@ -14,10 +14,24 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.4"
+const CurrentVersion = "0.51.5"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.5",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Atomic 'record': Automatically creates a Markdown stub if the devlog file doesn't exist.",
+			"Orphan Warnings: 'bd devlog sync' now warns about devlog files not present in the index.",
+			"Non-interactive 'prune': New 'bd devlog prune' command to quickly purge ghost sessions.",
+			"Auto-Flush: Maintenance commands (alias, unalias, prune, etc.) now automatically update JSONL files.",
+			"Preferred Casing: Entities now preserve their original casing for better readability in UI results.",
+		},
+		Protocol: []string{
+			"Agents MUST run 'bd devlog verify --fix' as part of the session close checklist.",
+		},
+	},
 	{
 		Version: "0.51.4",
 		Date:    "2026-05-25",

@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     CREATE TABLE IF NOT EXISTS entities (
     id TEXT PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
+    preferred_name TEXT,
     type TEXT DEFAULT 'component',
     first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
     mention_count INTEGER DEFAULT 1,
@@ -149,8 +150,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     entity_id TEXT,
     relevance TEXT DEFAULT 'mentioned',
     PRIMARY KEY(session_id, entity_id),
-    FOREIGN KEY(session_id) REFERENCES sessions(id),
-    FOREIGN KEY(entity_id) REFERENCES entities(id)
+    FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY(entity_id) REFERENCES entities(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS entity_deps (
@@ -161,9 +162,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     confidence REAL DEFAULT 1.0,
     source TEXT DEFAULT 'manual',
     PRIMARY KEY(from_entity, to_entity, relationship),
-    FOREIGN KEY(from_entity) REFERENCES entities(id),
-    FOREIGN KEY(to_entity) REFERENCES entities(id),
-    FOREIGN KEY(discovered_in) REFERENCES sessions(id)
+    FOREIGN KEY(from_entity) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY(to_entity) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY(discovered_in) REFERENCES sessions(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS branch_states (
@@ -196,7 +197,7 @@ CREATE TABLE IF NOT EXISTS extraction_log (
     input_length INTEGER,
     entities_found INTEGER,
     duration_ms INTEGER,
-    FOREIGN KEY(session_id) REFERENCES sessions(id)
+    FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
 -- Events table (audit trail)

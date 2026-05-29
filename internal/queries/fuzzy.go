@@ -45,17 +45,22 @@ func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([
 			return nil, fmt.Errorf("fts scan failed: %w", err)
 		}
 		if !seen[name] {
-			// Fetch real ID using case-insensitive comparison
+			// Fetch real ID and preferred name using case-insensitive comparison
 			var id string
-			idQuery := "SELECT id FROM entities WHERE LOWER(name) = LOWER(?)"
-			if err := db.QueryRowContext(ctx, idQuery, name).Scan(&id); err != nil {
+			var preferredName sql.NullString
+			idQuery := "SELECT id, preferred_name FROM entities WHERE LOWER(name) = LOWER(?)"
+			if err := db.QueryRowContext(ctx, idQuery, name).Scan(&id, &preferredName); err != nil {
 				if err != sql.ErrNoRows { // Only return error if it's not simply "not found"
 					return nil, fmt.Errorf("id resolution query failed for name '%s': %w", name, err)
 				}
 				// If ErrNoRows, it means FTS matched but base table didn't have it (corrupted FTS?), skip this specific name
 				continue
 			}
-			results = append(results, ResolvedEntity{ID: id, Name: name})
+			displayName := name
+			if preferredName.Valid && preferredName.String != "" {
+				displayName = preferredName.String
+			}
+			results = append(results, ResolvedEntity{ID: id, Name: displayName})
 			seen[name] = true
 		}
 	}
@@ -67,7 +72,7 @@ func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([
 			return results, nil
 		}
 		queryLike := `
-            SELECT id, name FROM entities 
+            SELECT id, name, preferred_name FROM entities 
             WHERE LOWER(name) LIKE LOWER(?) 
             ORDER BY length(name) ASC
             LIMIT ?
@@ -80,11 +85,16 @@ func ResolveEntities(ctx context.Context, db *sql.DB, term string, limit int) ([
 
 		for rowsLike.Next() {
 			var id, name string
-			if err := rowsLike.Scan(&id, &name); err != nil {
+			var preferredName sql.NullString
+			if err := rowsLike.Scan(&id, &name, &preferredName); err != nil {
 				return nil, fmt.Errorf("like scan failed: %w", err)
 			}
 			if !seen[name] { // Add only if not already found by FTS
-				results = append(results, ResolvedEntity{ID: id, Name: name})
+				displayName := name
+				if preferredName.Valid && preferredName.String != "" {
+					displayName = preferredName.String
+				}
+				results = append(results, ResolvedEntity{ID: id, Name: displayName})
 				seen[name] = true
 			}
 		}

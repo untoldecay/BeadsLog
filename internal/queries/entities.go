@@ -129,8 +129,8 @@ func GetAliasSuggestions(ctx context.Context, db *sql.DB, threshold float64) ([]
 			SELECT entity_id, COUNT(*) as session_count FROM EntitySessions GROUP BY entity_id
 		)
 		SELECT 
-			e1_info.name, 
-			e2_info.name, 
+			COALESCE(e1_info.preferred_name, e1_info.name), 
+			COALESCE(e2_info.preferred_name, e2_info.name), 
 			CAST(o.intersection_count AS REAL) / (s1.session_count + s2.session_count - o.intersection_count) as similarity
 		FROM Overlap o
 		JOIN Stats s1 ON o.e1 = s1.entity_id

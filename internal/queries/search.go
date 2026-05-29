@@ -129,7 +129,13 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
 
 	// 3. Entity Search & Expansion (only if not Strict/TextOnly)
 	if !opts.Strict && !opts.TextOnly {
-		entityQuery := `SELECT name FROM entities_fts WHERE entities_fts MATCH ? LIMIT 5`
+		entityQuery := `
+			SELECT COALESCE(e.preferred_name, ef.name) 
+			FROM entities_fts ef
+			JOIN entities e ON ef.rowid = e.rowid
+			WHERE ef.name MATCH ? 
+			LIMIT 5
+		`
 		// Use OR query for entity matching to be broader
 		eRows, err := db.QueryContext(ctx, entityQuery, or)
 		if err == nil {
