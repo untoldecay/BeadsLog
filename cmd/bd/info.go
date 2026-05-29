@@ -310,6 +310,12 @@ var versionChanges = []VersionChange{
 	},
 	{
 		Version: "0.51.0",
+		Date:    "2026-05-21",
+		Changes: []string{
+			"NEW: Team-Aware Catchup - bd catchup now includes Author/Actor metadata",
+			"NEW: Grouped Summary Prompt - updated catchup prompt to mandatory group by team member",
+		},
+	},
 	{
 		Version: "0.50.0",
 		Date:    "2026-05-21",
