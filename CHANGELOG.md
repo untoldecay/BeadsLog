@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.7] - 2026-05-26
+
+### Fixed
+- **Casing Preservation** - RegexExtractor now correctly preserves the original casing of entities while maintaining case-insensitive lookups.
+- **Robust Path Discovery** - `FindBeadsDir` now searches upwards, ensuring `auto-flush` works correctly in nested workspace directories.
+- **Unalias Stability** - Fixed a bug where `unalias` failed on mixed-case entity names.
+
 ## [0.51.6] - 2026-05-26
 
 ### Added

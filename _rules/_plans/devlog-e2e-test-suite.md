@@ -47,3 +47,29 @@ To ensure the stability of the Devlog system and its recent enhancements (Extrac
 ### Test 8: Session Lifecycle
 - **Action:** Run `bd devlog pause` and `bd devlog abandon`.
 - **Validation:** `bd devlog status` correctly surfaces the states and short reasons.
+
+### Test 9: Atomic Record & Success Trap Prevention
+- **Action:** Run `bd devlog record` for a file that does NOT exist.
+- **Validation:** 
+  1. The command creates the file automatically.
+  2. The command output contains the `🚀 **AI ACTION REQUIRED:**` directive.
+
+### Test 10: Incomplete Stub Detection
+- **Action:** Run `bd devlog verify` on the newly created stub (which contains placeholders).
+- **Validation:** `verify` must report the session as an "unfinalized stub" and issue an AI Directive.
+
+### Test 11: Orphan Detection
+- **Action:** Create a new `.md` file in the devlog directory but do NOT record it.
+- **Validation:** `bd devlog sync` must print a warning about the orphaned file.
+
+### Test 12: Non-Interactive Prune
+- **Action:** Delete a recorded file and run `bd devlog sync` to mark it as a ghost. Then run `bd devlog prune`.
+- **Validation:** The ghost session is removed from the database without interactive prompts.
+
+### Test 13: Preferred Casing
+- **Action:** Extract an entity with specific casing (e.g. `UserAuthenticationService`).
+- **Validation:** `bd devlog entities` must display the name with its original casing, not just lowercase.
+
+### Test 14: Auto-Flush Metadata
+- **Action:** Run `bd devlog alias`.
+- **Validation:** `.beads/aliases.jsonl` must be updated immediately without an explicit manual sync.

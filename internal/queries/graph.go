@@ -21,17 +21,17 @@ type EntityGraph struct {
 func GetEntityGraphExact(ctx context.Context, db *sql.DB, entityName string, depth int, relType string) (*EntityGraph, error) {
 	query := `
 	WITH RECURSIVE graph(id, name, rel_type, depth, path) AS (
-		SELECT e.id, e.name, '', 0, e.name
-		FROM entities e WHERE e.name = ? 
+		SELECT e.id, COALESCE(e.preferred_name, e.name), '', 0, COALESCE(e.preferred_name, e.name)
+		FROM entities e WHERE e.name = LOWER(?) 
 		
 		UNION ALL 
 		
-		SELECT e.id, e.name, ed.relationship, g.depth+1, g.path || ' → ' || e.name
+		SELECT e.id, COALESCE(e.preferred_name, e.name), ed.relationship, g.depth+1, g.path || ' → ' || COALESCE(e.preferred_name, e.name)
 		FROM entities e 
 		JOIN entity_deps ed ON e.id = ed.to_entity 
 		JOIN graph g ON ed.from_entity = g.id
 		WHERE g.depth < ? 
-		  AND g.path NOT LIKE '%' || e.name || '%'
+		  AND g.path NOT LIKE '%' || COALESCE(e.preferred_name, e.name) || '%'
 		  AND (? = '' OR ed.relationship = ?)
 	)
 	SELECT id, name, rel_type, depth, path FROM graph ORDER BY depth;
@@ -46,6 +46,34 @@ func GetEntityGraphExact(ctx context.Context, db *sql.DB, entityName string, dep
 	return parseGraph(rows)
 }
 
+func GetEntityImpactExact(ctx context.Context, db *sql.DB, entityName string, depth int, relType string) (*EntityGraph, error) {
+	query := `
+	WITH RECURSIVE graph(id, name, rel_type, depth, path) AS (
+		SELECT e.id, COALESCE(e.preferred_name, e.name), '', 0, COALESCE(e.preferred_name, e.name)
+		FROM entities e WHERE e.name = LOWER(?) 
+		
+		UNION ALL 
+		
+		SELECT e.id, COALESCE(e.preferred_name, e.name), ed.relationship, g.depth+1, COALESCE(e.preferred_name, e.name) || ' → ' || g.path
+		FROM entities e 
+		JOIN entity_deps ed ON e.id = ed.from_entity 
+		JOIN graph g ON ed.to_entity = g.id
+		WHERE g.depth < ? 
+		  AND g.path NOT LIKE '%' || COALESCE(e.preferred_name, e.name) || '%'
+		  AND (? = '' OR ed.relationship = ?)
+	)
+	SELECT id, name, rel_type, depth, path FROM graph ORDER BY depth;
+	`
+
+	rows, err := db.QueryContext(ctx, query, entityName, depth, relType, relType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query entity impact: %w", err)
+	}
+	defer rows.Close()
+
+	return parseGraph(rows)
+}
+
 type CooccurrenceNode struct {
 	Name  string
 	Count int
@@ -54,12 +82,12 @@ type CooccurrenceNode struct {
 // GetRelatedEntitiesByCooccurrence finds entities that frequently appear in the same sessions
 func GetRelatedEntitiesByCooccurrence(ctx context.Context, db *sql.DB, entityID string, limit int) ([]CooccurrenceNode, error) {
 	query := `
-		SELECT e.name, COUNT(*) as co_count
+		SELECT COALESCE(e.preferred_name, e.name), COUNT(*) as co_count
 		FROM session_entities se1
 		JOIN session_entities se2 ON se1.session_id = se2.session_id
 		JOIN entities e ON se2.entity_id = e.id
 		WHERE se1.entity_id = ? AND se2.entity_id != ?
-		GROUP BY e.name
+		GROUP BY e.id
 		ORDER BY co_count DESC, e.name ASC
 		LIMIT ?
 	`
@@ -89,7 +117,7 @@ type PathStep struct {
 func GetPathBetweenEntities(ctx context.Context, db *sql.DB, startID, endID string) ([]PathStep, error) {
 	// 1. Get entity names for the path
 	nameMap := make(map[string]string)
-	eRows, err := db.QueryContext(ctx, "SELECT id, name FROM entities WHERE id IN (?, ?)", startID, endID)
+	eRows, err := db.QueryContext(ctx, "SELECT id, COALESCE(preferred_name, name) FROM entities WHERE id IN (?, ?)", startID, endID)
 	if err == nil {
 		defer eRows.Close()
 		for eRows.Next() {
@@ -173,7 +201,7 @@ func GetPathBetweenEntities(ctx context.Context, db *sql.DB, startID, endID stri
 		// Get entity name
 		name := nameMap[curr.entityID]
 		if name == "" {
-			db.QueryRowContext(ctx, "SELECT name FROM entities WHERE id = ?", curr.entityID).Scan(&name)
+			db.QueryRowContext(ctx, "SELECT COALESCE(preferred_name, name) FROM entities WHERE id = ?", curr.entityID).Scan(&name)
 			nameMap[curr.entityID] = name
 		}
 

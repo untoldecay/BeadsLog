@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/cmd/bd/setup"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/recipes"
 )
 
@@ -297,14 +298,9 @@ func runAiderRecipe() {
 }
 
 func findBeadsDir() string {
-	// Check for .beads in current directory
-	if info, err := os.Stat(".beads"); err == nil && info.IsDir() {
-		return ".beads"
-	}
-	// Check for redirected beads directory
-	redirectPath := ".beads/.redirect"
-	if data, err := os.ReadFile(redirectPath); err == nil {
-		return strings.TrimSpace(string(data))
+	d := beads.FindBeadsDir()
+	if d != "" {
+		return d
 	}
 	return ".beads"
 }

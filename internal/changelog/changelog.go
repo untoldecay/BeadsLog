@@ -14,10 +14,22 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.51.6"
+const CurrentVersion = "0.51.7"
 
 
 var entries = []Entry{
+	{
+		Version: "0.51.7",
+		Date:    "2026-05-26",
+		Features: []string{
+			"Casing Preservation: RegexExtractor now preserves original casing for entities.",
+			"Robust Discovery: Enhanced FindBeadsDir for cross-directory workspace stability.",
+			"Unalias Fix: Case-sensitive unaliasing for consistent registry cleanup.",
+		},
+		Protocol: []string{
+			"Entities now appear in the UI with their preferred capitalization.",
+		},
+	},
 	{
 		Version: "0.51.6",
 		Date:    "2026-05-26",

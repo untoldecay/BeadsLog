@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/charmbracelet/huh"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
@@ -2202,7 +2203,7 @@ underlying Markdown devlogs. This will extract the original entity name
 from the text and restore its session links and architectural dependencies.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		aliasName := strings.ToLower(strings.TrimSpace(args[0]))
+		aliasName := strings.TrimSpace(args[0])
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -2851,17 +2852,22 @@ func flushMetadata(ctx context.Context) {
 	}
 	defer store.Close()
 
+	bDir := beads.FindBeadsDir()
+	if bDir == "" {
+		bDir = ".beads"
+	}
+
 	// 1. Export Issues (Issues + Status)
 	jsonlPath := config.GetString("storage.jsonl_path")
 	if jsonlPath == "" {
-		jsonlPath = filepath.Join(config.GetString("beads.dir"), "issues.jsonl")
+		jsonlPath = filepath.Join(bDir, "issues.jsonl")
 	}
 	if err := exportToJSONL(ctx, jsonlPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: auto-flush issues failed: %v\n", err)
 	}
 
 	// 2. Export Aliases
-	aliasesPath := filepath.Join(config.GetString("beads.dir"), "aliases.jsonl")
+	aliasesPath := filepath.Join(bDir, "aliases.jsonl")
 	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: auto-flush aliases failed: %v\n", err)
 	}

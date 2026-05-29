@@ -427,7 +427,7 @@ func extractAndLinkEntities(store *sqlite.SQLiteStorage, sessionID, text string,
 
 		// Get the actual ID if it was an update (in case hash collision or existing name)
 		var actualID string
-		err = db.QueryRow("SELECT id FROM entities WHERE name = ?", entity.Name).Scan(&actualID)
+		err = db.QueryRow("SELECT id FROM entities WHERE name = ?", strings.ToLower(entity.Name)).Scan(&actualID)
 		if err == nil {
 			entityID = actualID
 		}
@@ -483,13 +483,13 @@ func ensureEntityExists(store *sqlite.SQLiteStorage, name string) string {
 	db := store.UnderlyingDB()
 	entityID := fmt.Sprintf("ent-%s", hashID(name))
 	_, _ = db.Exec(`
-        INSERT OR IGNORE INTO entities (id, name, type, mention_count)
-        VALUES (?, ?, 'component', 0)
-    `, entityID, name)
+        INSERT OR IGNORE INTO entities (id, name, preferred_name, type, mention_count)
+        VALUES (?, ?, ?, 'component', 0)
+    `, entityID, strings.ToLower(name), name)
 
 	// In case of name collision but different ID, get the actual one
 	var actualID string
-	err := db.QueryRow("SELECT id FROM entities WHERE name = ?", name).Scan(&actualID)
+	err := db.QueryRow("SELECT id FROM entities WHERE name = ?", strings.ToLower(name)).Scan(&actualID)
 	if err == nil {
 		return actualID
 	}

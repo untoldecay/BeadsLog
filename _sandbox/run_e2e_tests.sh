@@ -158,4 +158,89 @@ if ! ./bd devlog resume --last 1 > /dev/null; then
 fi
 echo "✅ Test 8 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 9: Atomic Record & Success Trap Prevention"
+# ---------------------------------------------------------
+# Record a file that does not exist
+RECORD_OUT=$(./bd devlog record --subject "[feat] atomic stub" --problem "test stub" --file "_rules/_devlog/2026-05-26_atomic.md")
+if [ ! -f "_rules/_devlog/2026-05-26_atomic.md" ]; then
+    echo "❌ FAIL: Stub file not created automatically."
+    exit 1
+fi
+if ! echo "$RECORD_OUT" | grep -q "AI ACTION REQUIRED"; then
+    echo "❌ FAIL: Success Trap Prevention directive missing."
+    exit 1
+fi
+echo "✅ Test 9 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 10: Incomplete Stub Detection"
+# ---------------------------------------------------------
+VERIFY_OUT=$(./bd devlog verify)
+if ! echo "$VERIFY_OUT" | grep -q "unfinalized stubs"; then
+    echo "❌ FAIL: verify did not detect placeholder stub."
+    echo "$VERIFY_OUT"
+    exit 1
+fi
+echo "✅ Test 10 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 11: Orphan Detection"
+# ---------------------------------------------------------
+echo "# I am an orphan" > _rules/_devlog/2026-05-26_orphan.md
+SYNC_OUT=$(./bd devlog sync)
+if ! echo "$SYNC_OUT" | grep -q "orphaned devlog file"; then
+    echo "❌ FAIL: sync did not warn about orphan."
+    echo "$SYNC_OUT"
+    exit 1
+fi
+echo "✅ Test 11 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 12: Non-Interactive Prune"
+# ---------------------------------------------------------
+rm _rules/_devlog/2026-05-26_orphan.md
+./bd devlog sync > /dev/null # This should mark any missing recorded files as ghost
+PRUNE_OUT=$(./bd devlog prune)
+if ! echo "$PRUNE_OUT" | grep -q "Pruned"; then
+    echo "❌ FAIL: prune command output unexpected."
+    echo "$PRUNE_OUT"
+    exit 1
+fi
+echo "✅ Test 12 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 13: Preferred Casing"
+# ---------------------------------------------------------
+echo -e "# Session\n\nWorking on UserAuthenticationService" > _rules/_devlog/2026-05-26_casing.md
+./bd devlog verify --fix > /dev/null
+./bd devlog sync > /dev/null
+if ! ./bd devlog entities --sort=mentions | grep -q "UserAuthenticationService"; then
+    echo "❌ FAIL: Preferred casing not preserved."
+    ./bd devlog entities --sort=mentions
+    exit 1
+fi
+echo "✅ Test 13 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 14: Auto-Flush Metadata"
+# ---------------------------------------------------------
+# Create another entity to alias
+echo -e "# Session\n\nWorking on auth-provider" > _rules/_devlog/2026-05-26_alias_test.md
+./bd devlog verify --fix > /dev/null
+./bd devlog sync > /dev/null
+# Clean old aliases if any
+rm -f .beads/aliases.jsonl
+./bd devlog alias UserAuthenticationService auth-provider > /dev/null
+# Verify it updated on disk WITHOUT manual sync
+if [ ! -f ".beads/aliases.jsonl" ]; then
+    echo "❌ FAIL: Auto-flush failed to create aliases.jsonl."
+    exit 1
+fi
+if ! grep -qi "UserAuthenticationService" .beads/aliases.jsonl; then
+    echo "❌ FAIL: Auto-flush did not record the alias."
+    exit 1
+fi
+echo "✅ Test 14 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

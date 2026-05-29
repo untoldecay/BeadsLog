@@ -91,8 +91,8 @@ func (r *RegexExtractor) Extract(text string) ([]Entity, []Relationship, error) 
 				lowerMatch := strings.ToLower(match)
 				if !r.blacklist[lowerMatch] && !seen[lowerMatch] {
 					entities = append(entities, Entity{
-						Name:       lowerMatch,
-						Type:       "component", // Default type for regex matches
+						Name:       match, // Preserve original casing
+						Type:       "component",
 						Confidence: p.confidence,
 						Source:     "regex",
 					})
@@ -123,8 +123,8 @@ func ExtractRelationships(text string) []Relationship {
 			}
 
 			rels = append(rels, Relationship{
-				FromEntity: strings.ToLower(strings.TrimSpace(match[1])),
-				ToEntity:   strings.ToLower(strings.TrimSpace(match[2])),
+				FromEntity: strings.TrimSpace(match[1]),
+				ToEntity:   strings.TrimSpace(match[2]),
 				Type:       relType,
 				Confidence: 1.0,      // Explicit manual edges are gold standard
 				Source:     "manual", // Differentiate from inferred regex edges
