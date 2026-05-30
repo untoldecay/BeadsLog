@@ -346,6 +346,47 @@ func parseIndexMD(filename string) ([]IndexRow, error) {
 	return rows, nil
 }
 
+// extractDevlogMetadata parses a markdown file to find the # Title and ## Problem section
+func extractDevlogMetadata(path string) (string, string, error) {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", "", err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var subject, problem string
+	var inProblem bool
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// 1. Get Subject (# Title)
+		if subject == "" && strings.HasPrefix(trimmed, "# ") {
+			subject = strings.TrimPrefix(trimmed, "# ")
+			continue
+		}
+
+		// 2. Detect Problem Header (## Problem)
+		if strings.HasPrefix(trimmed, "## Problem") {
+			inProblem = true
+			continue
+		}
+
+		// 3. Stop if another H2 starts
+		if inProblem && strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "## Problem") {
+			inProblem = false
+			break
+		}
+
+		// 4. Capture first non-empty line of problem
+		if inProblem && problem == "" && trimmed != "" {
+			problem = trimmed
+		}
+	}
+
+	return subject, problem, nil
+}
+
 // GetOrphanedFiles returns a list of .md files in the devlog directory that are NOT in the index
 func GetOrphanedFiles(dir string, indexedRows []IndexRow) ([]string, error) {
 	files, err := ioutil.ReadDir(dir)

@@ -14,10 +14,22 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.52.1"
+const CurrentVersion = "0.52.2"
 
 
 var entries = []Entry{
+	{
+		Version: "0.52.2",
+		Date:    "2026-05-30",
+		Features: []string{
+			"Write-First Workflow: Reverted 'Auto-Stub' in favor of a stricter 'Write -> Record' order.",
+			"Auto-Metadata Extraction: 'bd devlog record' now automatically parses Subject and Problem from your file.",
+			"Loud Error Reporting: High-signal directives when a devlog file is missing.",
+		},
+		Protocol: []string{
+			"You MUST write the full Markdown devlog FIRST, then run 'bd devlog record --file <path>'.",
+		},
+	},
 	{
 		Version: "0.52.1",
 		Date:    "2026-05-26",

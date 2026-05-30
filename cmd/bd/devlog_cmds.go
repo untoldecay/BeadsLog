@@ -1847,17 +1847,9 @@ var devlogVerifyCmd = &cobra.Command{
 		defer rows.Close()
 
 		var incomplete []struct{ ID, Title, Filename string }
-		var stubs []string
 		for rows.Next() {
 			var s struct{ ID, Title, Filename, Narrative string }
 			rows.Scan(&s.ID, &s.Title, &s.Filename, &s.Narrative)
-			
-			// Detect unfinalized stubs (placeholders)
-			if strings.Contains(s.Narrative, "<!-- Describe the technical context -->") || 
-			   strings.Contains(s.Narrative, "- [ ] Task 1") {
-				stubs = append(stubs, s.ID)
-			}
-
 			incomplete = append(incomplete, struct{ ID, Title, Filename string }{s.ID, s.Title, s.Filename})
 		}
 
@@ -1876,14 +1868,6 @@ var devlogVerifyCmd = &cobra.Command{
 				fmt.Printf("- [%s] %s (%s)\n", s.ID, s.Title, s.Filename)
 			}
 
-			if len(stubs) > 0 {
-				fmt.Printf("\n%s Found %d unfinalized stubs (placeholders still present):\n", ui.RenderFail("🚨"), len(stubs))
-				for _, sid := range stubs {
-					fmt.Printf("   - %s\n", sid)
-				}
-				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
-				fmt.Println("You MUST fill in the 'Work Done' and 'Architectural Relationships' for these files.")
-			}
 			fmt.Printf("\nFound %d sessions with missing metadata.\n", len(incomplete))
 			if len(orphans) > 0 {
 				fmt.Printf("Found %d orphaned files.\n", len(orphans))
@@ -1891,44 +1875,7 @@ var devlogVerifyCmd = &cobra.Command{
 			fmt.Printf("\n%s Tip: Run 'bd devlog verify --fix' to automatically adopt orphans and backfill metadata.\n", ui.RenderAccent("💡"))
 			fmt.Println("     Use '--fix-regex' for fast extraction or '--fix-ai' for high quality.")
 		} else {
-			// Phase 1: Adopt Orphans (Only if not targeting, or if we want to support adopting specific file?)
-			// For simplicity, we only adopt all orphans if no target is specified.
-			if target == "" && len(orphans) > 0 {
-				fmt.Printf("Adopting %d orphaned files...\n", len(orphans))
-				// ... (Adoption logic same as before) ...
-				// Re-implementing simplified adoption for brevity in replacement
-				devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
-				if devlogDir == "" { devlogDir = "_rules/_devlog" }
-				indexPath := filepath.Join(devlogDir, "_index.md")
-				
-				for _, o := range orphans {
-					title := strings.TrimSuffix(o, ".md")
-					date := time.Now().Format("2006-01-02")
-					if len(o) >= 10 {
-						if _, err := time.Parse("2006-01-02", o[:10]); err == nil {
-							date = o[:10]
-							title = strings.TrimSpace(strings.ReplaceAll(title[10:], "-", " "))
-							if title == "" { title = "Adopted session" }
-						}
-					}
-					entry := fmt.Sprintf("| [adopt] %s | Automatically adopted during verify | %s | [%s](%s) |\n", title, date, o, o)
-					f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY, 0644)
-					if err == nil {
-						stat, _ := f.Stat()
-						if stat.Size() > 0 {
-							lastChar := make([]byte, 1)
-							_, _ = f.ReadAt(lastChar, stat.Size()-1)
-							if lastChar[0] != '\n' { f.WriteString("\n") }
-						}
-						f.WriteString(entry)
-						f.Close()
-						fmt.Printf("  ✓ Adopted %s\n", o)
-					}
-				}
-				fmt.Println("  Tip: Run 'bd devlog sync' to ingest newly adopted files.")
-			}
-
-			// Phase 2: Backfill Metadata
+			// Phase 1: Adopt Orphans
 			if len(incomplete) > 0 {
 				// Disclaimer
 				if fixAI {
@@ -1977,15 +1924,6 @@ var devlogVerifyCmd = &cobra.Command{
 			if len(orphans) == 0 && len(incomplete) == 0 {
 				fmt.Println("Nothing to fix.")
 			}
-
-			if len(stubs) > 0 {
-				fmt.Printf("\n%s Found %d unfinalized stubs (placeholders still present):\n", ui.RenderFail("🚨"), len(stubs))
-				for _, sid := range stubs {
-					fmt.Printf("   - %s\n", sid)
-				}
-				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
-				fmt.Println("You MUST fill in the 'Work Done' and 'Architectural Relationships' for these files.")
-			}
 		}
 	},
 }
@@ -1994,14 +1932,14 @@ var devlogRecordCmd = &cobra.Command{
 	Use:   "record",
 	Short: "Automatically record a devlog entry in the index",
 	Run: func(cmd *cobra.Command, args []string) {
+		file, _ := cmd.Flags().GetString("file")
 		subject, _ := cmd.Flags().GetString("subject")
 		problem, _ := cmd.Flags().GetString("problem")
-		file, _ := cmd.Flags().GetString("file")
 		author, _ := cmd.Flags().GetString("author")
 		agent, _ := cmd.Flags().GetString("agent")
 
-		if subject == "" || problem == "" || file == "" {
-			fmt.Println("Error: --subject, --problem, and --file are mandatory.")
+		if file == "" {
+			fmt.Println("Error: --file is mandatory.")
 			os.Exit(1)
 		}
 
@@ -2017,7 +1955,42 @@ var devlogRecordCmd = &cobra.Command{
 			devlogDir = "_rules/_devlog"
 		}
 
-		// Resolve Author/Agent early for possible stub creation
+		// 1. Verify file existence
+		targetFile := file
+		if _, err := os.Stat(targetFile); os.IsNotExist(err) {
+			// Try relative to devlogDir
+			relPath := filepath.Join(devlogDir, file)
+			if _, err := os.Stat(relPath); os.IsNotExist(err) {
+				fmt.Printf("\n%s Error: Devlog file not found: %s\n", ui.RenderFail("🚨"), file)
+				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
+				fmt.Println("You MUST create and write the full devlog Markdown file FIRST, then run this command.")
+				fmt.Println("Follow the rules in '_rules/_devlog/_generate-devlog.md'.")
+				os.Exit(1)
+			}
+			targetFile = relPath
+		}
+
+		// 2. Auto-Extract Metadata from file if missing
+		if subject == "" || problem == "" {
+			extractedSubject, extractedProblem, err := extractDevlogMetadata(targetFile)
+			if err == nil {
+				if subject == "" && extractedSubject != "" {
+					subject = extractedSubject
+				}
+				if problem == "" && extractedProblem != "" {
+					problem = extractedProblem
+				}
+			}
+		}
+
+		// 3. Mandatory checks
+		if subject == "" || problem == "" {
+			fmt.Println("Error: Could not extract Subject or Problem from file.")
+			fmt.Println("Ensure your file has a '# Subject' and a '## Problem' section, or use --subject and --problem flags.")
+			os.Exit(1)
+		}
+
+		// 4. Resolve Author/Agent
 		if author == "" {
 			author = config.GetString("devlog.author")
 		}
@@ -2039,45 +2012,15 @@ var devlogRecordCmd = &cobra.Command{
 			agent = "Unknown"
 		}
 
-		// Verify file existence (prevent agent confusion)
-		targetFile := file
-		if _, err := os.Stat(targetFile); os.IsNotExist(err) {
-			// Try relative to devlogDir
-			relPath := filepath.Join(devlogDir, file)
-			if _, err := os.Stat(relPath); os.IsNotExist(err) {
-				// ATOMIC: File missing, create a stub!
-				fmt.Printf("File '%s' not found. Creating a new devlog stub...\n", targetFile)
-				
-				// Use the resolved relative path if it was inferred
-				if !strings.Contains(targetFile, string(filepath.Separator)) {
-					targetFile = relPath
-				}
-
-				stub := fmt.Sprintf(devlogStubTemplate, subject, time.Now().Format("2006-01-02"), author, problem)
-				if err := os.WriteFile(targetFile, []byte(stub), 0644); err != nil {
-					fmt.Printf("Error creating stub: %v\n", err)
-					os.Exit(1)
-				}
-				fmt.Printf("✓ Created stub: %s\n", targetFile)
-				fmt.Println("\n🚀 **AI ACTION REQUIRED:**")
-				fmt.Println("The file above is only a TEMPLATE. You MUST now:")
-				fmt.Println("1. OPEN and READ the file.")
-				fmt.Println("2. FILL IN the 'Work Done' and 'Architectural Relationships' based on this session.")
-				fmt.Println("3. Your work is NOT logged until you finalize the content.")
-			} else {
-				targetFile = relPath
-			}
-		}
-
 		indexPath := filepath.Join(devlogDir, "_index.md")
 		
-		// 3. Get Date
+		// 5. Get Date
 		date := time.Now().Format("2006-01-02 15:04")
 
-		// 4. Generate Session ID (for stability)
+		// 6. Generate Session ID (for stability)
 		sessionID := fmt.Sprintf("sess-%s", hashID(subject+date))
 
-		// 5. Get Branch & Commit Info
+		// 7. Get Branch & Commit Info
 		branchInfo := "N/A"
 		commitSHA := ""
 		if config.GetBool("devlog.branch-tracking") {
@@ -2099,8 +2042,7 @@ var devlogRecordCmd = &cobra.Command{
 			commitSHA = strings.TrimSpace(string(commitOut))
 		}
 
-		// 6. Format Row
-		// New 7-column format: | Subject | Problems | Author | Agent | Date | Branch | Devlog |
+		// 8. Format Row
 		fileName := filepath.Base(targetFile)
 		devlogLink := fmt.Sprintf("[%s](%s?id=%s", fileName, fileName, sessionID)
 		if commitSHA != "" {
@@ -2110,7 +2052,7 @@ var devlogRecordCmd = &cobra.Command{
 		
 		row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", subject, problem, author, agent, date, branchInfo, devlogLink)
 
-		// 7. Append to File
+		// 9. Append to File
 		f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			fmt.Printf("Error opening index: %v\n", err)
@@ -2125,7 +2067,7 @@ var devlogRecordCmd = &cobra.Command{
 
 		fmt.Printf("✓ Recorded session: %s\n", subject)
 
-		// 8. Sync
+		// 10. Sync
 		fmt.Println("→ Syncing devlog...")
 		devlogSyncCmd.Run(cmd, []string{})
 	},

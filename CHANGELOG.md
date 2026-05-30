@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.2] - 2026-05-30
+
+### Changed
+- **Write-First Workflow** - Reverted automatic stub creation in `bd devlog record`. Agents are now required to write the full Markdown content before indexing, ensuring higher data quality.
+- **Auto-Metadata Extraction** - `bd devlog record` now automatically extracts the `subject` and `problem` from the Markdown file headers, reducing redundant CLI flags.
+- **Loud Error Reporting** - Missing devlog files now trigger a high-signal AI Directive to prevent "Success Traps."
+
 ## [0.52.1] - 2026-05-26
 
 ### Added
