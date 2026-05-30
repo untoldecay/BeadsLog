@@ -1876,6 +1876,39 @@ var devlogVerifyCmd = &cobra.Command{
 			fmt.Println("     Use '--fix-regex' for fast extraction or '--fix-ai' for high quality.")
 		} else {
 			// Phase 1: Adopt Orphans
+			if target == "" && len(orphans) > 0 {
+				fmt.Printf("Adopting %d orphaned files...\n", len(orphans))
+				devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+				if devlogDir == "" { devlogDir = "_rules/_devlog" }
+				indexPath := filepath.Join(devlogDir, "_index.md")
+				
+				for _, o := range orphans {
+					title := strings.TrimSuffix(o, ".md")
+					date := time.Now().Format("2006-01-02")
+					if len(o) >= 10 {
+						if _, err := time.Parse("2006-01-02", o[:10]); err == nil {
+							date = o[:10]
+							title = strings.TrimSpace(strings.ReplaceAll(title[10:], "-", " "))
+							if title == "" { title = "Adopted session" }
+						}
+					}
+					entry := fmt.Sprintf("| [adopt] %s | Automatically adopted during verify | Unknown | Unknown | %s | N/A | [%s](%s) |\n", title, date, o, o)
+					f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY, 0644)
+					if err == nil {
+						stat, _ := f.Stat()
+						if stat.Size() > 0 {
+							lastChar := make([]byte, 1)
+							_, _ = f.ReadAt(lastChar, stat.Size()-1)
+							if lastChar[0] != '\n' { f.WriteString("\n") }
+						}
+						f.WriteString(entry)
+						f.Close()
+						fmt.Printf("  ✓ Adopted %s\n", o)
+					}
+				}
+				fmt.Println("  Tip: Run 'bd devlog sync' to ingest newly adopted files.")
+			}
+
 			if len(incomplete) > 0 {
 				// Disclaimer
 				if fixAI {
@@ -1970,7 +2003,22 @@ var devlogRecordCmd = &cobra.Command{
 			targetFile = relPath
 		}
 
-		// 2. Auto-Extract Metadata from file if missing
+		indexPath := filepath.Join(devlogDir, "_index.md")
+
+		// 2. File Collision Check
+		// Prevent registering the same file twice
+		if indexContent, err := os.ReadFile(indexPath); err == nil {
+			fileName := filepath.Base(targetFile)
+			// Check if the filename appears inside markdown link syntax e.g. [name](name)
+			if strings.Contains(string(indexContent), "]("+fileName) {
+				fmt.Printf("\n%s Error: File Collision Detected\n", ui.RenderFail("🚨"))
+				fmt.Printf("The file '%s' is already registered in the devlog index.\n", fileName)
+				fmt.Println("You MUST use a unique filename for each session.")
+				os.Exit(1)
+			}
+		}
+
+		// 3. Auto-Extract Metadata from file if missing
 		if subject == "" || problem == "" {
 			extractedSubject, extractedProblem, err := extractDevlogMetadata(targetFile)
 			if err == nil {
@@ -2011,8 +2059,6 @@ var devlogRecordCmd = &cobra.Command{
 		if agent == "" {
 			agent = "Unknown"
 		}
-
-		indexPath := filepath.Join(devlogDir, "_index.md")
 		
 		// 5. Get Date
 		date := time.Now().Format("2006-01-02 15:04")

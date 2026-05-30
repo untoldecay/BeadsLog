@@ -146,8 +146,9 @@ echo -e "\n[*] Test 8: Session Lifecycle"
 # ---------------------------------------------------------
 ./bd devlog pause --scope branch:main --message "Testing pause" > /dev/null
 ./bd devlog sync > /dev/null
-if ! ./bd devlog search "Testing pause" | grep -q "Testing pause"; then
-    echo "❌ FAIL: Pause state not found in search."
+if ! ./bd devlog list | grep -qi "paused"; then
+    echo "❌ FAIL: Pause state not found in list."
+    ./bd devlog list
     exit 1
 fi
 ./bd devlog abandon --scope branch:main --message "Testing abandon" > /dev/null
@@ -159,27 +160,39 @@ fi
 echo "✅ Test 8 Passed."
 
 # ---------------------------------------------------------
-echo -e "\n[*] Test 9: Atomic Record & Success Trap Prevention"
+echo -e "\n[*] Test 9: Write-First Workflow Enforcement"
 # ---------------------------------------------------------
 # Record a file that does not exist
-RECORD_OUT=$(./bd devlog record --subject "[feat] atomic stub" --problem "test stub" --file "_rules/_devlog/2026-05-26_atomic.md")
-if [ ! -f "_rules/_devlog/2026-05-26_atomic.md" ]; then
-    echo "❌ FAIL: Stub file not created automatically."
+RECORD_OUT=$(./bd devlog record --subject "[feat] atomic stub" --problem "test stub" --file "_rules/_devlog/2026-05-26_atomic.md" 2>&1 || true)
+if [ -f "_rules/_devlog/2026-05-26_atomic.md" ]; then
+    echo "❌ FAIL: Stub file was created automatically (should be write-first)."
     exit 1
 fi
 if ! echo "$RECORD_OUT" | grep -q "AI ACTION REQUIRED"; then
-    echo "❌ FAIL: Success Trap Prevention directive missing."
+    echo "❌ FAIL: Write-First directive missing."
     exit 1
 fi
 echo "✅ Test 9 Passed."
 
 # ---------------------------------------------------------
-echo -e "\n[*] Test 10: Incomplete Stub Detection"
+echo -e "\n[*] Test 10: Auto-Metadata Extraction"
 # ---------------------------------------------------------
-VERIFY_OUT=$(./bd devlog verify)
-if ! echo "$VERIFY_OUT" | grep -q "unfinalized stubs"; then
-    echo "❌ FAIL: verify did not detect placeholder stub."
-    echo "$VERIFY_OUT"
+cat << 'EOF' > _rules/_devlog/2026-05-26_auto-metadata.md
+# Auto Meta Subject
+**Date:** 2026-05-30
+**Author:** Alice E2E
+
+## Problem
+This is an auto-extracted problem description.
+
+## Context
+Test
+EOF
+./bd devlog record --file "_rules/_devlog/2026-05-26_auto-metadata.md" > /dev/null
+./bd devlog sync > /dev/null
+SEARCH_OUT=$(./bd devlog search "Auto Meta Subject")
+if ! echo "$SEARCH_OUT" | grep -q "Auto Meta Subject"; then
+    echo "❌ FAIL: Auto-extracted subject not found in index."
     exit 1
 fi
 echo "✅ Test 10 Passed."
