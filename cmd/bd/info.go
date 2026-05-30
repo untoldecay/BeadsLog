@@ -297,7 +297,18 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
-		Version: "0.52.2",
+		Version: "0.53.0",
+		Date:    "2026-05-30",
+		Changes: []string{
+			"NEW: Write-First Workflow - bd devlog record now requires the file to exist",
+			"NEW: Auto-Metadata Extraction - tool parses Subject/Problem from Markdown",
+			"NEW: File Collision Check - prevents double-registering the same file",
+			"NEW: Agent-Proofing - louder AI directives and improved maintenance visibility",
+		},
+	},
+	{
+		Version: "0.52.0",
+
 		Date:    "2026-05-30",
 		Changes: []string{
 			"NEW: Write-First Workflow - bd devlog record now requires the file to exist",
