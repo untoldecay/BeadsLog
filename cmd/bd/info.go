@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.53.1",
+		Date:    "2026-05-31",
+		Changes: []string{
+			"NEW: Time Utility - bd now command to get current system time in devlog format",
+			"NEW: Protocol Update - agents now instructed to use bd now to prevent time drift",
+		},
+	},
+	{
 		Version: "0.53.0",
 		Date:    "2026-05-30",
 		Changes: []string{

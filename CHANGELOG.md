@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.53.0] - 2026-05-31
+## [0.53.1] - 2026-05-31
+
+### Added
+- **Time Utility** - Added `bd now` command to output the current system time in the standard `YYYY-MM-DD HH:MM` format.
+- **Protocol Guardrail** - Updated the injected agent protocol to mandate the use of `bd now`, eliminating timestamp hallucinations in devlog headers.
+
+## [0.53.0] - 2026-05-30
+
 
 ## [0.53.0] - 2026-05-31
 

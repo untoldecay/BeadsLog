@@ -14,12 +14,24 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.53.0"
+const CurrentVersion = "0.53.1"
 
 
 var entries = []Entry{
 	{
-		Version: "0.52.2",
+		Version: "0.53.1",
+		Date:    "2026-05-31",
+		Features: []string{
+			"Time Utility: Added 'bd now' command to provide current system time in devlog format.",
+			"Protocol Update: Injected protocol now instructs agents to use 'bd now' to prevent time hallucinations.",
+		},
+		Protocol: []string{
+			"Run 'bd now' to get the current timestamp for devlog headers.",
+		},
+	},
+	{
+		Version: "0.53.0",
+
 		Date:    "2026-05-30",
 		Features: []string{
 			"Write-First Workflow: Reverted 'Auto-Stub' in favor of a stricter 'Write -> Record' order.",
