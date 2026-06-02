@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.2] - 2026-05-31
+
+### Fixed
+- **Catchup Prompt Accessibility** - `bd init` and `bd onboard` now automatically create or update the `_generate-catchup.md` file, ensuring agents always have the correct instructions for summarization.
+
 ## [0.53.1] - 2026-05-31
 
 ### Added

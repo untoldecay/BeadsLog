@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.53.2",
+		Date:    "2026-05-31",
+		Changes: []string{
+			"FIX: Catchup Prompt - Tool now ensures _generate-catchup.md exists in the project",
+		},
+	},
+	{
 		Version: "0.53.1",
 		Date:    "2026-05-31",
 		Changes: []string{
