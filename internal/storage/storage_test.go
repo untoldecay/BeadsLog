@@ -191,6 +191,24 @@ func (m *mockStorage) RenameDependencyPrefix(ctx context.Context, oldPrefix, new
 func (m *mockStorage) RenameCounterPrefix(ctx context.Context, oldPrefix, newPrefix string) error {
 	return nil
 }
+func (m *mockStorage) GetAllAliases(ctx context.Context) ([]types.AliasRecord, error) {
+	return nil, nil
+}
+func (m *mockStorage) SaveAliases(ctx context.Context, aliases []types.AliasRecord) error {
+	return nil
+}
+func (m *mockStorage) SetBranchState(ctx context.Context, state types.BranchState) error {
+	return nil
+}
+func (m *mockStorage) GetBranchState(ctx context.Context, scopeType types.ScopeType, scopeRef string) (*types.BranchState, error) {
+	return nil, nil
+}
+func (m *mockStorage) UpdateBranchCache(ctx context.Context, cache types.BranchCache) error {
+	return nil
+}
+func (m *mockStorage) GetBranchCache(ctx context.Context, branchName string) (*types.BranchCache, error) {
+	return nil, nil
+}
 func (m *mockStorage) RunInTransaction(ctx context.Context, fn func(tx Transaction) error) error {
 	return nil
 }

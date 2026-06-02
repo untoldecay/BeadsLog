@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -57,19 +58,20 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 
 		// Merge Entities
 		for _, e := range entities {
-			if existing, ok := allEntities[e.Name]; ok {
+			key := strings.ToLower(e.Name)
+			if existing, ok := allEntities[key]; ok {
 				// Merge logic: keep higher confidence
 				if e.Confidence > existing.Confidence {
-					allEntities[e.Name] = e
+					allEntities[key] = e
 				}
 			} else {
-				allEntities[e.Name] = e
+				allEntities[key] = e
 			}
 		}
 		
 		// Merge Relationships
 		for _, r := range relationships {
-			key := fmt.Sprintf("%s|%s|%s", r.FromEntity, r.ToEntity, r.Type)
+			key := strings.ToLower(fmt.Sprintf("%s|%s|%s", r.FromEntity, r.ToEntity, r.Type))
 			if existing, ok := allRelationships[key]; ok {
 				if r.Confidence > existing.Confidence {
 					allRelationships[key] = r

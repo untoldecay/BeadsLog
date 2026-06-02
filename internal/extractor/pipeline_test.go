@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -31,8 +32,9 @@ Also changed nginx.conf settings.
 	}
 
 	for _, e := range result.Entities {
-		if _, ok := expectedEntities[e.Name]; ok {
-			expectedEntities[e.Name] = true
+		lowerName := strings.ToLower(e.Name)
+		if _, ok := expectedEntities[lowerName]; ok {
+			expectedEntities[lowerName] = true
 			if e.Confidence != 0.8 {
 				t.Errorf("Expected confidence 0.8 for %s, got %f", e.Name, e.Confidence)
 			}
@@ -69,7 +71,7 @@ func TestRelationshipPrioritization(t *testing.T) {
 
 	found := false
 	for _, r := range result.Relationships {
-		if r.FromEntity == "a" && r.ToEntity == "b" {
+		if strings.ToLower(r.FromEntity) == "a" && strings.ToLower(r.ToEntity) == "b" {
 			found = true
 			if r.Source != "manual" || r.Confidence != 1.0 {
 				t.Errorf("Expected manual relationship with 1.0 confidence, got %s and %f", r.Source, r.Confidence)

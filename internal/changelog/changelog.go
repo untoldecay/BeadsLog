@@ -14,12 +14,12 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.53.2"
+const CurrentVersion = "0.54.0"
 
 
 var entries = []Entry{
 	{
-		Version: "0.53.2",
+		Version: "0.54.0",
 		Date:    "2026-05-31",
 		Features: []string{
 			"Catchup Prompt: Automated creation/update of '_generate-catchup.md' during init and onboard.",

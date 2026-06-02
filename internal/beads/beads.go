@@ -460,7 +460,24 @@ func FindBeadsDir() string {
 		}
 	}
 
-	// 2. Search for .beads/ in current directory and ancestors (Local Discovery)
+	// 2. For worktrees, prioritize main repository root (bd-de6)
+	if git.IsWorktree() {
+		mainRepoRoot, err := git.GetMainRepoRoot()
+		if err == nil && mainRepoRoot != "" {
+			beadsDir := filepath.Join(mainRepoRoot, ".beads")
+			if info, err := os.Stat(beadsDir); err == nil && info.IsDir() {
+				// Follow redirect if present
+				beadsDir = FollowRedirect(beadsDir)
+
+				// Validate directory contains actual project files
+				if hasBeadsProjectFiles(beadsDir) {
+					return beadsDir
+				}
+			}
+		}
+	}
+
+	// 3. Search for .beads/ in current directory and ancestors (Local Discovery)
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ""
@@ -492,24 +509,6 @@ func FindBeadsDir() string {
 			break
 		}
 		dir = parent
-	}
-
-	// 3. For worktrees, fall back to main repository root if local discovery failed
-	if git.IsWorktree() {
-		var err error
-		mainRepoRoot, err := git.GetMainRepoRoot()
-		if err == nil && mainRepoRoot != "" {
-			beadsDir := filepath.Join(mainRepoRoot, ".beads")
-			if info, err := os.Stat(beadsDir); err == nil && info.IsDir() {
-				// Follow redirect if present
-				beadsDir = FollowRedirect(beadsDir)
-
-				// Validate directory contains actual project files
-				if hasBeadsProjectFiles(beadsDir) {
-					return beadsDir
-				}
-			}
-		}
 	}
 
 	return ""
