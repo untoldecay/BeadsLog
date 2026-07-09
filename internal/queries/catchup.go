@@ -25,7 +25,7 @@ func GetCatchupDelta(ctx context.Context, db *sql.DB, since time.Time) (*Catchup
 	sessionRows, err := db.QueryContext(ctx, `
 		SELECT s.id, s.title, s.timestamp, s.narrative, COALESCE(s.branch, 'N/A'), COALESCE(s.author, 'Unknown')
 		FROM sessions s
-		WHERE s.timestamp > ?
+		WHERE s.is_ghost = 0 AND s.timestamp > ?
 		ORDER BY s.timestamp ASC
 	`, since.Format(time.RFC3339))
 	if err != nil {

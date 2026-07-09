@@ -537,7 +537,39 @@ var devlogSyncCmd = &cobra.Command{
 
 		// Store last sync time
 		_ = store.SetMetadata(rootCtx, "last_devlog_sync", time.Now().Format(time.RFC3339))
-		
+
+		// GHOST RECONCILIATION: sessions whose index row was removed are never
+		// visited by the row loop above, so their is_ghost flag goes stale.
+		// If the file is also gone from disk, mark them ghosts here.
+		indexed := make(map[string]bool, len(rows))
+		for _, r := range rows {
+			indexed[filepath.Base(r.Filename)] = true
+		}
+		db := store.UnderlyingDB()
+		if sessRows, qErr := db.QueryContext(rootCtx, "SELECT id, filename FROM sessions WHERE is_ghost = 0"); qErr == nil {
+			var staleIDs []string
+			for sessRows.Next() {
+				var id, fn string
+				if sessRows.Scan(&id, &fn) != nil || indexed[filepath.Base(fn)] {
+					continue
+				}
+				if _, err := os.Stat(fn); err == nil {
+					continue // file exists at recorded path (orphan, adoptable via verify --fix)
+				}
+				if _, err := os.Stat(filepath.Join(devlogDir, filepath.Base(fn))); err == nil {
+					continue // file exists in devlog dir
+				}
+				staleIDs = append(staleIDs, id)
+			}
+			sessRows.Close()
+			for _, id := range staleIDs {
+				_, _ = db.ExecContext(rootCtx, "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE id = ?", id)
+			}
+			if len(staleIDs) > 0 && verboseFlag {
+				fmt.Printf("Marked %d de-indexed session(s) with missing files as ghosts\n", len(staleIDs))
+			}
+		}
+
 		// ORPHAN DETECTION
 		orphans, _ := GetOrphanedFiles(devlogDir, rows)
 		if len(orphans) > 0 {
@@ -556,8 +588,33 @@ var devlogSyncCmd = &cobra.Command{
 		} else if !quietFlag {
 			fmt.Println("Already up to date.")
 		}
+
+		// RECONCILIATION SUMMARY: surface repair needs instead of burying them in per-file warnings
+		incomplete, ghosts := devlogHealthCounts(store.UnderlyingDB())
+		if ghosts > 0 {
+			fmt.Printf("✖ %d ghost session(s) in index — run 'bd devlog prune'\n", ghosts)
+		}
+		if incomplete > 0 {
+			fmt.Printf("○ %d incomplete session(s) — run 'bd devlog verify --fix'\n", incomplete)
+		}
 		fmt.Printf("\n%s Tip: Use -v for detailed sync logs or --help for options.\n", ui.RenderAccent("💡"))
 	},
+}
+
+// devlogHealthCounts returns sessions needing repair: incomplete (missing
+// entities/relationships or containing placeholder text) and ghosts (index
+// entries whose markdown file no longer exists on disk).
+func devlogHealthCounts(db *sql.DB) (incomplete, ghosts int) {
+	_ = db.QueryRow(`
+		SELECT COUNT(DISTINCT id)
+		FROM sessions
+		WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+		OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+		OR (narrative LIKE '%<!-- Describe the technical context -->%'
+		OR narrative LIKE '%- [ ] Task 1%')
+	`).Scan(&incomplete)
+	_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghosts)
+	return
 }
 
 const devlogStubTemplate = `# %s
@@ -937,7 +994,7 @@ var devlogListCmd = &cobra.Command{
 		}
 		query := fmt.Sprintf("SELECT %s FROM sessions", fields)
 		var queryArgs []interface{}
-		var conditions []string
+		conditions := []string{"is_ghost = 0"}
 		if sessionType != "" {
 			conditions = append(conditions, "type = ?")
 			queryArgs = append(queryArgs, sessionType)
@@ -959,40 +1016,60 @@ var devlogListCmd = &cobra.Command{
 		}
 		defer rows.Close()
 
+		type listSession struct {
+			ID        string `json:"id"`
+			Title     string `json:"title"`
+			Timestamp string `json:"timestamp"`
+			Type      string `json:"type"`
+			Author    string `json:"author"`
+			Narrative string `json:"narrative,omitempty"`
+		}
+		var sessions []listSession
 		for rows.Next() {
-			var id, title, timestampStr, typ, authorName string
+			var s listSession
 			var narrative sql.NullString
-			
+
 			var err error
 			if preview {
-				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName, &narrative)
+				err = rows.Scan(&s.ID, &s.Title, &s.Timestamp, &s.Type, &s.Author, &narrative)
 			} else {
-				err = rows.Scan(&id, &title, &timestampStr, &typ, &authorName)
+				err = rows.Scan(&s.ID, &s.Title, &s.Timestamp, &s.Type, &s.Author)
 			}
-			
+
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error scanning row: %v\n", err)
 				continue
 			}
-			
+			if narrative.Valid {
+				s.Narrative = narrative.String
+			}
+			sessions = append(sessions, s)
+		}
+
+		if jsonOutput {
+			outputJSON(sessions)
+			return
+		}
+
+		for _, s := range sessions {
 			// Parse and format timestamp
-			displayTime := timestampStr
-			if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
+			displayTime := s.Timestamp
+			if t, err := time.Parse(time.RFC3339, s.Timestamp); err == nil {
 				displayTime = t.Local().Format("2006-01-02 15:04")
 			}
 
 			// Render standard line
-			line := fmt.Sprintf("[%s] [%s] [%s] %s - %s", 
-				ui.RenderMuted(displayTime), 
-				ui.RenderAccent(id), 
-				ui.RenderMuted(authorName), 
-				ui.RenderMuted(typ), 
-				title)
+			line := fmt.Sprintf("[%s] [%s] [%s] %s - %s",
+				ui.RenderMuted(displayTime),
+				ui.RenderAccent(s.ID),
+				ui.RenderMuted(s.Author),
+				ui.RenderMuted(s.Type),
+				s.Title)
 			fmt.Println(line)
 
 			// Render preview if requested
-			if preview && narrative.Valid && narrative.String != "" {
-				lines := strings.Split(narrative.String, "\n")
+			if preview && s.Narrative != "" {
+				lines := strings.Split(s.Narrative, "\n")
 				count := 0
 				for _, l := range lines {
 					trimmed := strings.TrimSpace(l)
@@ -1001,7 +1078,7 @@ var devlogListCmd = &cobra.Command{
 					}
 					// Clean markers
 					clean := strings.ReplaceAll(trimmed, "**", "")
-					
+
 					fmt.Printf("      %s\n", ui.RenderMuted(clean))
 					count++
 					if count >= 2 { // 2 lines of content is enough for list
@@ -1068,14 +1145,24 @@ Noise terms like CSS properties and common generic verbs are automatically filte
 		}
 		defer rows.Close()
 
+		type entityRow struct {
+			Name  string `json:"name"`
+			Count int    `json:"count"`
+		}
+		var entityRows []entityRow
 		var entities [][]string
 		for rows.Next() {
-			var name string
-			var count int
-			if err := rows.Scan(&name, &count); err != nil {
+			var e entityRow
+			if err := rows.Scan(&e.Name, &e.Count); err != nil {
 				continue
 			}
-			entities = append(entities, []string{name, fmt.Sprintf("%d", count)})
+			entityRows = append(entityRows, e)
+			entities = append(entities, []string{e.Name, fmt.Sprintf("%d", e.Count)})
+		}
+
+		if jsonOutput {
+			outputJSON(entityRows)
+			return
 		}
 
 		if len(entities) > 0 {
@@ -1116,20 +1203,22 @@ var devlogShowCmd = &cobra.Command{
 			}
 		}
 
-		rows, err := store.UnderlyingDB().QueryContext(rootCtx, 
-			"SELECT id, filename, timestamp FROM sessions WHERE id = ? OR filename LIKE ? OR timestamp LIKE ?", 
+		rows, err := store.UnderlyingDB().QueryContext(rootCtx,
+			"SELECT id, filename, timestamp, is_ghost FROM sessions WHERE id = ? OR filename LIKE ? OR timestamp LIKE ?",
 			target, "%"+target+"%", timestampQuery+"%")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error querying sessions: %v\n", err)
 			os.Exit(1)
 		}
 
-		var matches []struct {
+		type sessionMatch struct {
 			ID, Filename, Timestamp string
+			IsGhost                 bool
 		}
+		var matches []sessionMatch
 		for rows.Next() {
-			var m struct{ ID, Filename, Timestamp string }
-			if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp); err == nil {
+			var m sessionMatch
+			if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp, &m.IsGhost); err == nil {
 				matches = append(matches, m)
 			}
 		}
@@ -1139,13 +1228,13 @@ var devlogShowCmd = &cobra.Command{
 		if len(matches) == 0 && len(target) >= 10 {
 			// Query by date prefix to narrow down
 			datePart := target[:10]
-			rows, err := store.UnderlyingDB().QueryContext(rootCtx, 
-				"SELECT id, filename, timestamp FROM sessions WHERE timestamp LIKE ?", 
+			rows, err := store.UnderlyingDB().QueryContext(rootCtx,
+				"SELECT id, filename, timestamp, is_ghost FROM sessions WHERE timestamp LIKE ?",
 				datePart+"%")
 			if err == nil {
 				for rows.Next() {
-					var m struct{ ID, Filename, Timestamp string }
-					if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp); err == nil {
+					var m sessionMatch
+					if err := rows.Scan(&m.ID, &m.Filename, &m.Timestamp, &m.IsGhost); err == nil {
 						// Convert DB timestamp to Local and check if it matches target
 						if t, err := time.Parse(time.RFC3339, m.Timestamp); err == nil {
 							localStr := t.Local().Format("2006-01-02 15:04")
@@ -1168,7 +1257,7 @@ var devlogShowCmd = &cobra.Command{
 			// Check for exact ID match first
 			for _, m := range matches {
 				if m.ID == target {
-					matches = []struct{ ID, Filename, Timestamp string }{m}
+					matches = []sessionMatch{m}
 					goto found
 				}
 			}
@@ -1186,8 +1275,9 @@ var devlogShowCmd = &cobra.Command{
 		}
 
 	found:
-		filename := matches[0].Filename
-		
+		match := matches[0]
+		filename := match.Filename
+
 		// Try to find the file
 		// 1. As is (absolute or relative to cwd)
 		content, err := os.ReadFile(filename)
@@ -1202,8 +1292,24 @@ var devlogShowCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading file %s: %v\n", filename, err)
+			if match.IsGhost {
+				fmt.Fprintf(os.Stderr, "✖ Session %s is a ghost: its file '%s' no longer exists on disk.\n", match.ID, filename)
+				fmt.Fprintf(os.Stderr, "  Run 'bd devlog prune' to clean ghost sessions.\n")
+			} else {
+				fmt.Fprintf(os.Stderr, "Error reading file %s: %v\n", filename, err)
+			}
 			os.Exit(1)
+		}
+
+		if jsonOutput {
+			outputJSON(struct {
+				ID        string `json:"id"`
+				Filename  string `json:"filename"`
+				Timestamp string `json:"timestamp"`
+				IsGhost   bool   `json:"is_ghost"`
+				Content   string `json:"content"`
+			}{match.ID, filename, match.Timestamp, match.IsGhost, string(content)})
+			return
 		}
 		fmt.Println(string(content))
 		fmt.Printf("\n%s Tip: Use --help to see how to match IDs or dates.\n", ui.RenderAccent("💡"))
@@ -1377,6 +1483,10 @@ var devlogImpactCmd = &cobra.Command{
 		}
 
 		if len(targets) == 0 {
+			if jsonOutput {
+				outputJSON([]struct{}{})
+				return
+			}
 			fmt.Printf("No entity found matching '%s'.\n", term)
 
 			// Suggestions
@@ -1390,30 +1500,50 @@ var devlogImpactCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("Impact of '%s' (%d matches):\n\n", term, len(targets))
-
+		type dependent struct {
+			Name         string `json:"name"`
+			Relationship string `json:"relationship"`
+		}
+		type impactResult struct {
+			Entity     string      `json:"entity"`
+			Dependents []dependent `json:"dependents"`
+		}
+		var results []impactResult
 		for _, t := range targets {
 			rows, err := db.QueryContext(rootCtx, `
-				SELECT e.name, ed.relationship 
-				FROM entity_deps ed 
-				JOIN entities e ON ed.from_entity = e.id 
+				SELECT e.name, ed.relationship
+				FROM entity_deps ed
+				JOIN entities e ON ed.from_entity = e.id
 				WHERE ed.to_entity = ?
 			`, t.ID)
 
 			if err != nil {
-				fmt.Printf("  Error querying deps for %s: %v\n", t.Name, err)
+				fmt.Fprintf(os.Stderr, "  Error querying deps for %s: %v\n", t.Name, err)
 				continue
 			}
-			
-			var deps []string
+
+			r := impactResult{Entity: t.Name, Dependents: []dependent{}}
 			for rows.Next() {
-				var name, rel string
-				rows.Scan(&name, &rel)
-				deps = append(deps, fmt.Sprintf("- %s (%s)", name, rel))
+				var d dependent
+				rows.Scan(&d.Name, &d.Relationship)
+				r.Dependents = append(r.Dependents, d)
 			}
 			rows.Close()
-			
-			fmt.Println(ui.RenderImpactTable(t.Name, deps, ui.GetWidth()))
+			results = append(results, r)
+		}
+
+		if jsonOutput {
+			outputJSON(results)
+			return
+		}
+
+		fmt.Printf("Impact of '%s' (%d matches):\n\n", term, len(targets))
+		for _, r := range results {
+			var deps []string
+			for _, d := range r.Dependents {
+				deps = append(deps, fmt.Sprintf("- %s (%s)", d.Name, d.Relationship))
+			}
+			fmt.Println(ui.RenderImpactTable(r.Entity, deps, ui.GetWidth()))
 			fmt.Println()
 		}
 		fmt.Printf("\n%s Tip: Use --help for command options (limit, strict).\n", ui.RenderAccent("💡"))
@@ -1438,11 +1568,10 @@ var devlogResumeCmd = &cobra.Command{
 			}
 			defer store.Close()
 
-			fmt.Printf("Resuming last %d session(s):\n\n", lastN)
-			query := "SELECT title, narrative FROM sessions"
+			query := "SELECT title, narrative FROM sessions WHERE is_ghost = 0"
 			var queryArgs []interface{}
 			if author != "" {
-				query += " WHERE author LIKE ?"
+				query += " AND author LIKE ?"
 				queryArgs = append(queryArgs, "%"+author+"%")
 			}
 			query += " ORDER BY timestamp DESC LIMIT ?"
@@ -1455,39 +1584,58 @@ var devlogResumeCmd = &cobra.Command{
 			}
 			defer rows.Close()
 
+			type resumeSession struct {
+				Title     string `json:"title"`
+				Narrative string `json:"narrative"`
+			}
+			var sessions []resumeSession
 			for rows.Next() {
-				var title, narrative string
-				rows.Scan(&title, &narrative)
-				fmt.Printf("=== %s ===\n%s\n\n", title, narrative)
+				var s resumeSession
+				rows.Scan(&s.Title, &s.Narrative)
+				sessions = append(sessions, s)
+			}
+
+			if jsonOutput {
+				outputJSON(sessions)
+				return
+			}
+
+			fmt.Printf("Resuming last %d session(s):\n\n", lastN)
+			for _, s := range sessions {
+				fmt.Printf("=== %s ===\n%s\n\n", s.Title, s.Narrative)
 			}
 			return
 		}
 
 		query := args[0]
-		fmt.Printf("Resuming context for: %s\n", query)
+		if !jsonOutput {
+			fmt.Printf("Resuming context for: %s\n", query)
 
-		// Check for proximity warnings
-		store, err := sqlite.New(rootCtx, dbPath)
-		if err == nil {
-			defer store.Close()
-			db := store.UnderlyingDB()
-			warnings, _ := queries.CheckProximityWarnings(rootCtx, db, types.ScopeSession, query)
-			for _, w := range warnings {
-				badge := ""
-				if w.State == types.StatePaused {
-					badge = ui.TableWarningStyle.Render("[⏸ PAUSED]")
-				} else if w.State == types.StateAbandoned {
-					badge = ui.TableFailStyle.Render("[🚫 ABANDONED]")
+			// Check for proximity warnings
+			store, err := sqlite.New(rootCtx, dbPath)
+			if err == nil {
+				defer store.Close()
+				db := store.UnderlyingDB()
+				warnings, _ := queries.CheckProximityWarnings(rootCtx, db, types.ScopeSession, query)
+				for _, w := range warnings {
+					badge := ""
+					if w.State == types.StatePaused {
+						badge = ui.TableWarningStyle.Render("[⏸ PAUSED]")
+					} else if w.State == types.StateAbandoned {
+						badge = ui.TableFailStyle.Render("[🚫 ABANDONED]")
+					}
+					fmt.Printf("\n⚠️  %s This work is %s: %s\n", badge, w.State, w.ShortReason)
+					fmt.Printf("   Scope: %s:%s\n", w.ScopeType, w.ScopeRef)
+					fmt.Printf("   Reasoning session: %s\n\n", w.FullReasonID)
 				}
-				fmt.Printf("\n⚠️  %s This work is %s: %s\n", badge, w.State, w.ShortReason)
-				fmt.Printf("   Scope: %s:%s\n", w.ScopeType, w.ScopeRef)
-				fmt.Printf("   Reasoning session: %s\n\n", w.FullReasonID)
 			}
 		}
 
-		// Search sessions and show latest
+		// Search sessions and show latest (search handles --json itself)
 		devlogSearchCmd.Run(cmd, args)
-		fmt.Printf("\n%s Tip: Use --help to customize context window size.\n", ui.RenderAccent("💡"))
+		if !jsonOutput {
+			fmt.Printf("\n%s Tip: Use --help to customize context window size.\n", ui.RenderAccent("💡"))
+		}
 	},
 }
 
@@ -1562,36 +1710,67 @@ var devlogStatusCmd = &cobra.Command{
 			lastSync = "(never)"
 		}
 
-		fmt.Println("\nDevlog System Status")
-		fmt.Println("====================")
-		
 		if devlogDir == "" {
-			fmt.Println("Status: Not configured")
-			fmt.Println("Action: Run 'bd devlog initialize' to set up a devlog space.")
+			if jsonOutput {
+				outputJSON(map[string]bool{"configured": false})
+			} else {
+				fmt.Println("\nDevlog System Status")
+				fmt.Println("====================")
+				fmt.Println("Status: Not configured")
+				fmt.Println("Action: Run 'bd devlog initialize' to set up a devlog space.")
+			}
 			return
 		}
 
-		fmt.Printf("Space Directory: %s\n", devlogDir)
-		fmt.Printf("Last Sync:       %s\n", lastSync)
-
 		// Get stats
 		db := store.UnderlyingDB()
-		var sessionsCount, entitiesCount, relationshipsCount, ghostCount, incompleteCount int
+		var sessionsCount, entitiesCount, relationshipsCount int
 
 		_ = db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessionsCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entitiesCount)
 		_ = db.QueryRow("SELECT COUNT(*) FROM entity_deps").Scan(&relationshipsCount)
-		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghostCount)
-		
-		// Count incomplete (missing metadata OR placeholders)
-		_ = db.QueryRow(`
-			SELECT COUNT(DISTINCT id) 
-			FROM sessions 
-			WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
-			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
-			OR (narrative LIKE '%<!-- Describe the technical context -->%' 
-			OR narrative LIKE '%- [ ] Task 1%')
-		`).Scan(&incompleteCount)
+		incompleteCount, ghostCount := devlogHealthCounts(db)
+
+		var optimized, pending, failed, unenriched int
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 2").Scan(&optimized)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 1").Scan(&pending)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 3").Scan(&failed)
+		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status IS NULL OR enrichment_status = 0").Scan(&unenriched)
+
+		// Check hooks
+		hookStatus := map[string]bool{}
+		for _, h := range []string{"post-commit", "post-merge"} {
+			installed := false
+			if content, err := os.ReadFile(filepath.Join(".git/hooks", h)); err == nil {
+				installed = strings.Contains(string(content), "bd devlog sync")
+			}
+			hookStatus[h] = installed
+		}
+
+		if jsonOutput {
+			outputJSON(struct {
+				Configured    bool            `json:"configured"`
+				SpaceDir      string          `json:"space_dir"`
+				LastSync      string          `json:"last_sync"`
+				Sessions      int             `json:"sessions"`
+				Incomplete    int             `json:"incomplete"`
+				Ghosts        int             `json:"ghosts"`
+				Entities      int             `json:"entities"`
+				Relationships int             `json:"relationships"`
+				Optimized     int             `json:"optimized"`
+				Pending       int             `json:"pending"`
+				Failed        int             `json:"failed"`
+				Unenriched    int             `json:"unenriched"`
+				Hooks         map[string]bool `json:"hooks"`
+			}{true, devlogDir, lastSync, sessionsCount, incompleteCount, ghostCount,
+				entitiesCount, relationshipsCount, optimized, pending, failed, unenriched, hookStatus})
+			return
+		}
+
+		fmt.Println("\nDevlog System Status")
+		fmt.Println("====================")
+		fmt.Printf("Space Directory: %s\n", devlogDir)
+		fmt.Printf("Last Sync:       %s\n", lastSync)
 
 		fmt.Printf("\nDatabase Statistics:\n")
 		fmt.Printf("  Sessions:      %d\n", sessionsCount)
@@ -1605,11 +1784,6 @@ var devlogStatusCmd = &cobra.Command{
 		fmt.Printf("  Relationships: %d\n", relationshipsCount)
 
 		// Enrichment Stats
-		var optimized, pending, failed int
-		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 2").Scan(&optimized)
-		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 1").Scan(&pending)
-		_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE enrichment_status = 3").Scan(&failed)
-
 		fmt.Printf("\nEnrichment Status (AI):\n")
 		fmt.Printf("  ● Optimized: %d\n", optimized)
 		if pending > 0 {
@@ -1618,27 +1792,24 @@ var devlogStatusCmd = &cobra.Command{
 		if failed > 0 {
 			fmt.Printf("  ✖ Failed:    %d\n", failed)
 		}
-		if pending == 0 && failed == 0 && optimized > 0 {
-			fmt.Printf("  ✨ All memory optimized\n")
+		if unenriched > 0 {
+			fmt.Printf("  ○ Unenriched: %d (never queued)\n", unenriched)
 		}
-		// Check hooks
+		// Only claim full health when nothing needs repair anywhere
+		if pending == 0 && failed == 0 && unenriched == 0 && incompleteCount == 0 && ghostCount == 0 && optimized > 0 {
+			fmt.Printf("  ✨ All memory optimized\n")
+		} else if incompleteCount > 0 || ghostCount > 0 {
+			fmt.Printf("\n⚠️  Memory health: %d incomplete, %d ghost(s) — see hints above.\n", incompleteCount, ghostCount)
+		}
 		fmt.Printf("\nGit Hooks:\n")
-		hooks := []string{"post-commit", "post-merge"}
-		for _, h := range hooks {
-			installed := false
-			path := filepath.Join(".git/hooks", h)
-			if content, err := os.ReadFile(path); err == nil {
-				if strings.Contains(string(content), "bd devlog sync") {
-					installed = true
-				}
-			}
+		for _, h := range []string{"post-commit", "post-merge"} {
 			status := "✗"
-			if installed {
+			if hookStatus[h] {
 				status = "✓"
 			}
 			fmt.Printf("  %s %s\n", status, h)
 		}
-		
+
 		fmt.Printf("\n%s Tip: Use --help for detailed configuration info.\n", ui.RenderAccent("💡"))
 		fmt.Println()
 	},

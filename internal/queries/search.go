@@ -192,13 +192,14 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			 OR (bs.scope_type = 'entity' AND s.id IN (SELECT session_id FROM session_entities WHERE entity_id = bs.scope_ref))
 			 OR (bs.full_reason_ref = s.id)
 		LEFT JOIN branch_cache bc ON bc.branch_name = s.branch OR bc.branch_name = REPLACE(s.branch, ' (local)', '')
+		WHERE s.is_ghost = 0
 	`, snippetFunc)
 
 	var args []interface{}
 	args = append(args, mainQuery)
 
 	if opts.Author != "" {
-		sqlQuery += " WHERE s.author LIKE ?"
+		sqlQuery += " AND s.author LIKE ?"
 		args = append(args, "%"+opts.Author+"%")
 	}
 
