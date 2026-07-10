@@ -20,7 +20,6 @@
 {"alias_name":"devlog_core","canonical_name":"devlog-core"}
 {"alias_name":"workingprotocol.md","canonical_name":"working_protocol.md"}
 {"alias_name":"workingprotocolmd","canonical_name":"working_protocol.md"}
-{"alias_name":"in-process","canonical_name":"inprocess"}
 {"alias_name":"pre-commit-hook","canonical_name":"precommithook"}
 {"alias_name":"pre-commit hook","canonical_name":"precommithook"}
 {"alias_name":"regex-extractor","canonical_name":"regexextractor"}
@@ -30,3 +29,4 @@
 {"alias_name":"devlog_verify","canonical_name":"devlogverify"}
 {"alias_name":"ollama-extractor","canonical_name":"ollamaextractor"}
 {"alias_name":"devlog sync","canonical_name":"devlog_sync"}
+{"alias_name":"in-process","canonical_name":"inprocess"}
