@@ -75,6 +75,73 @@ type DevlogInitResult struct {
 
 
 
+// writeGenesisDevlog creates the first devlog of a fresh install — a real,
+// honest record of the initialization itself — and registers it in the index
+// with a stable session ID, exactly like a normal 'bd devlog record'.
+func writeGenesisDevlog(baseDir, indexPath string, quiet bool) {
+	now := time.Now()
+	date := now.Format("2006-01-02 15:04")
+
+	author := os.Getenv("BD_ACTOR")
+	if author == "" {
+		out, _ := exec.Command("git", "config", "user.name").Output()
+		author = strings.TrimSpace(string(out))
+	}
+	if author == "" {
+		author = "Unknown"
+	}
+
+	repoName := ""
+	if out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output(); err == nil {
+		repoName = filepath.Base(strings.TrimSpace(string(out)))
+	}
+	if repoName == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			repoName = filepath.Base(cwd)
+		} else {
+			repoName = "this-repository"
+		}
+	}
+
+	branch := "main"
+	if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+		if b := strings.TrimSpace(string(out)); b != "" {
+			branch = b
+		}
+	}
+
+	content := strings.NewReplacer(
+		"{{DATE}}", date,
+		"{{AUTHOR}}", author,
+		"{{REPO}}", repoName,
+		"{{BRANCH}}", branch,
+	).Replace(genesisTemplate)
+
+	fileName := now.Format("2006-01-02") + "_beadslog-genesis.md"
+	if err := os.WriteFile(filepath.Join(baseDir, fileName), []byte(content), 0644); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error writing genesis devlog: %v\n", err)
+		}
+		return
+	}
+
+	subject := "[init] BeadsLog Genesis"
+	sessionID := fmt.Sprintf("sess-%s", hashID(subject+date))
+	problem := fmt.Sprintf("BeadsLog initialized on %s by %s", date, author)
+	row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | [%s](%s?id=%s) |\n",
+		subject, problem, author, "bd init", date, branch, fileName, fileName, sessionID)
+
+	f, err := os.OpenFile(indexPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error registering genesis devlog: %v\n", err)
+		}
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(row)
+}
+
 func initializeDevlog(baseDir string, quiet bool, autoSync, enforce, backgroundEnrich bool, targetAgents []string) DevlogInitResult {
 
 	var result DevlogInitResult
@@ -108,6 +175,8 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce, backgroundE
 			if !quiet {
 				fmt.Fprintf(os.Stderr, "Error writing _index.md: %v\n", err)
 			}
+		} else {
+			writeGenesisDevlog(baseDir, indexPath, quiet)
 		}
 	} else {
 		// UPGRADE: Automatically migrate existing index if it's legacy
@@ -714,6 +783,29 @@ This index provides a record of human-AI collaboration.
 
 | Subject | Problems | Author | Agent | Date | Branch | Devlog |
 |---------|----------|--------|-------|------|--------|---------|
+`
+
+// genesisTemplate is the first, automatically generated devlog of a fresh
+// install: an honest record of the memory system's own initialization that
+// doubles as a format example for agents. Placeholders: {{DATE}}, {{AUTHOR}},
+// {{REPO}}, {{BRANCH}}.
+const genesisTemplate = `# [init] BeadsLog Genesis
+
+**Date:** {{DATE}}
+
+## Problem
+This repository had no persistent memory. BeadsLog was initialized on {{DATE}} by {{AUTHOR}} to give agents and humans a shared record, versioned in git, of every session, decision, and architectural change in {{REPO}}.
+
+### Details
+
+- **Repository:** {{REPO}}
+- **Branch:** {{BRANCH}}
+- **Initialized by:** {{AUTHOR}}
+
+This entry was generated automatically by 'bd devlog initialize'. It is the first session in this project's memory and serves as a format example: every future entry records a real working session following this structure — a Problem, the narrative of what happened, and the architectural relationships it touched.
+
+### Architectural Relationships
+- BeadsLog -> {{REPO}} (tracks)
 `
 
 const promptTemplateManual = `# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)

@@ -85,8 +85,9 @@ func TestCLI_DevlogTrust_FreshInstallHasNoGhosts(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow CLI test in short mode")
 	}
-	// Regression (BeadsLog-a2g): the index template seeded a sample row whose
-	// file never existed, so every fresh install started with 1 ghost.
+	// Regression (BeadsLog-a2g): the index template used to seed a sample row
+	// whose file never existed (1 ghost on every fresh install). Now initialize
+	// generates a real genesis devlog: exactly 1 session, 0 ghosts, 0 incomplete.
 	tmpDir := setupCLITestDB(t)
 	runBDInProcess(t, tmpDir, "devlog", "initialize")
 	runBDInProcess(t, tmpDir, "config", "set", "devlog_dir", "_rules/_devlog")
@@ -95,19 +96,26 @@ func TestCLI_DevlogTrust_FreshInstallHasNoGhosts(t *testing.T) {
 	if strings.Contains(out, "ghost") || strings.Contains(out, "incomplete") {
 		t.Errorf("fresh install should have no ghosts or incompletes:\n%s", out)
 	}
-	if !strings.Contains(out, "No sessions recorded yet") {
-		t.Errorf("empty devlog space should get a friendly message, not an error:\n%s", out)
-	}
 
 	store, err := sqlite.New(context.Background(), filepath.Join(tmpDir, ".beads", "beads.db"))
 	if err != nil {
 		t.Fatalf("Failed to open test DB: %v", err)
 	}
 	defer store.Close()
-	var ghosts int
+	var sessions, ghosts int
+	_ = store.UnderlyingDB().QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessions)
 	_ = store.UnderlyingDB().QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghosts)
-	if ghosts != 0 {
-		t.Errorf("fresh install has %d ghost(s)", ghosts)
+	if sessions != 1 || ghosts != 0 {
+		t.Errorf("fresh install: expected exactly 1 genesis session and 0 ghosts, got %d/%d", sessions, ghosts)
+	}
+
+	// The genesis is a real, resumable session
+	out = runBDInProcess(t, tmpDir, "devlog", "resume", "--last", "1")
+	if !strings.Contains(out, "BeadsLog Genesis") {
+		t.Errorf("resume on fresh install should return the genesis session:\n%s", out)
+	}
+	if !strings.Contains(out, "initialized on") {
+		t.Errorf("genesis narrative missing initialization facts:\n%s", out)
 	}
 }
 
