@@ -92,10 +92,10 @@ echo -e "${YELLOW}Building tool...${NC}"
 go build -o bd ./cmd/bd/
 
 # 5. Publish
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo -e "\n${YELLOW}Publishing...${NC}"
 read -p "Do you want to publish (push to remote)? [y/N] " DO_PUBLISH
 if [[ $DO_PUBLISH =~ ^[Yy]$ ]]; then
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     echo "1) Push to current branch ($CURRENT_BRANCH)"
     echo "2) Push to main"
     read -p "Select [1-2]: " PUSH_CHOICE
@@ -118,7 +118,7 @@ fi
 # 6. Display install commands
 SHORT_SHA=$(git rev-parse --short HEAD)
 echo -e "\n${GREEN}✨ Release Process Complete!${NC}"
-echo -e "Install commands for this build:"
-echo -e "  Current Commit: ${BLUE}go install github.com/untoldecay/BeadsLog/cmd/bd@$SHORT_SHA${NC}"
-echo -e "  Current Branch: ${BLUE}go install github.com/untoldecay/BeadsLog/cmd/bd@$CURRENT_BRANCH${NC}"
-EOF
+echo -e "Install command for this build (short hash — most reliable):"
+echo -e "  ${BLUE}go install github.com/untoldecay/BeadsLog/cmd/bd@$SHORT_SHA${NC}"
+echo -e "If the module proxy hasn't seen this commit yet:"
+echo -e "  ${BLUE}GOPROXY=direct go install github.com/untoldecay/BeadsLog/cmd/bd@$SHORT_SHA${NC}"
