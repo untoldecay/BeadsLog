@@ -154,22 +154,38 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
 }
 
 // sessionsLinkedToEntities returns the set of session IDs graph-linked to an
-// entity whose name matches one of the query tokens.
-func sessionsLinkedToEntities(ctx context.Context, db *sql.DB, tokens []string) map[string]bool {
+// entity whose name matches one of the query tokens, the raw query, or the
+// separator-stripped join of all tokens ("payment-gateway" → "paymentgateway").
+func sessionsLinkedToEntities(ctx context.Context, db *sql.DB, rawQuery string, tokens []string) map[string]bool {
 	linked := make(map[string]bool)
 	if len(tokens) == 0 {
 		return linked
 	}
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(tokens)), ",")
-	args := make([]interface{}, len(tokens))
-	for i, t := range tokens {
-		args[i] = strings.ToLower(strings.TrimSuffix(t, "*"))
+	candidates := make([]string, 0, len(tokens)+2)
+	for _, t := range tokens {
+		candidates = append(candidates, strings.ToLower(strings.TrimSuffix(t, "*")))
 	}
+	candidates = append(candidates,
+		strings.ToLower(strings.TrimSpace(rawQuery)),
+		strings.ToLower(strings.Join(tokens, "")))
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(candidates)), ",")
+	args := make([]interface{}, len(candidates))
+	for i, c := range candidates {
+		args[i] = c
+	}
+	// Match canonical names AND registry aliases, so merged variant
+	// spellings ("PaymentGateway" → payment-gateway) still earn the bonus.
 	rows, err := db.QueryContext(ctx, `
 		SELECT DISTINCT se.session_id
 		FROM session_entities se
 		JOIN entities e ON se.entity_id = e.id
-		WHERE e.name IN (`+placeholders+`)`, args...)
+		WHERE e.name IN (`+placeholders+`)
+		UNION
+		SELECT DISTINCT se.session_id
+		FROM session_entities se
+		JOIN entity_aliases a ON se.entity_id = a.canonical_id
+		WHERE a.alias_name IN (`+placeholders+`)`, append(args, args...)...)
 	if err != nil {
 		return linked
 	}
@@ -242,7 +258,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 	}
 	defer rows.Close()
 
-	entityLinked := sessionsLinkedToEntities(ctx, db, tokens)
+	entityLinked := sessionsLinkedToEntities(ctx, db, opts.Query, tokens)
 
 	var results []SearchResult
 	for rows.Next() {

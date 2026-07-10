@@ -3,10 +3,8 @@
 {"alias_name":"bd devlog extract","canonical_name":"bd-devlog-extract"}
 {"alias_name":"extractionpipeline","canonical_name":"extraction-pipeline"}
 {"alias_name":"devlogsync","canonical_name":"devlog_sync"}
-{"alias_name":"devlog sync","canonical_name":"devlog_sync"}
 {"alias_name":"bd onboard","canonical_name":"bd-onboard"}
 {"alias_name":"gemini-cli","canonical_name":"geminicli"}
-{"alias_name":"ollama-extractor","canonical_name":"ollamaextractor"}
 {"alias_name":"memory health","canonical_name":"memory-health"}
 {"alias_name":"multiselect","canonical_name":"multi-select"}
 {"alias_name":"devlogcore.go","canonical_name":"devlog_core.go"}
@@ -30,3 +28,5 @@
 {"alias_name":"extraction_log","canonical_name":"extraction-log"}
 {"alias_name":"extractionlog","canonical_name":"extraction-log"}
 {"alias_name":"devlog_verify","canonical_name":"devlogverify"}
+{"alias_name":"ollama-extractor","canonical_name":"ollamaextractor"}
+{"alias_name":"devlog sync","canonical_name":"devlog_sync"}

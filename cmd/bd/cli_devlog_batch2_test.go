@@ -114,6 +114,24 @@ func TestCLI_Batch2_EntityBonus(t *testing.T) {
 	if !found {
 		t.Errorf("expected an entity_bonus of 0.75 for the graph-linked session:\n%s", out)
 	}
+
+	// Merged variant spellings must earn the bonus too: hyphenated queries
+	// are token-split, and variant names resolve via the alias registry.
+	for _, q := range []string{"ollama-extractor", "OllamaExtractor"} {
+		out := runBDInProcess(t, tmpDir, "devlog", "search", q, "--json")
+		if err := json.Unmarshal([]byte(out), &resp); err != nil {
+			t.Fatalf("search %q --json invalid: %v\n%s", q, err, out)
+		}
+		bonus := false
+		for _, r := range resp.Results {
+			if r.EntityBonus == 0.75 {
+				bonus = true
+			}
+		}
+		if !bonus {
+			t.Errorf("query %q: expected entity_bonus 0.75 via alias/joined-token match:\n%s", q, out)
+		}
+	}
 }
 
 func TestCLI_Batch2_PruneNoise(t *testing.T) {
