@@ -29,6 +29,8 @@ var commonWords = map[string]bool{
 	"use": true, "used": true, "using": true, "was": true, "we": true,
 	"were": true, "what": true, "when": true, "where": true, "which": true,
 	"will": true, "with": true, "work": true, "you": true, "your": true,
+	// trunk branch names — never architectural entities on their own
+	"main": true, "master": true, "develop": true, "branch": true,
 }
 
 // IsNoise reports whether an extracted entity name is junk that should never
@@ -68,6 +70,9 @@ func IsNoise(name string) bool {
 		if allCommon {
 			return true
 		}
+	} else if commonWords[strings.ToLower(name)] {
+		// A bare common word ("master", "step", "map") is never a component
+		return true
 	}
 
 	return false

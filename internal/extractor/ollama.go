@@ -193,7 +193,33 @@ Required Output Format:
 		}
 	}
 
+	entities, relationships = groundExtraction(text, entities, relationships)
 	return entities, relationships, nil
+}
+
+// groundExtraction drops LLM output not grounded in the source text: an
+// entity name that never occurs in the devlog is a hallucination — most
+// commonly the model echoing the prompt's few-shot example (nginx,
+// auth-service). Relationships require both endpoints to be grounded.
+func groundExtraction(text string, entities []Entity, relationships []Relationship) ([]Entity, []Relationship) {
+	lowerText := strings.ToLower(text)
+	inText := func(name string) bool {
+		return name != "" && strings.Contains(lowerText, strings.ToLower(name))
+	}
+
+	var groundedEntities []Entity
+	for _, e := range entities {
+		if inText(e.Name) {
+			groundedEntities = append(groundedEntities, e)
+		}
+	}
+	var groundedRels []Relationship
+	for _, r := range relationships {
+		if inText(r.FromEntity) && inText(r.ToEntity) {
+			groundedRels = append(groundedRels, r)
+		}
+	}
+	return groundedEntities, groundedRels
 }
 
 func cleanJSON(s string) string {

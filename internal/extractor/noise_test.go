@@ -70,3 +70,44 @@ func TestPipelineFiltersNoise(t *testing.T) {
 		t.Errorf("legit relationship was dropped: %+v", result.Relationships)
 	}
 }
+
+func TestIsNoiseSingleCommonWords(t *testing.T) {
+	for _, n := range []string{"master", "main", "step", "map", "using"} {
+		if !IsNoise(n) {
+			t.Errorf("IsNoise(%q) = false, want true (bare common word)", n)
+		}
+	}
+	for _, n := range []string{"ollama", "nginx", "sessions", "beadslog"} {
+		if IsNoise(n) {
+			t.Errorf("IsNoise(%q) = true, want false", n)
+		}
+	}
+}
+
+func TestGroundExtraction(t *testing.T) {
+	text := "BeadsLog was initialized to track the PaymentGateway rollout."
+	entities := []Entity{
+		{Name: "beadslog"},
+		{Name: "paymentgateway"},
+		{Name: "nginx"},        // few-shot echo — not in text
+		{Name: "auth-service"}, // few-shot echo — not in text
+	}
+	rels := []Relationship{
+		{FromEntity: "beadslog", ToEntity: "paymentgateway", Type: "tracks"},
+		{FromEntity: "nginx", ToEntity: "auth-service", Type: "proxies_to"}, // echo
+		{FromEntity: "beadslog", ToEntity: "nginx", Type: "uses"},           // half-grounded
+	}
+
+	ge, gr := groundExtraction(text, entities, rels)
+	if len(ge) != 2 {
+		t.Errorf("expected 2 grounded entities, got %d: %+v", len(ge), ge)
+	}
+	for _, e := range ge {
+		if e.Name == "nginx" || e.Name == "auth-service" {
+			t.Errorf("hallucinated entity survived grounding: %q", e.Name)
+		}
+	}
+	if len(gr) != 1 || gr[0].Type != "tracks" {
+		t.Errorf("expected only the grounded relationship, got %+v", gr)
+	}
+}

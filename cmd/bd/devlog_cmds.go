@@ -110,10 +110,18 @@ func writeGenesisDevlog(baseDir, indexPath string, quiet bool) {
 		}
 	}
 
+	// The relationship arrow endpoint must survive noise filtering, or the
+	// genesis session starts incomplete (short repo names like "ui" would).
+	arrowTarget := repoName
+	if extractor.IsNoise(arrowTarget) {
+		arrowTarget = repoName + "-repository"
+	}
+
 	content := strings.NewReplacer(
 		"{{DATE}}", date,
 		"{{AUTHOR}}", author,
 		"{{REPO}}", repoName,
+		"{{ARROW_TARGET}}", arrowTarget,
 		"{{BRANCH}}", branch,
 	).Replace(genesisTemplate)
 
@@ -805,7 +813,7 @@ This repository had no persistent memory. BeadsLog was initialized on {{DATE}} b
 This entry was generated automatically by 'bd devlog initialize'. It is the first session in this project's memory and serves as a format example: every future entry records a real working session following this structure — a Problem, the narrative of what happened, and the architectural relationships it touched.
 
 ### Architectural Relationships
-- BeadsLog -> {{REPO}} (tracks)
+- BeadsLog -> {{ARROW_TARGET}} (tracks)
 `
 
 const promptTemplateManual = `# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)
