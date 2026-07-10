@@ -19,6 +19,9 @@ bd init
 bd onboard
 ```
 
+> [!NOTE]
+> **Folder naming:** entity extraction filters common words and trunk branch names (`master`, `main`, `test`, `core`, ...) to keep the knowledge graph clean. If your project folder is named one of these (e.g. a worktree checked out as `master/`), BeadsLog automatically tracks it as `<name>-repository`. Manually written relationship arrows targeting a filtered word are dropped **with a warning** — rename the entity in your arrow (e.g. `master-repository`) to keep the edge.
+
 ## 🛠 Useful commands
 
 Your agents handle the heavy lifting. As a human, you only need to know one command: [Check all commands here](docs/COMMANDS.md).

@@ -35,3 +35,12 @@ The Devlog is the **entry and exit point** of every task:
 
 ## Crystallization
 This is the "magic" of BeadsLog. If an agent forgets to add the `Architectural Relationships` block, the **Background AI worker** will read the narrative and append it for them. This turns temporary thoughts into permanent, version-controlled wiki data.
+
+## Entity Naming Rules
+To keep the graph high-signal, extraction filters out noise: names shorter than 3 characters, pure numbers, phrase fragments, bare common words, and trunk branch names (`master`, `main`, `develop`). This applies to **all** sources — including manually written arrows. If an arrow targets a filtered word, the edge is dropped with a stderr warning; use a qualified name instead:
+
+```markdown
+### Architectural Relationships
+- AuthService -> master (deploys)            <- dropped with warning
+- AuthService -> master-branch (deploys)     <- kept
+```

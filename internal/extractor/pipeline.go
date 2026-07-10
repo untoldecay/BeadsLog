@@ -75,6 +75,14 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 		// Merge Relationships (drop edges touching a noise endpoint)
 		for _, r := range relationships {
 			if IsNoise(r.FromEntity) || IsNoise(r.ToEntity) {
+				// Never silently drop an explicit human-written arrow
+				if r.Source == "manual" {
+					bad := r.FromEntity
+					if !IsNoise(bad) {
+						bad = r.ToEntity
+					}
+					fmt.Fprintf(os.Stderr, "⚠️  Dropped relationship '%s -> %s': %q is a filtered common/noise word. Rename the entity (e.g. '%s-service' or '%s-repository') to keep this edge.\n", r.FromEntity, r.ToEntity, bad, bad, bad)
+				}
 				continue
 			}
 			key := strings.ToLower(fmt.Sprintf("%s|%s|%s", r.FromEntity, r.ToEntity, r.Type))
