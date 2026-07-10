@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-07-10
+
+### Added
+- **Trust Layer** - Ghost sessions (index entries whose files are gone) are now excluded from `resume`, `list`, `search`, and `catchup`; `devlog show` explains ghosts and points at `prune`; `devlog status` reports unenriched sessions and a memory-health warning instead of claiming "optimized" while sessions need repair; `devlog sync` ends with a reconciliation summary and ghost-marks de-indexed sessions.
+- **Machine-First Output** - `--json` support for `devlog list/show/resume/status/entities/impact` and `bd catchup` (both modes).
+- **Auto-Alias Merging** - `devlog sync` merges separator-variant duplicate entities (`ollama-extractor` = `ollamaextractor`); variant names persist in the alias registry, undo via `unalias`. Near matches are never auto-merged.
+- **Extraction Noise Filtering** - Junk names (mid-word fragments, phrase fragments like "map it step") are rejected at extraction for all sources; `devlog prune --noise` purges pre-existing junk.
+- **Entity Search Bonus** - Sessions graph-linked to an entity matching the query rank higher (+0.75), alias- and hyphen-aware.
+- **Interactive Graph Export** - `devlog graph <entity> --html <path>` writes an Obsidian-style force-directed graph (drag/zoom/hover; solid = explicit deps, dashed = co-occurrence).
+- **Genesis Devlog** - `devlog initialize` generates a real first session recording the initialization (date, author, repo) with one clean relationship; fresh installs start with 1 complete session, 0 ghosts.
+- **Catchup Feature Digest** - `bd catchup --digest` groups activity by feature arc (branch-keyed, entity fallback) with 2-3 line narratives extracted from real session content, deduped authors, top entities, and attached lifecycle deltas.
+- **Ongoing Lifecycle State** - New `[🔄 ONGOING]` state for off-branch work that is alive but not in front of anyone; new `bd devlog ongoing` command as the explicit un-pause.
+
+### Changed
+- **Prune Removes Index Rows** - `devlog prune` now also deletes the ghosts' `_index.md` rows so a re-sync can no longer resurrect them.
+- **PAUSED Means Deliberate** - Off-branch unmerged work derives ONGOING instead of PAUSED; proximity warnings fire only for explicit paused/abandoned scopes.
+- **Friendly Empty Index** - An empty devlog table is a "No sessions recorded yet" message, not a format error.
+
+### Fixed
+- Kebab-case regex no longer matches mid-word ("Multi-layered" can't produce `ulti-layered`).
+- Catchup `--ack` cutoff uses nano precision (state changes in the same second no longer stay "new" forever).
+- Fresh installs no longer start with a seeded ghost from the index template.
+
 ## [0.54.0] - 2026-05-31
 
 ### Fixed

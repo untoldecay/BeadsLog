@@ -14,10 +14,29 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.54.0"
+const CurrentVersion = "0.55.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.55.0",
+		Date:    "2026-07-10",
+		Features: []string{
+			"Trust Layer: ghost sessions excluded from resume/list/search/catchup; honest 'devlog status' health; sync reconciliation summary.",
+			"Machine-First: '--json' on devlog list/show/resume/status/entities/impact and catchup.",
+			"Graph Trust: extraction-time noise filtering, auto-merge of duplicate entity variants on sync, 'devlog prune --noise'.",
+			"Entity Bonus: graph-linked sessions rank higher in search (alias-aware).",
+			"Visual Graph: 'devlog graph <entity> --html <path>' exports an interactive force-directed graph.",
+			"Genesis Devlog: fresh installs start with a real first session (0 ghosts, 0 incomplete).",
+			"Catchup Digest: 'bd catchup --digest' groups activity by feature arc with narratives and lifecycle deltas.",
+			"Ongoing State: off-branch work shows [🔄 ONGOING]; 'bd devlog ongoing' is the explicit un-pause.",
+		},
+		Protocol: []string{
+			"Trust your reads: resume/search/list never return dead sessions; when sync reports ghosts or incompletes, run the suggested repair command.",
+			"Prefer '--json' on devlog read commands for machine-readable output.",
+			"PAUSED now always means deliberately parked with a reason; ONGOING is a healthy context switch — do not treat it as blocked.",
+		},
+	},
 	{
 		Version: "0.54.0",
 		Date:    "2026-05-31",
