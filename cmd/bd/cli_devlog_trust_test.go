@@ -81,6 +81,36 @@ func ghostSessionID(t *testing.T, tmpDir string) string {
 	return id
 }
 
+func TestCLI_DevlogTrust_FreshInstallHasNoGhosts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow CLI test in short mode")
+	}
+	// Regression (BeadsLog-a2g): the index template seeded a sample row whose
+	// file never existed, so every fresh install started with 1 ghost.
+	tmpDir := setupCLITestDB(t)
+	runBDInProcess(t, tmpDir, "devlog", "initialize")
+	runBDInProcess(t, tmpDir, "config", "set", "devlog_dir", "_rules/_devlog")
+
+	out := runBDInProcess(t, tmpDir, "devlog", "sync")
+	if strings.Contains(out, "ghost") || strings.Contains(out, "incomplete") {
+		t.Errorf("fresh install should have no ghosts or incompletes:\n%s", out)
+	}
+	if !strings.Contains(out, "No sessions recorded yet") {
+		t.Errorf("empty devlog space should get a friendly message, not an error:\n%s", out)
+	}
+
+	store, err := sqlite.New(context.Background(), filepath.Join(tmpDir, ".beads", "beads.db"))
+	if err != nil {
+		t.Fatalf("Failed to open test DB: %v", err)
+	}
+	defer store.Close()
+	var ghosts int
+	_ = store.UnderlyingDB().QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghosts)
+	if ghosts != 0 {
+		t.Errorf("fresh install has %d ghost(s)", ghosts)
+	}
+}
+
 func TestCLI_DevlogTrust_GhostExclusion(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow CLI test in short mode")

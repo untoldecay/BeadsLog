@@ -514,8 +514,10 @@ var devlogSyncCmd = &cobra.Command{
 		}
 
 		if rows == nil || len(rows) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: Index file found at %s but contains no valid entries.\n", indexPath)
-			fmt.Fprintf(os.Stderr, "Tip: Verify the file format matches the 'bd devlog init' template.\n")
+			// Fresh devlog space: an empty table is normal, not an error
+			if !quietFlag {
+				fmt.Println("No sessions recorded yet — write a devlog and run 'bd devlog record --file <path>'.")
+			}
 			return
 		}
 
@@ -712,7 +714,6 @@ This index provides a record of human-AI collaboration.
 
 | Subject | Problems | Author | Agent | Date | Branch | Devlog |
 |---------|----------|--------|-------|------|--------|---------|
-| [init] Setup | Initial devlog structure setup | Unknown | Unknown | 2024-01-01 00:00 | main | [2024-01-01_setup.md](2024-01-01_setup.md) |
 `
 
 const promptTemplateManual = `# Prompt: Generate Chronological Debugging & Development Log (Manual Mode)
