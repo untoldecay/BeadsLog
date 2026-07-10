@@ -12,13 +12,19 @@ bd catchup
 ```
 This prints a raw delta of project progress since your last "acknowledged" catchup.
 
-### 2. Acknowledge and Reset
+### 2. The Feature Digest (recommended for humans)
+```bash
+bd catchup --digest
+```
+Groups the same activity **by feature arc** — sessions sharing a work branch form an arc; trunk work is grouped by its dominant entity. Each arc opens with a 2-3 line narrative extracted from real session content (the first session's Problem and the latest Final Status), followed by its sessions, key entities, and any lifecycle changes that hit that arc since you last looked ("⚠ PAUSED since you last looked — ..."). Add `--json` for machine-readable output.
+
+### 3. Acknowledge and Reset
 ```bash
 bd catchup --ack
 ```
 Once you are up to speed, use the `--ack` flag to update your local "seen" timestamp.
 
-### 3. Agent-Assisted Summaries
+### 4. Agent-Assisted Summaries
 For a high-signal brief, ask your agent to use the catchup prompt:
 > *"I've run bd catchup. Please use `_rules/_devlog/_generate-catchup.md` to summarize this activity for me, focusing on architectural drifts and blocked paths."*
 

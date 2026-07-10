@@ -289,8 +289,9 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			} else if opts.CurrentBranch != "" && cleanBranch == opts.CurrentBranch {
 				r.LifecycleStatus = types.StateActive
 			} else if cleanBranch != "main" && cleanBranch != "develop" && cleanBranch != "master" {
-				// Off-branch and not validated -> effectively paused
-				r.LifecycleStatus = types.StatePaused
+				// Off-branch and unmerged: alive, just not in front of anyone.
+				// PAUSED is reserved for explicit 'bd devlog pause'.
+				r.LifecycleStatus = types.StateOngoing
 			} else {
 				r.LifecycleStatus = types.StateActive
 			}
@@ -380,8 +381,9 @@ func CheckProximityWarnings(ctx context.Context, db *sql.DB, scopeType types.Sco
 	query := `
 		SELECT state, scope_type, scope_ref, short_reason, full_reason_ref
 		FROM branch_states
-		WHERE (scope_type = ? AND scope_ref = ?)
-		   OR (scope_type = 'branch' AND scope_ref = (SELECT branch FROM sessions WHERE id = ? OR filename LIKE ? LIMIT 1))
+		WHERE state IN ('paused', 'abandoned')
+		  AND ((scope_type = ? AND scope_ref = ?)
+		   OR (scope_type = 'branch' AND scope_ref = (SELECT branch FROM sessions WHERE id = ? OR filename LIKE ? LIMIT 1)))
 	`
 	
 	rows, err := db.QueryContext(ctx, query, scopeType, scopeRef, scopeRef, "%"+scopeRef+"%")

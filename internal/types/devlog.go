@@ -7,7 +7,8 @@ type LifecycleState string
 
 const (
 	StateActive    LifecycleState = "active"
-	StatePaused    LifecycleState = "paused"
+	StateOngoing   LifecycleState = "ongoing" // alive but not currently in front of anyone (context switch)
+	StatePaused    LifecycleState = "paused"  // explicitly parked with a reason
 	StateAbandoned LifecycleState = "abandoned"
 )
 

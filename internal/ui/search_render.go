@@ -101,6 +101,8 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 				title = lipgloss.NewStyle().Foreground(ColorWarn).Render("[⏸ PAUSED]") + " " + title
 			} else if r.LifecycleStatus == "abandoned" {
 				title = lipgloss.NewStyle().Foreground(ColorFail).Render("[🚫 ABANDONED]") + " " + title
+			} else if r.LifecycleStatus == "ongoing" {
+				title = lipgloss.NewStyle().Foreground(ColorMuted).Render("[🔄 ONGOING]") + " " + title
 			} else if r.IsValidated {
 				title = lipgloss.NewStyle().Foreground(ColorPass).Render("[🟢 VALIDATED]") + " " + title
 			}

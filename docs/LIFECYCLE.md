@@ -8,8 +8,9 @@
 
 | State | Badge | Meaning | Agent Action |
 |---|---|---|---|
-| **Active** | (None) | Work on a living branch or recent activity. | Safe to build on. |
-| **Paused** | `[⏸ PAUSED]` | Work deliberately parked or on a stale branch. | Read context only. |
+| **Active** | (None) | Work on the current branch or recent activity. | Safe to build on. |
+| **Ongoing** | `[🔄 ONGOING]` | Work alive on another branch — the owner context-switched away and will resume. Derived automatically for off-branch unmerged work. | Safe to read; coordinate before modifying. |
+| **Paused** | `[⏸ PAUSED]` | Work **explicitly** parked with a reason (`bd devlog pause`). | Read context only. |
 | **Abandoned**| `[🚫 ABANDONED]`| Work found to be flawed or rejected. | **Cautionary history only.** |
 
 ### 🟢 The "Validated" Badge
@@ -28,6 +29,15 @@ When an experiment fails:
 ```bash
 bd devlog abandon --scope entity:NewRenderer --message "Caused GPU memory leaks"
 ```
+
+### 3. Reviving Work (the explicit un-pause)
+When a paused scope is alive again — without needing to check out the branch:
+```bash
+bd devlog ongoing --scope branch:feature-xyz --message "Resuming after the landing page ships"
+```
+Note: you rarely need this for mere context switches — off-branch unmerged work
+is shown as `[🔄 ONGOING]` automatically. `PAUSED` only ever means someone ran
+`bd devlog pause` deliberately.
 
 ## 🛠 Proximity Guardrails
 BeadsLog protects you from repeating mistakes. If you try to work on a file or task that overlaps with an `ABANDONED` scope, the tool will proactively warn you:

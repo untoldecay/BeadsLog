@@ -2719,6 +2719,18 @@ var devlogAbandonCmd = &cobra.Command{
 	},
 }
 
+var devlogOngoingCmd = &cobra.Command{
+	Use:   "ongoing",
+	Short: "Mark a scope as ongoing (alive, will be resumed) — the explicit un-pause",
+	Long: `Mark a scope as ongoing: work that is alive and will be resumed, just not
+actively in front of anyone right now (e.g. after a context switch).
+Unlike 'pause', ongoing carries no warning for other agents. Use it to
+revive a previously paused scope without checking out the branch.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleStateChange(cmd, types.StateOngoing)
+	},
+}
+
 func handleStateChange(cmd *cobra.Command, state types.LifecycleState) {
 	scope, _ := cmd.Flags().GetString("scope")
 	message, _ := cmd.Flags().GetString("message")
@@ -3213,6 +3225,9 @@ func init() {
 	devlogAbandonCmd.Flags().String("scope", "", "Scope to abandon (branch:name, entity:id, file:path, task:id, session:id)")
 	devlogAbandonCmd.Flags().String("message", "", "Short reason for abandoning")
 
+	devlogOngoingCmd.Flags().String("scope", "", "Scope to mark ongoing (branch:name, entity:id, file:path, task:id, session:id)")
+	devlogOngoingCmd.Flags().String("message", "", "Short note on why/when it will resume")
+
 	devlogMigrateCmd.Flags().Bool("format-index", false, "Upgrade _index.md to 5-column format")
 
 	devlogAliasCmd.Flags().Bool("dry-run", false, "Show what would be collapsed without making changes")
@@ -3240,6 +3255,7 @@ func init() {
 	devlogCmd.AddCommand(devlogRecordCmd)
 	devlogCmd.AddCommand(devlogPauseCmd)
 	devlogCmd.AddCommand(devlogAbandonCmd)
+	devlogCmd.AddCommand(devlogOngoingCmd)
 	devlogCmd.AddCommand(devlogMigrateCmd)
 	devlogCmd.AddCommand(devlogAuthorsCmd)
 	
