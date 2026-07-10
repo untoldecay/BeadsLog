@@ -56,8 +56,11 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 		
 		usedExtractors = append(usedExtractors, ext.Name())
 
-		// Merge Entities
+		// Merge Entities (noise-filtered so every source benefits)
 		for _, e := range entities {
+			if IsNoise(e.Name) {
+				continue
+			}
 			key := strings.ToLower(e.Name)
 			if existing, ok := allEntities[key]; ok {
 				// Merge logic: keep higher confidence
@@ -68,9 +71,12 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 				allEntities[key] = e
 			}
 		}
-		
-		// Merge Relationships
+
+		// Merge Relationships (drop edges touching a noise endpoint)
 		for _, r := range relationships {
+			if IsNoise(r.FromEntity) || IsNoise(r.ToEntity) {
+				continue
+			}
 			key := strings.ToLower(fmt.Sprintf("%s|%s|%s", r.FromEntity, r.ToEntity, r.Type))
 			if existing, ok := allRelationships[key]; ok {
 				if r.Confidence > existing.Confidence {

@@ -62,7 +62,7 @@ func TestRelationshipPrioritization(t *testing.T) {
 	
 	pipeline := NewPipeline("")
 	text := `
-- A -> B (uses)
+- AuthCore -> BillingAPI (uses)
 `
 	result, err := pipeline.Run(context.Background(), text)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestRelationshipPrioritization(t *testing.T) {
 
 	found := false
 	for _, r := range result.Relationships {
-		if strings.ToLower(r.FromEntity) == "a" && strings.ToLower(r.ToEntity) == "b" {
+		if strings.ToLower(r.FromEntity) == "authcore" && strings.ToLower(r.ToEntity) == "billingapi" {
 			found = true
 			if r.Source != "manual" || r.Confidence != 1.0 {
 				t.Errorf("Expected manual relationship with 1.0 confidence, got %s and %f", r.Source, r.Confidence)
@@ -79,6 +79,6 @@ func TestRelationshipPrioritization(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("Relationship A -> B not found")
+		t.Error("Relationship AuthCore -> BillingAPI not found")
 	}
 }

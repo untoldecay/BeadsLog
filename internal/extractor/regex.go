@@ -77,8 +77,8 @@ func (r *RegexExtractor) Extract(text string) ([]Entity, []Relationship, error) 
 		{regexp.MustCompile(`use[A-Z][\w]+`), 0.8, 5}, // hooks like useSortable
 
 		// WEAK Patterns (0.5 confidence)
-		{regexp.MustCompile(`[A-Z][a-z]+(?:[A-Z][a-z]+)+`), 0.5, 5}, // Generic CamelCase
-		{regexp.MustCompile(`[a-z]+-[a-z]+`), 0.5, 5},               // Generic kebab-case
+		{regexp.MustCompile(`[A-Z][a-z]+(?:[A-Z][a-z]+)+`), 0.5, 5},      // Generic CamelCase
+		{regexp.MustCompile(`(?i)\b[a-z]+(?:-[a-z]+)+\b`), 0.5, 5},       // Generic kebab-case (word-bounded: "Multi-layered" must not yield "ulti-layered")
 	}
 
 	seen := make(map[string]bool)

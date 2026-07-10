@@ -68,3 +68,5 @@ eval.scenario_id: "test-redact"
 devlog.author: "Gemini-Test-Agent"
 
 last-seen-changelog-version: 0.50.0
+
+last-remote-version-check: "2026-07-10T07:19:59+02:00"

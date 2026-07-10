@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/types"
@@ -589,6 +590,12 @@ var devlogSyncCmd = &cobra.Command{
 			fmt.Println("Already up to date.")
 		}
 
+		// AUTO-ALIAS: merge separator-variant duplicates (ollama-extractor vs
+		// ollamaextractor). Variant names stay in the registry; undo via unalias.
+		if mergedCount, aErr := queries.AutoAliasDuplicates(rootCtx, db); aErr == nil && mergedCount > 0 {
+			fmt.Printf("🔗 Auto-merged %d duplicate entity variant(s) (undo: bd devlog unalias <name>)\n", mergedCount)
+		}
+
 		// RECONCILIATION SUMMARY: surface repair needs instead of burying them in per-file warnings
 		incomplete, ghosts := devlogHealthCounts(store.UnderlyingDB())
 		if ghosts > 0 {
@@ -838,6 +845,7 @@ This includes:
 		strict, _ := cmd.Flags().GetBool("strict")
 		limit, _ := cmd.Flags().GetInt("limit")
 		relType, _ := cmd.Flags().GetString("type")
+		htmlPath, _ := cmd.Flags().GetString("html")
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -878,34 +886,42 @@ This includes:
 			return
 		}
 
-		type graphMatch struct {
-			Name  string
-			Graph *queries.EntityGraph
-			Co    []queries.CooccurrenceNode
-		}
-		var matches []graphMatch
+		var matches []graphExport
 
 		for _, t := range targets {
 			graph, _ := queries.GetEntityGraphExact(rootCtx, db, t.Name, depth, relType)
 			co, _ := queries.GetRelatedEntitiesByCooccurrence(rootCtx, db, t.ID, 5)
-			
+
 			if (graph != nil && len(graph.Nodes) > 0) || len(co) > 0 {
-				matches = append(matches, graphMatch{Name: t.Name, Graph: graph, Co: co})
+				matches = append(matches, graphExport{Root: t.Name, Graph: graph, Co: co})
 			}
+		}
+
+		if htmlPath != "" {
+			if len(matches) == 0 {
+				fmt.Println("No graph or co-occurrence data to export.")
+				return
+			}
+			if err := writeGraphHTML(htmlPath, matches); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing HTML graph: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("✅ Interactive graph exported: %s\n", htmlPath)
+			return
 		}
 
 		if len(matches) > 0 {
 			for _, m := range matches {
-				fmt.Printf("\n=== Entity: %s ===\n", ui.RenderAccent(m.Name))
-				
+				fmt.Printf("\n=== Entity: %s ===\n", ui.RenderAccent(m.Root))
+
 				if m.Graph != nil && len(m.Graph.Nodes) > 1 { // More than just the root
 					fmt.Println("\nExplicit Dependencies (Graph):")
 					fmt.Println(ui.RenderEntityTree(m.Graph))
 				}
-				
+
 				if len(m.Co) > 0 {
 					fmt.Println("\nImplicit Relationships (Co-occurrence):")
-					fmt.Println(ui.RenderCooccurrenceTable(m.Name, m.Co, ui.GetWidth()))
+					fmt.Println(ui.RenderCooccurrenceTable(m.Root, m.Co, ui.GetWidth()))
 				}
 			}
 		} else {
@@ -2500,6 +2516,30 @@ var devlogPruneCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
+		// --noise: purge junk entities (truncation artifacts, phrase fragments)
+		// that predate extraction-time filtering.
+		if noiseFlag, _ := cmd.Flags().GetBool("noise"); noiseFlag {
+			rows, qErr := db.QueryContext(rootCtx, "SELECT id, name FROM entities")
+			if qErr != nil {
+				fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", qErr)
+				os.Exit(1)
+			}
+			var noiseIDs []string
+			for rows.Next() {
+				var id, name string
+				if rows.Scan(&id, &name) == nil && extractor.IsNoise(name) {
+					noiseIDs = append(noiseIDs, id)
+				}
+			}
+			rows.Close()
+			for _, id := range noiseIDs {
+				_, _ = db.Exec("DELETE FROM session_entities WHERE entity_id = ?", id)
+				_, _ = db.Exec("DELETE FROM entity_deps WHERE from_entity = ? OR to_entity = ?", id, id)
+				_, _ = db.Exec("DELETE FROM entities WHERE id = ?", id)
+			}
+			fmt.Printf("✅ Pruned %d noise entit(ies).\n", len(noiseIDs))
+		}
+
 		// Remove the ghosts' rows from _index.md first — otherwise the next
 		// sync re-ingests them from the index and resurrects the ghosts.
 		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
@@ -3040,6 +3080,8 @@ func init() {
 	devlogGraphCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
 	devlogGraphCmd.Flags().String("type", "", "Filter by relationship type (e.g., uses, contains)")
+	devlogGraphCmd.Flags().String("html", "", "Export an interactive force-graph HTML file to the given path (e.g. --html output/graph.html)")
+	devlogPruneCmd.Flags().Bool("noise", false, "Also purge junk entities (truncation artifacts, phrase fragments)")
 
 	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")
 	devlogImpactCmd.Flags().Int("limit", 25, "Max matching entities to show")

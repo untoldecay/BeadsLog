@@ -165,3 +165,55 @@ func TestGetAliasSuggestions(t *testing.T) {
 		t.Errorf("Expected similarity 1.0, got %f", suggestions[0].Similarity)
 	}
 }
+
+func TestAutoAliasDuplicates(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, _ = db.Exec("INSERT INTO sessions (id, title, timestamp) VALUES ('s1', 'Session 1', '2026-05-01T10:00:00Z')")
+	_, _ = db.Exec("INSERT INTO entities (id, name, mention_count) VALUES ('e1', 'ollamaextractor', 10)")
+	_, _ = db.Exec("INSERT INTO entities (id, name, mention_count) VALUES ('e2', 'ollama-extractor', 5)")
+	_, _ = db.Exec("INSERT INTO entities (id, name, mention_count) VALUES ('e3', 'ollama', 7)")
+	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s1', 'e2')")
+
+	merged, err := AutoAliasDuplicates(ctx, db)
+	if err != nil {
+		t.Fatalf("AutoAliasDuplicates failed: %v", err)
+	}
+	if merged != 1 {
+		t.Errorf("expected 1 merge, got %d", merged)
+	}
+
+	// Canonical (highest mention_count) absorbed the variant's mentions
+	var count int
+	if err := db.QueryRow("SELECT mention_count FROM entities WHERE id = 'e1'").Scan(&count); err != nil {
+		t.Fatalf("canonical entity missing: %v", err)
+	}
+	if count != 15 {
+		t.Errorf("expected mention_count 15, got %d", count)
+	}
+
+	// Variant entity gone, its name preserved in the registry
+	var n int
+	_ = db.QueryRow("SELECT COUNT(*) FROM entities WHERE id = 'e2'").Scan(&n)
+	if n != 0 {
+		t.Error("variant entity row should be deleted")
+	}
+	var canonical string
+	if err := db.QueryRow("SELECT canonical_id FROM entity_aliases WHERE alias_name = 'ollama-extractor'").Scan(&canonical); err != nil || canonical != "e1" {
+		t.Errorf("registry mapping missing or wrong: %q, %v", canonical, err)
+	}
+
+	// Session link moved to canonical
+	_ = db.QueryRow("SELECT COUNT(*) FROM session_entities WHERE entity_id = 'e1'").Scan(&n)
+	if n != 1 {
+		t.Errorf("session link not moved to canonical, got %d", n)
+	}
+
+	// Near-match "ollama" must NOT be merged
+	_ = db.QueryRow("SELECT COUNT(*) FROM entities WHERE id = 'e3'").Scan(&n)
+	if n != 1 {
+		t.Error("near-match 'ollama' was wrongly merged")
+	}
+}

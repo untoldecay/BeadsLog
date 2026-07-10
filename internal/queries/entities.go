@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // AliasEntities collapses one or more alias entities into a target canonical entity.
@@ -100,6 +101,62 @@ func AliasEntities(ctx context.Context, db *sql.DB, targetID string, aliases []R
 func UnaliasEntity(ctx context.Context, db *sql.DB, aliasName string) error {
 	_, err := db.ExecContext(ctx, "DELETE FROM entity_aliases WHERE alias_name = ?", aliasName)
 	return err
+}
+
+// normalizeEntityName strips separators so spelling variants of the same
+// component compare equal: "ollama-extractor" == "ollamaextractor" == "Ollama Extractor".
+func normalizeEntityName(name string) string {
+	return strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "", " ", "").Replace(name))
+}
+
+// AutoAliasDuplicates merges entities whose names are identical after
+// normalization. Only exact normalized matches are merged — near matches
+// ("ollama" vs "ollamaextractor") remain suggestions, never auto-merges.
+// The canonical entity is the one with the highest mention_count; variant
+// names stay in the entity_aliases registry so future extractions resolve
+// to the canonical. Returns the number of entities merged away.
+func AutoAliasDuplicates(ctx context.Context, db *sql.DB) (int, error) {
+	rows, err := db.QueryContext(ctx, "SELECT id, name, mention_count FROM entities")
+	if err != nil {
+		return 0, err
+	}
+	groups := make(map[string][]ResolvedEntity)
+	counts := make(map[string]int)
+	for rows.Next() {
+		var e ResolvedEntity
+		var mentions int
+		if rows.Scan(&e.ID, &e.Name, &mentions) != nil {
+			continue
+		}
+		key := normalizeEntityName(e.Name)
+		groups[key] = append(groups[key], e)
+		counts[e.ID] = mentions
+	}
+	rows.Close()
+
+	merged := 0
+	for _, group := range groups {
+		if len(group) < 2 {
+			continue
+		}
+		canonical := group[0]
+		for _, e := range group[1:] {
+			if counts[e.ID] > counts[canonical.ID] {
+				canonical = e
+			}
+		}
+		var aliases []ResolvedEntity
+		for _, e := range group {
+			if e.ID != canonical.ID {
+				aliases = append(aliases, e)
+			}
+		}
+		if err := AliasEntities(ctx, db, canonical.ID, aliases); err != nil {
+			return merged, err
+		}
+		merged += len(aliases)
+	}
+	return merged, nil
 }
 
 type AliasSuggestion struct {

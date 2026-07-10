@@ -153,6 +153,36 @@ func HybridSearch(ctx context.Context, db *sql.DB, opts SearchOptions) (SearchRe
 	return response, nil
 }
 
+// sessionsLinkedToEntities returns the set of session IDs graph-linked to an
+// entity whose name matches one of the query tokens.
+func sessionsLinkedToEntities(ctx context.Context, db *sql.DB, tokens []string) map[string]bool {
+	linked := make(map[string]bool)
+	if len(tokens) == 0 {
+		return linked
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(tokens)), ",")
+	args := make([]interface{}, len(tokens))
+	for i, t := range tokens {
+		args[i] = strings.ToLower(strings.TrimSuffix(t, "*"))
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT DISTINCT se.session_id
+		FROM session_entities se
+		JOIN entities e ON se.entity_id = e.id
+		WHERE e.name IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return linked
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil {
+			linked[id] = true
+		}
+	}
+	return linked
+}
+
 func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuery string, tokens []string, opts SearchOptions) ([]SearchResult, error) {
 	// snippet column is index 2 (narrative)
 	snippetFunc := "snippet(sessions_fts, 2, '<b>', '</b>', '...', 128)"
@@ -211,6 +241,8 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		return nil, err
 	}
 	defer rows.Close()
+
+	entityLinked := sessionsLinkedToEntities(ctx, db, tokens)
 
 	var results []SearchResult
 	for rows.Next() {
@@ -283,9 +315,11 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			r.RecencyBonus = 0
 		}
 
-		// 4. Entity Pair Bonus: +0.75 if multiple tokens appear together
-		// (Already partially covered by Near bonus, but we can refine)
-		r.EntityBonus = 0 
+		// 4. Entity Bonus: +0.75 if the session is graph-linked to an entity
+		// matching a query token (stronger signal than raw text presence)
+		if entityLinked[r.ID] {
+			r.EntityBonus = 0.75
+		}
 
 		// Final Score (BM25 is lower=better, bonuses reduce score)
 		r.Score = r.BM25 - r.PhraseBonus - r.NearBonus - r.RecencyBonus - r.EntityBonus
