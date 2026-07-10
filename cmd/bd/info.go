@@ -297,6 +297,18 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.55.0",
+		Date:    "2026-07-10",
+		Changes: []string{
+			"NEW: Trust Layer - ghost sessions excluded from resume/search/list/catchup; honest status health",
+			"NEW: Catchup Digest - bd catchup --digest groups activity by feature arc with narratives",
+			"NEW: Ongoing State - off-branch work shows [ONGOING]; bd devlog ongoing is the explicit un-pause",
+			"NEW: Graph Trust - extraction noise filtering, auto-alias merging, entity search bonus",
+			"NEW: Visual Graph - bd devlog graph --html exports an interactive force-directed graph",
+			"NEW: Genesis Devlog - fresh installs start with a real first session (0 ghosts)",
+		},
+	},
+	{
 		Version: "0.54.0",
 		Date:    "2026-05-31",
 		Changes: []string{

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.0] - 2026-07-10
 
+## [0.55.0] - 2026-07-10
+
 ### Added
 - **Trust Layer** - Ghost sessions (index entries whose files are gone) are now excluded from `resume`, `list`, `search`, and `catchup`; `devlog show` explains ghosts and points at `prune`; `devlog status` reports unenriched sessions and a memory-health warning instead of claiming "optimized" while sessions need repair; `devlog sync` ends with a reconciliation summary and ghost-marks de-indexed sessions.
 - **Machine-First Output** - `--json` support for `devlog list/show/resume/status/entities/impact` and `bd catchup` (both modes).
