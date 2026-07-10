@@ -2500,6 +2500,54 @@ var devlogPruneCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
+		// Remove the ghosts' rows from _index.md first — otherwise the next
+		// sync re-ingests them from the index and resurrects the ghosts.
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+		var ghostFiles []string
+		if ghostRows, qErr := db.QueryContext(rootCtx, "SELECT filename FROM sessions WHERE is_ghost = 1"); qErr == nil {
+			for ghostRows.Next() {
+				var fn string
+				if ghostRows.Scan(&fn) != nil {
+					continue
+				}
+				base := filepath.Base(fn)
+				// Skip if the file reappeared on disk — sync will un-ghost it
+				if _, err := os.Stat(filepath.Join(devlogDir, base)); err == nil {
+					continue
+				}
+				ghostFiles = append(ghostFiles, base)
+			}
+			ghostRows.Close()
+		}
+		removedRows := 0
+		indexPath := filepath.Join(devlogDir, "_index.md")
+		if content, rErr := os.ReadFile(indexPath); rErr == nil && len(ghostFiles) > 0 {
+			var kept []string
+			for _, line := range strings.Split(string(content), "\n") {
+				dead := false
+				for _, gf := range ghostFiles {
+					if strings.Contains(line, "]("+gf) {
+						dead = true
+						break
+					}
+				}
+				if dead {
+					removedRows++
+				} else {
+					kept = append(kept, line)
+				}
+			}
+			if removedRows > 0 {
+				if wErr := os.WriteFile(indexPath, []byte(strings.Join(kept, "\n")), 0644); wErr != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not update %s: %v\n", indexPath, wErr)
+					removedRows = 0
+				}
+			}
+		}
+
 		// Manual cleanup to ensure it works on databases without cascades
 		_, _ = db.Exec("DELETE FROM session_entities WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
 		_, _ = db.Exec("DELETE FROM extraction_log WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
@@ -2513,6 +2561,9 @@ var devlogPruneCmd = &cobra.Command{
 
 		count, _ := res.RowsAffected()
 		fmt.Printf("✅ Pruned %d ghost session(s).\n", count)
+		if removedRows > 0 {
+			fmt.Printf("✅ Removed %d dead row(s) from _index.md\n", removedRows)
+		}
 		
 		// Flush cleanup
 		flushMetadata(rootCtx)

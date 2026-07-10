@@ -200,6 +200,47 @@ func TestCLI_DevlogTrust_SyncReconcilesDeindexedSessions(t *testing.T) {
 	}
 }
 
+func TestCLI_DevlogTrust_PruneRemovesIndexRows(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow CLI test in short mode")
+	}
+	// prune must also drop the ghost's _index.md row, otherwise the next
+	// sync re-ingests it and the ghost resurrects.
+	tmpDir, ghostTitle := setupDevlogTrustFixture(t)
+	devlogDir := filepath.Join(tmpDir, "_rules", "_devlog")
+
+	out := runBDInProcess(t, tmpDir, "devlog", "prune")
+	if !strings.Contains(out, "Pruned 1 ghost") || !strings.Contains(out, "Removed 1 dead row(s)") {
+		t.Errorf("prune should report DB and index cleanup:\n%s", out)
+	}
+
+	indexBytes, err := os.ReadFile(filepath.Join(devlogDir, "_index.md"))
+	if err != nil {
+		t.Fatalf("Failed to read index: %v", err)
+	}
+	if strings.Contains(string(indexBytes), "phantom") {
+		t.Errorf("index still contains the pruned ghost's row:\n%s", indexBytes)
+	}
+
+	// The critical regression: a re-sync must NOT resurrect the ghost
+	runBDInProcess(t, tmpDir, "devlog", "sync")
+	store, err := sqlite.New(context.Background(), filepath.Join(tmpDir, ".beads", "beads.db"))
+	if err != nil {
+		t.Fatalf("Failed to open test DB: %v", err)
+	}
+	defer store.Close()
+	var ghosts int
+	_ = store.UnderlyingDB().QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghosts)
+	if ghosts != 0 {
+		t.Errorf("ghost resurrected after prune + sync: %d ghost(s)", ghosts)
+	}
+
+	out = runBDInProcess(t, tmpDir, "devlog", "resume", "--last", "5")
+	if strings.Contains(out, ghostTitle) {
+		t.Errorf("resume returned resurrected ghost:\n%s", out)
+	}
+}
+
 func TestCLI_DevlogTrust_StatusHonesty(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow CLI test in short mode")
