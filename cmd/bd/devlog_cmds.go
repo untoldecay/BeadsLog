@@ -694,10 +694,11 @@ func devlogHealthCounts(db *sql.DB) (incomplete, ghosts int) {
 	_ = db.QueryRow(`
 		SELECT COUNT(DISTINCT id)
 		FROM sessions
-		WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+		WHERE ((id NOT IN (SELECT DISTINCT session_id FROM session_entities)
 		OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
 		OR (narrative LIKE '%<!-- Describe the technical context -->%'
-		OR narrative LIKE '%- [ ] Task 1%')
+		OR narrative LIKE '%- [ ] Task 1%'))
+		AND narrative NOT LIKE '%No architectural changes%'
 	`).Scan(&incomplete)
 	_ = db.QueryRow("SELECT COUNT(*) FROM sessions WHERE is_ghost = 1").Scan(&ghosts)
 	return
@@ -718,6 +719,7 @@ const devlogStubTemplate = `# %s
 
 ## Architectural Relationships
 <!-- Add explicit edges here: - EntityA -> EntityB (relationship) -->
+<!-- No code/dependency change (docs, file moves, reports)? Write: _No architectural changes_ -->
 `
 
 const catchupPromptTemplate = `# Prompt: High-Signal Activity Catchup Summary
@@ -827,6 +829,7 @@ Since Background AI Enrichment is DISABLED, manually append relationships at the
 ### Architectural Relationships
 - EntityA -> EntityB (uses)
 ` + "```" + `
+If the session touched no code/dependencies (docs, file moves, reports), write ` + "`_No architectural changes_`" + ` instead — this marks it complete so ` + "`verify`" + ` stops flagging it.
 
 ## persona:
 Meticulous technical writer documenting the learning journey.
@@ -2189,6 +2192,7 @@ var devlogVerifyCmd = &cobra.Command{
 			FROM sessions 
 			WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
 			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+			AND narrative NOT LIKE '%No architectural changes%'
 		`
 		var queryArgs []interface{}
 		

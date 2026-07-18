@@ -177,6 +177,53 @@ func TestCLI_DevlogTrust_ShowGhost(t *testing.T) {
 	}
 }
 
+// A devlog that declares "_No architectural changes_" has no edges by design
+// (docs, file moves, reports). It must NOT be flagged as incomplete forever,
+// and must never trigger AI backfill (which invents spurious edges).
+func TestCLI_DevlogVerify_NoArchMarkerNotFlagged(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow CLI test in short mode")
+	}
+	tmpDir := setupCLITestDB(t)
+	devlogDir := filepath.Join(tmpDir, "_rules", "_devlog")
+	if err := os.MkdirAll(devlogDir, 0755); err != nil {
+		t.Fatalf("Failed to create devlog dir: %v", err)
+	}
+
+	// Admin devlog: no arrows -> no edges. Without the marker this session
+	// (0 entity_deps) would be flagged incomplete.
+	adminContent := `# Relocate guidelines and prune unused files
+
+Moved a few docs around and deleted dead files. No code touched.
+
+### Architectural Relationships
+_No architectural changes_
+`
+	if err := os.WriteFile(filepath.Join(devlogDir, "2026-01-03_admin.md"), []byte(adminContent), 0644); err != nil {
+		t.Fatalf("Failed to write admin session: %v", err)
+	}
+	indexContent := `## Work Index
+
+| Subject | Problems | Date | Devlog |
+|---------|----------|------|--------|
+| [chore] Relocate guidelines | File moves | 2026-01-03 | [2026-01-03_admin.md](2026-01-03_admin.md) |
+`
+	if err := os.WriteFile(filepath.Join(devlogDir, "_index.md"), []byte(indexContent), 0644); err != nil {
+		t.Fatalf("Failed to write index: %v", err)
+	}
+
+	runBDInProcess(t, tmpDir, "config", "set", "devlog_dir", "_rules/_devlog")
+	runBDInProcess(t, tmpDir, "devlog", "sync")
+
+	out := runBDInProcess(t, tmpDir, "devlog", "verify")
+	if strings.Contains(out, "admin.md") || strings.Contains(out, "missing metadata") {
+		t.Errorf("marked no-arch session should not be flagged incomplete:\n%s", out)
+	}
+	if !strings.Contains(out, "All sessions have linked entities") {
+		t.Errorf("verify should report all complete when only session is marked no-arch:\n%s", out)
+	}
+}
+
 func TestCLI_DevlogTrust_SyncSummary(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow CLI test in short mode")

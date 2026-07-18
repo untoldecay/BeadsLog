@@ -36,6 +36,8 @@ The Devlog is the **entry and exit point** of every task:
 ## Crystallization
 This is the "magic" of BeadsLog. If an agent forgets to add the `Architectural Relationships` block, the **Background AI worker** will read the narrative and append it for them. This turns temporary thoughts into permanent, version-controlled wiki data.
 
+**No-edge sessions:** some devlogs are administrative (docs, file moves, review reports) and have no code or dependency edges to record. Write `_No architectural changes_` in the relationships block to mark them complete — `bd devlog verify` then skips them instead of flagging them as incomplete forever, and no AI backfill is attempted (which would otherwise invent spurious edges).
+
 ## Entity Naming Rules
 To keep the graph high-signal, extraction filters out noise: names shorter than 3 characters, pure numbers, phrase fragments, bare common words, and trunk branch names (`master`, `main`, `develop`). This applies to **all** sources — including manually written arrows. If an arrow targets a filtered word, the edge is dropped with a stderr warning; use a qualified name instead:
 
