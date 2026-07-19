@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.55.1",
+		Date:    "2026-07-20",
+		Changes: []string{
+			"NEW: No-Arch Marker - admin devlogs can write '_No architectural changes_' so 'bd devlog verify' stops flagging them and skips AI backfill",
+		},
+	},
+	{
 		Version: "0.55.0",
 		Date:    "2026-07-10",
 		Changes: []string{

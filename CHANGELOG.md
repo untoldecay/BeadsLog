@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.1] - 2026-07-20
+
+### Added
+- **No-Arch Marker** - Administrative devlogs (docs, file moves, review reports) can write `_No architectural changes_` in their relationships block to declare they have no edges by design. `bd devlog verify` now treats them as complete instead of flagging them as incomplete forever, and never runs AI backfill on them (which could otherwise invent spurious edges).
+
 ## [0.55.0] - 2026-07-10
 
 ## [0.55.0] - 2026-07-10

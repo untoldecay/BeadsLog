@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.55.0"
+const CurrentVersion = "0.55.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.55.1",
+		Date:    "2026-07-20",
+		Features: []string{
+			"No-Arch Marker: administrative devlogs (docs, file moves, reports) can write '_No architectural changes_' in their relationships block; 'bd devlog verify' then treats them as complete instead of flagging them forever, and never runs AI backfill on them.",
+		},
+		Protocol: []string{
+			"For a devlog with no code/dependency change (docs, file moves, reports), write '_No architectural changes_' under Architectural Relationships instead of leaving it empty.",
+		},
+	},
 	{
 		Version: "0.55.0",
 		Date:    "2026-07-10",
