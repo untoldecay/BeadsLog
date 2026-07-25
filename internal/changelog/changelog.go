@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.55.1"
+const CurrentVersion = "0.55.2"
 
 
 var entries = []Entry{
+	{
+		Version: "0.55.2",
+		Date:    "2026-07-25",
+		Features: []string{
+			"Idempotent alias registry: '.beads/aliases.jsonl' is now byte-stable across syncs. Deterministic ORDER BY on GetAllAliases plus a sha256 gate in exportAliasesToJSONL skip no-op rewrites, so 'bd sync' and 'bd devlog record' no longer create spurious git diffs. Multi-worktree branch switching stops requiring stash-shuffling for aliases.jsonl churn.",
+		},
+		Protocol: []string{
+			"No agent action required. Existing aliases.jsonl files re-sort once on the next sync, then remain byte-stable.",
+		},
+	},
 	{
 		Version: "0.55.1",
 		Date:    "2026-07-20",

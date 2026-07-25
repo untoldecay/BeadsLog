@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.2] - 2026-07-25
+
+### Fixed
+- **Idempotent alias registry export** - `.beads/aliases.jsonl` no longer churns on every `bd sync` and `bd devlog record`. `GetAllAliases` now returns rows in deterministic order (`ORDER BY canonical_name, alias_name`), and `exportAliasesToJSONL` short-circuits the file write when the sha256 of the buffered output matches the current on-disk content. Existing `aliases.jsonl` files re-sort once on the next sync, then remain byte-stable. Resolves the multi-worktree branch-switch pain where every branch operation surfaced a pending `aliases.jsonl` diff and forced stash-shuffling. Regression test at `_sandbox/alias-idempotency/`.
+
 ## [0.55.1] - 2026-07-20
 
 ### Added
