@@ -14,6 +14,7 @@ func (s *SQLiteStorage) GetAllAliases(ctx context.Context) ([]types.AliasRecord,
 		SELECT ea.alias_name, e.name as canonical_name
 		FROM entity_aliases ea
 		JOIN entities e ON ea.canonical_id = e.id
+		ORDER BY e.name, ea.alias_name
 	`
 	
 	rows, err := s.db.QueryContext(ctx, query)

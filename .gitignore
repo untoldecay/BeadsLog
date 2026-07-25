@@ -136,3 +136,4 @@ _sandbox/Test-*/
 _sandbox/new_test_repo/eval/
 _rules/_evals/results/
 _sandbox/e2e_test_env
+_sandbox/alias-idempotency/repo/

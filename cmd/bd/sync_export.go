@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -285,7 +287,22 @@ func exportAliasesToJSONL(ctx context.Context, aliasesPath string) error {
 		return nil
 	}
 
-	// Create temp file for atomic write
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	for _, a := range aliases {
+		if err := encoder.Encode(a); err != nil {
+			return fmt.Errorf("failed to encode alias %s: %w", a.AliasName, err)
+		}
+	}
+
+	// Skip the rename if the on-disk content is already identical. Prevents
+	// no-op syncs from bumping mtime and producing spurious git diffs.
+	if existing, err := os.ReadFile(aliasesPath); err == nil {
+		if sha256.Sum256(existing) == sha256.Sum256(buf.Bytes()) {
+			return nil
+		}
+	}
+
 	dir := filepath.Dir(aliasesPath)
 	base := filepath.Base(aliasesPath)
 	tempFile, err := os.CreateTemp(dir, base+".tmp.*")
@@ -298,14 +315,12 @@ func exportAliasesToJSONL(ctx context.Context, aliasesPath string) error {
 		_ = os.Remove(tempPath)
 	}()
 
-	encoder := json.NewEncoder(tempFile)
-	for _, a := range aliases {
-		if err := encoder.Encode(a); err != nil {
-			return fmt.Errorf("failed to encode alias %s: %w", a.AliasName, err)
-		}
+	if _, err := tempFile.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("failed to write aliases: %w", err)
 	}
-
-	_ = tempFile.Close()
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
 
 	if err := os.Rename(tempPath, aliasesPath); err != nil {
 		return fmt.Errorf("failed to replace aliases file: %w", err)
