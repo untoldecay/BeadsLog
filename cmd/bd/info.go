@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.55.2",
+		Date:    "2026-07-26",
+		Changes: []string{
+			"FIX: Idempotent alias registry - .beads/aliases.jsonl no longer churns on every bd sync/bd devlog record; deterministic ORDER BY + sha256 gate eliminate multi-worktree branch-switch stashing",
+		},
+	},
+	{
 		Version: "0.55.1",
 		Date:    "2026-07-20",
 		Changes: []string{
