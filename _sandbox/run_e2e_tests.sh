@@ -307,12 +307,46 @@ if [ "$(git branch --show-current)" != "main" ]; then
     echo "❌ FAIL: user left on $(git branch --show-current) instead of main"
     exit 1
 fi
-if ! "$BD_BIN" doctor --no-daemon 2>&1 | grep -q "Local-only mode"; then
+# Capture output first: piping doctor straight into grep -q races with
+# pipefail (grep exits on match -> doctor gets SIGPIPE -> pipeline fails).
+DOCTOR_OUT=$("$BD_BIN" doctor --no-daemon 2>&1 || true)
+if ! echo "$DOCTOR_OUT" | grep -q "Local-only mode"; then
     echo "❌ FAIL: doctor does not report local-only mode"
+    echo "$DOCTOR_OUT" | grep -i "sync branch" || true
     exit 1
 fi
 
 cd "$TEST_DIR"
 echo "✅ Test 15 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 16: Fresh-Clone Init With Committed Aliases (v0.56.0 crash regression)"
+# ---------------------------------------------------------
+# Simulates 'bd init' in a fresh clone whose git history contains beads data
+# INCLUDING aliases.jsonl — this path dereferenced a nil global store and
+# panicked (SIGSEGV) in v0.56.0.
+FRESH="$TEST_DIR/fresh_clone_aliases"
+mkdir -p "$FRESH/.beads" && cd "$FRESH"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+printf '{"id":"repro-1","title":"seed","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"}\n' > .beads/issues.jsonl
+printf '{"alias_name":"authsvc","canonical_name":"auth-service"}\n' > .beads/aliases.jsonl
+git add .beads && git commit -q -m "seed beads data"
+rm -rf .beads  # fresh-clone simulation: git history has the data, disk does not
+
+INIT_OUT=$("$BD_BIN" init --no-daemon --prefix repro 2>&1) || {
+    echo "❌ FAIL: bd init crashed on repo with committed aliases"
+    echo "$INIT_OUT" | tail -5
+    exit 1
+}
+if ! echo "$INIT_OUT" | grep -q "imported entity aliases from git"; then
+    echo "❌ FAIL: aliases were not imported from git history"
+    echo "$INIT_OUT" | grep -iE "alias|import" || true
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 16 Passed."
 
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

@@ -435,7 +435,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			// Also import aliases from local file
 			localAliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
 			if _, err := os.Stat(localAliasesPath); err == nil {
-				if err := importAliasesFromJSONL(ctx, localAliasesPath); err == nil {
+				if err := importAliasesFromJSONL(ctx, store, localAliasesPath); err == nil {
 					if !quiet {
 						fmt.Fprintf(os.Stderr, "✓ Imported entity aliases from local %s\n", localAliasesPath)
 					}
@@ -469,7 +469,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 					_ = tmpFile.Close()
 					defer os.Remove(tmpPath)
 
-					if err := importAliasesFromJSONL(ctx, tmpPath); err == nil && !quiet {
+					if err := importAliasesFromJSONL(ctx, store, tmpPath); err == nil && !quiet {
 						fmt.Fprintf(os.Stderr, "✓ Successfully imported entity aliases from git.\n")
 					}
 				}

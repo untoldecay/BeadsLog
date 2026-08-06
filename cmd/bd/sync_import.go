@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/debug"
+	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/types"
 )
 
@@ -148,7 +149,7 @@ func importFromJSONLInline(ctx context.Context, jsonlPath string, renameOnImport
 	beadsDir := filepath.Dir(jsonlPath)
 	aliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
 	if _, err := os.Stat(aliasesPath); err == nil {
-		if err := importAliasesFromJSONL(ctx, aliasesPath); err != nil {
+		if err := importAliasesFromJSONL(ctx, store, aliasesPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to import aliases: %v\n", err)
 		} else {
 			fmt.Fprintf(os.Stderr, "Imported entity aliases from registry.\n")
@@ -158,7 +159,14 @@ func importFromJSONLInline(ctx context.Context, jsonlPath string, renameOnImport
 	return nil
 }
 
-func importAliasesFromJSONL(ctx context.Context, aliasesPath string) error {
+// importAliasesFromJSONL imports alias records into st. The store is passed
+// explicitly because 'bd init' opens its own store before the package-global
+// one exists (PersistentPreRun doesn't run for init) — using the global here
+// caused a nil-pointer crash on init in repos with committed aliases (v0.56.0).
+func importAliasesFromJSONL(ctx context.Context, st storage.Storage, aliasesPath string) error {
+	if st == nil {
+		return fmt.Errorf("no storage available for alias import")
+	}
 	f, err := os.Open(aliasesPath)
 	if err != nil {
 		return err
@@ -176,7 +184,7 @@ func importAliasesFromJSONL(ctx context.Context, aliasesPath string) error {
 	}
 
 	if len(aliases) > 0 {
-		return store.SaveAliases(ctx, aliases)
+		return st.SaveAliases(ctx, aliases)
 	}
 	return nil
 }
