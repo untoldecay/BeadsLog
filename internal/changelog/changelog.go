@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.56.0"
+const CurrentVersion = "0.56.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.56.1",
+		Date:    "2026-08-07",
+		Features: []string{
+			"Fix: 'bd init' no longer crashes (nil-pointer SIGSEGV) in repos whose git history contains '.beads/aliases.jsonl' — the alias importer now receives the init-time store explicitly.",
+		},
+		Protocol: []string{
+			"No agent action required. If a previous 'bd init' crashed mid-import, re-run 'bd init --force' to complete alias import.",
+		},
+	},
 	{
 		Version: "0.56.0",
 		Date:    "2026-08-07",

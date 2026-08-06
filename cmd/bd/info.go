@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.56.1",
+		Date:    "2026-08-07",
+		Changes: []string{
+			"FIX: 'bd init' crashed (SIGSEGV) on fresh clones whose git history contains .beads/aliases.jsonl; alias importer now gets the store explicitly",
+		},
+	},
+	{
 		Version: "0.56.0",
 		Date:    "2026-08-07",
 		Changes: []string{

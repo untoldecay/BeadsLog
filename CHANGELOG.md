@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.56.1] - 2026-08-07
+
+## [0.56.1] - 2026-08-07
+
+### Fixed
+- **Crash on fresh-clone init with committed aliases** - `bd init` panicked (nil pointer SIGSEGV) in any repo whose git history contains `.beads/aliases.jsonl`: the alias importer used the package-global store, which is never set during init. The store is now passed explicitly and a nil guard returns an error instead of crashing. Regression covered by `_sandbox/run_e2e_tests.sh` Test 16.
+
 ## [0.56.0] - 2026-08-07
 
 ## [0.56.0] - 2026-08-07
