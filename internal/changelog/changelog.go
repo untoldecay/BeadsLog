@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.55.2"
+const CurrentVersion = "0.56.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.56.0",
+		Date:    "2026-08-07",
+		Features: []string{
+			"Solo/local-only mode: 'bd init --solo' keeps beads data strictly local (sync-mode: local-only, no-push, daemon auto-sync off) with two git postures — invisible ('.beads/' git-excluded) or a local-only 'beads-local' sync branch. 'bd doctor' skips remote sync checks in this mode instead of nagging.",
+			"Fix: team wizard no longer leaves you on the newly created sync branch (inverted switch-back guard in createSyncBranch).",
+		},
+		Protocol: []string{
+			"In solo repos (sync-mode: local-only), 'bd sync' commits locally and never pushes — do not treat unpushed beads data as an error, and skip 'git push' for beads-only changes.",
+		},
+	},
 	{
 		Version: "0.55.2",
 		Date:    "2026-07-25",

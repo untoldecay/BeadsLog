@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.56.0",
+		Date:    "2026-08-07",
+		Changes: []string{
+			"NEW: Solo mode - 'bd init --solo' keeps beads local-only (sync-mode: local-only, no-push, no daemon auto-sync) via git-exclude or a local 'beads-local' branch; 'bd doctor' stops nagging about unpushed beads data",
+			"FIX: team wizard no longer leaves you on the newly created sync branch",
+		},
+	},
+	{
 		Version: "0.55.2",
 		Date:    "2026-07-26",
 		Changes: []string{

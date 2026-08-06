@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-08-07
+
+## [0.56.0] - 2026-08-07
+
+### Added
+- **Solo/local-only mode** - `bd init --solo` configures beads for personal use in a shared repo: writes `sync-mode: local-only` plus enforcement keys (`no-push: true`, `daemon.auto-sync: false`), then offers two git postures — **Invisible** (`.beads/` in `.git/info/exclude`, hooks/merge driver skipped) or **Local branch** (beads commits go to a local-only `beads-local` branch, never pushed). `bd doctor` reports "Local-only mode — remote checks skipped" instead of nagging about unpushed sync branches. `--solo` and `--team` are mutually exclusive; composes with `--stealth`. E2E coverage in `_sandbox/run_e2e_tests.sh` (Test 15).
+
+### Fixed
+- **Team wizard branch switch-back** - `createSyncBranch` had an inverted guard (`!=` instead of `==`) and silently left users on the newly created sync branch instead of returning them to their original branch. Affected both `bd init --team` and the new solo local-branch path.
+
 ## [0.55.2] - 2026-07-26
 
 ## [0.55.2] - 2026-07-25
