@@ -256,4 +256,63 @@ if ! grep -qi "UserAuthenticationService" .beads/aliases.jsonl; then
 fi
 echo "✅ Test 14 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 15: Solo Mode Init (local-only)"
+# ---------------------------------------------------------
+BD_BIN="$TEST_DIR/bd"
+
+# Path 1: invisible (git-exclude)
+SOLO1="$TEST_DIR/solo_invisible"
+mkdir -p "$SOLO1" && cd "$SOLO1"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+git commit -q --allow-empty -m init
+printf "1\n" | "$BD_BIN" init --solo --prefix solotest --quiet --no-daemon > /dev/null 2>&1
+
+if ! grep -q 'sync-mode: "local-only"' .beads/config.yaml || \
+   ! grep -q 'no-push: true' .beads/config.yaml || \
+   ! grep -q 'daemon.auto-sync: false' .beads/config.yaml; then
+    echo "❌ FAIL: solo config keys missing from config.yaml"
+    grep -E "sync-mode|no-push|auto-sync" .beads/config.yaml || true
+    exit 1
+fi
+if ! grep -q "^\.beads/" .git/info/exclude; then
+    echo "❌ FAIL: .beads/ not in .git/info/exclude (invisible mode)"
+    exit 1
+fi
+if git status --porcelain | grep -q "\.beads"; then
+    echo "❌ FAIL: git still sees .beads files in invisible mode"
+    exit 1
+fi
+
+# Path 2: local-only sync branch
+SOLO2="$TEST_DIR/solo_branch"
+mkdir -p "$SOLO2" && cd "$SOLO2"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+git commit -q --allow-empty -m init
+printf "2\n" | "$BD_BIN" init --solo --prefix solotest2 --quiet --no-daemon > /dev/null 2>&1
+
+if ! grep -q 'sync-branch: "beads-local"' .beads/config.yaml; then
+    echo "❌ FAIL: sync-branch not set to beads-local"
+    exit 1
+fi
+if ! git rev-parse --verify beads-local > /dev/null 2>&1; then
+    echo "❌ FAIL: beads-local branch not created"
+    exit 1
+fi
+if [ "$(git branch --show-current)" != "main" ]; then
+    echo "❌ FAIL: user left on $(git branch --show-current) instead of main"
+    exit 1
+fi
+if ! "$BD_BIN" doctor --no-daemon 2>&1 | grep -q "Local-only mode"; then
+    echo "❌ FAIL: doctor does not report local-only mode"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 15 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
