@@ -102,6 +102,7 @@ func IsYamlOnlyKey(key string) bool {
 // This ensures consistency when users use different formats (dot vs hyphen).
 var keyAliases = map[string]string{
 	"sync.branch": "sync-branch",
+	"sync.mode":   "sync-mode",
 }
 
 // normalizeYamlKey converts a key to its canonical yaml format.

@@ -59,6 +59,14 @@ func createConfigYaml(beadsDir string, noDbMode bool) error {
 # Debounce interval for auto-flush (can also use BEADS_FLUSH_DEBOUNCE)
 # flush-debounce: "5s"
 
+# Solo / local-only mode (set automatically by 'bd init --solo')
+# When sync-mode is "local-only", beads data is never pushed to the remote
+# and 'bd doctor' skips remote sync checks. Pair with no-push and
+# daemon.auto-sync below, or re-run 'bd init --solo --force' to configure.
+# sync-mode: "auto"        # "auto" | "local-only"
+# no-push: false           # true = 'bd sync' commits locally, never pushes
+# daemon.auto-sync: false  # true = daemon auto-commits and auto-pushes
+
 # Git branch for beads commits (bd sync will commit to this branch)
 # IMPORTANT: Set this for team projects so all clones use the same sync branch.
 # This setting persists across clones (unlike database config which is gitignored).

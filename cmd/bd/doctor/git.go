@@ -12,6 +12,7 @@ import (
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 	"github.com/untoldecay/BeadsLog/cmd/bd/doctor/fix"
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/git"
 	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
@@ -676,6 +677,16 @@ func CheckSyncBranchHealth(path string) DoctorCheck {
 			Name:    "Sync Branch Health",
 			Status:  StatusOK,
 			Message: "N/A (no sync branch configured)",
+		}
+	}
+
+	// Solo mode: sync branch is intentionally local-only, remote comparison
+	// would only produce false "diverged/unpushed" warnings.
+	if config.GetString("sync-mode") == "local-only" {
+		return DoctorCheck{
+			Name:    "Sync Branch Health",
+			Status:  StatusOK,
+			Message: "Local-only mode (sync.mode: local-only) — remote checks skipped",
 		}
 	}
 

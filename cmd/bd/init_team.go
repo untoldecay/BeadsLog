@@ -212,9 +212,9 @@ func createSyncBranch(branchName string) error {
 		return err
 	}
 
-	// Switch back to original branch
+	// Switch back to original branch (checkout -b left us on the new branch)
 	currentBranch, err := getGitBranch()
-	if err == nil && currentBranch != branchName {
+	if err == nil && currentBranch == branchName {
 		cmd = exec.Command("git", "checkout", "-")
 		_ = cmd.Run() // Ignore error, branch creation succeeded
 	}

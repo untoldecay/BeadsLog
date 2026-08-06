@@ -39,6 +39,11 @@ With --from-jsonl: imports from the current .beads/issues.jsonl file on disk ins
 of scanning git history. Use this after manual JSONL cleanup (e.g., bd compact --purge-tombstones)
 to prevent deleted issues from being resurrected during re-initialization.
 
+With --solo: configures local-only mode for personal use in a shared repo.
+Sets sync.mode: local-only (no push, no daemon auto-sync) and lets you choose
+between git-excluding beads files entirely or committing them to a local-only
+branch. 'bd doctor' skips remote sync checks in this mode.
+
 With --stealth: configures per-repository git settings for invisible beads usage:
   • .git/info/exclude to prevent beads files from being committed
   • Claude Code settings with bd onboard instruction
@@ -49,7 +54,13 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		branch, _ := cmd.Flags().GetString("branch")
 		contributor, _ := cmd.Flags().GetBool("contributor")
 		team, _ := cmd.Flags().GetBool("team")
+		solo, _ := cmd.Flags().GetBool("solo")
 		stealth, _ := cmd.Flags().GetBool("stealth")
+
+		if solo && team {
+			fmt.Fprintln(os.Stderr, "Error: --solo and --team are mutually exclusive")
+			os.Exit(1)
+		}
 		skipMergeDriver, _ := cmd.Flags().GetBool("skip-merge-driver")
 		skipHooks, _ := cmd.Flags().GetBool("skip-hooks")
 		force, _ := cmd.Flags().GetBool("force")
@@ -483,6 +494,22 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
+		// Run solo wizard if --solo flag is set (local-only mode)
+		if solo {
+			excluded, err := runSoloWizard(ctx, store, stealth)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error running solo wizard: %v\n", err)
+				_ = store.Close()
+				os.Exit(1)
+			}
+			if excluded {
+				// Beads files are git-excluded: hooks would fail trying to
+				// 'git add' them, and the merge driver has nothing to merge.
+				skipHooks = true
+				skipMergeDriver = true
+			}
+		}
+
 		if err := store.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to close database: %v\n", err)
 		}
@@ -820,6 +847,7 @@ func init() {
 	initCmd.Flags().StringP("branch", "b", "", "Git branch for beads commits (default: current branch)")
 	initCmd.Flags().Bool("contributor", false, "Run OSS contributor setup wizard")
 	initCmd.Flags().Bool("team", false, "Run team workflow setup wizard")
+	initCmd.Flags().Bool("solo", false, "Run solo mode setup: beads data stays local, never pushed to remote")
 	initCmd.Flags().Bool("stealth", false, "Enable stealth mode: global gitattributes and gitignore, no local repo tracking")
 	initCmd.Flags().Bool("setup-exclude", false, "Configure .git/info/exclude to keep beads files local (for forks)")
 	initCmd.Flags().Bool("skip-hooks", false, "Skip git hooks installation")
