@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.56.1"
+const CurrentVersion = "0.56.2"
 
 
 var entries = []Entry{
+	{
+		Version: "0.56.2",
+		Date:    "2026-08-07",
+		Features: []string{
+			"Fix: 'bd devlog verify --fix' no longer loops forever on sessions whose regex extraction is fully noise-filtered — it reports the deadlock and suggests '--fix-ai' / 'bd devlog enrich'. AI-crystallized sessions (enrichment_status=2) are terminal: zero surviving edges after AI no longer flags them incomplete.",
+		},
+		Protocol: []string{
+			"If 'verify --fix' reports 'Regex extraction cannot clear these', run 'bd devlog enrich --all' (or 'verify --fix-ai') instead of re-running --fix.",
+		},
+	},
 	{
 		Version: "0.56.1",
 		Date:    "2026-08-07",

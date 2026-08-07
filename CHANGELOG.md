@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.56.2] - 2026-08-07
+
+## [0.56.2] - 2026-08-07
+
+### Fixed
+- **`verify --fix` noise-filter deadlock** - Sessions whose regex-extracted entities/relationships are entirely dropped by the noise filter could never clear their "incomplete" flag; `--fix` claimed success while fixing nothing, forever. It now reports the deadlock honestly and points to `--fix-ai` / `bd devlog enrich`. Additionally, AI-crystallized sessions (`enrichment_status = 2`) are now a terminal state: if AI extraction ran and found no edges, the session is no longer flagged incomplete. Regression covered by `_sandbox/run_e2e_tests.sh` Test 17.
+
 ## [0.56.1] - 2026-08-07
 
 ## [0.56.1] - 2026-08-07

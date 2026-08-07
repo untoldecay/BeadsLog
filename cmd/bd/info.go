@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.56.2",
+		Date:    "2026-08-07",
+		Changes: []string{
+			"FIX: 'devlog verify --fix' detects the noise-filter deadlock and suggests AI extraction; AI-crystallized sessions with zero edges are no longer flagged incomplete",
+		},
+	},
+	{
 		Version: "0.56.1",
 		Date:    "2026-08-07",
 		Changes: []string{
