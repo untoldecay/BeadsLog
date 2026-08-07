@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-08-07
+
+## [0.57.0] - 2026-08-07
+
+### Added
+- **Signature-gated prefix auto-adopt (BeadsLog-b4p)** - `bd sync` now silently adopts a single differing upstream issue prefix — repointing the DB prefix, migrating this clone's local issues, and tombstoning old IDs so the shared `issues.jsonl` heals — instead of erroring. It fires **only** toward the prefix declared in the committed `.beads/config.yaml` (the authored migration "signature", recorded by git). A prefix that merely appears in the JSONL without that declaration (test/CI pollution, stray cross-project issue, stale-clone push) is unsigned and still errors, so accidental prefixes never silently repoint a repo. Guards: own-sync-JSONL only, single upstream prefix, `--rename-on-import` takes precedence. Covered by `_sandbox/run_e2e_tests.sh` Tests 19–20 and 5 Go regression tests.
+- **`bd rename-prefix` authors the migration (BeadsLog-b4p)** - `rename-prefix` now writes the new prefix into `config.yaml` (in every path: single, no-issues, `--repair`), turning a local rename into a shareable migration teammates auto-adopt on sync. Round-trip covered by Test 21.
+- **`bd init` pins the prefix in config.yaml (BeadsLog-bl1)** - `init` now writes the resolved `issue-prefix` (flag > config > detected > directory name) uncommented into `config.yaml`, decoupling a repo's shared prefix from its renameable directory name. Covered by Test 22.
+- `config.SetYamlConfigAt(path, key, value)` - path-explicit config writer so config writes are deterministic (next to the active DB) rather than cwd-dependent.
+
+### Fixed
+- **`--rename-on-import` never persisted renames to JSONL (BeadsLog-1tz)** - `bd sync --rename-on-import` renamed prefixes only in the database; the stale old-prefix lines stayed in `issues.jsonl`, so the mismatch recurred on every sync and teammates resurrected the old prefix via LWW merge. Rename now tombstones every old ID (so the export/merge pipeline replaces the stale lines and clones delete their copies) and bumps `UpdatedAt` so LWW keeps the new-ID version. Regression covered by Test 18 and 2 Go tests.
+
 ## [0.56.2] - 2026-08-07
 
 ## [0.56.2] - 2026-08-07

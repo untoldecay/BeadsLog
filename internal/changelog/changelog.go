@@ -14,10 +14,24 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.56.2"
+const CurrentVersion = "0.57.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.57.0",
+		Date:    "2026-08-07",
+		Features: []string{
+			"Prefix migrations are now authored via the committed .beads/config.yaml issue-prefix — that git-tracked change is the 'signature'. 'bd sync' auto-adopts a single differing upstream prefix (migrating your local issues, tombstoning old IDs so the shared JSONL heals) ONLY when it matches the config.yaml declaration; unsigned prefixes (test/CI pollution, stray cross-project issues) still error instead of silently repointing the repo.",
+			"'bd rename-prefix' now writes the new prefix into config.yaml, turning a local rename into a shareable, authored migration teammates adopt on sync.",
+			"'bd init' now pins the resolved issue-prefix (flag > config > detected > directory name) uncommented in config.yaml, so every repo ships a stable, committed prefix decoupled from the (renameable) directory name.",
+			"Fix: 'bd sync --rename-on-import' now persists renames beyond the database — it tombstones old-prefix IDs so the shared issues.jsonl heals and teammates stop resurrecting the old prefix via LWW merge (previously the mismatch recurred on every sync).",
+		},
+		Protocol: []string{
+			"To migrate a team to a new issue prefix: run 'bd rename-prefix <new>' (writes config.yaml + renames issues + tombstones old IDs), then commit .beads/config.yaml and .beads/issues.jsonl and push. Teammates auto-adopt on their next 'bd sync'.",
+			"If 'bd sync' reports a prefix mismatch that is NOT an authored migration (e.g. a stray test prefix), it is treated as pollution and still errors — fix the source or run 'bd import --rename-on-import' to conform it to your configured prefix.",
+		},
+	},
 	{
 		Version: "0.56.2",
 		Date:    "2026-08-07",

@@ -297,6 +297,15 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.57.0",
+		Date:    "2026-08-07",
+		Changes: []string{
+			"FEATURE: prefix migrations are authored via the committed .beads/config.yaml issue-prefix; 'bd sync' auto-adopts a single differing upstream prefix ONLY when it matches that declaration (unsigned/pollution prefixes still error)",
+			"FEATURE: 'bd rename-prefix' writes the new prefix into config.yaml; 'bd init' pins the resolved prefix there too (decoupled from directory name)",
+			"FIX: 'bd sync --rename-on-import' tombstones old-prefix IDs so the shared issues.jsonl heals and teammates stop resurrecting the old prefix",
+		},
+	},
+	{
 		Version: "0.56.2",
 		Date:    "2026-08-07",
 		Changes: []string{
