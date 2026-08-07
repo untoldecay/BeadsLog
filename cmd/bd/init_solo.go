@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/untoldecay/BeadsLog/internal/config"
@@ -70,15 +71,27 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 	response = strings.TrimSpace(response)
 
 	if response == "2" {
-		if err := syncbranch.Set(ctx, store, soloLocalBranch); err != nil {
+		branch := soloLocalBranch
+		// Continue from an existing sync branch (config or a well-known branch
+		// like beads-metadata) instead of orphaning its history (BeadsLog-a2l).
+		if existing := detectExistingSyncBranch(); existing != "" {
+			fmt.Printf("\n%s Existing sync branch detected: %s\n", ui.RenderAccent("▶"), ui.RenderAccent(existing))
+			fmt.Print("  Continue from it (keeps beads history)? [Y/n]: ")
+			resp, _ := reader.ReadString('\n')
+			resp = strings.TrimSpace(strings.ToLower(resp))
+			if resp != "n" && resp != "no" {
+				branch = existing
+			}
+		}
+		if err := syncbranch.Set(ctx, store, branch); err != nil {
 			return false, fmt.Errorf("failed to set sync branch: %w", err)
 		}
-		if err := createSyncBranch(soloLocalBranch); err != nil {
+		if err := createSyncBranch(branch); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to create sync branch: %v\n", err)
-			fmt.Println("  You can create it manually: git checkout -b", soloLocalBranch)
+			fmt.Println("  You can create it manually: git checkout -b", branch)
 		}
-		fmt.Printf("\n%s Beads commits go to local branch %s (never pushed)\n", ui.RenderPass("✓"), ui.RenderAccent(soloLocalBranch))
-		printSoloSummary(soloLocalBranch)
+		fmt.Printf("\n%s Beads commits go to local branch %s (never pushed)\n", ui.RenderPass("✓"), ui.RenderAccent(branch))
+		printSoloSummary(branch)
 		return false, nil
 	}
 
@@ -88,6 +101,21 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 	fmt.Printf("\n%s .beads/ excluded from git — invisible to collaborators\n", ui.RenderPass("✓"))
 	printSoloSummary("")
 	return true, nil
+}
+
+// detectExistingSyncBranch returns a pre-existing sync branch to continue
+// from: the configured sync-branch if set, else a local or remote
+// "beads-metadata" branch (the conventional default). Empty if none.
+func detectExistingSyncBranch() string {
+	if configured := syncbranch.GetFromYAML(); configured != "" {
+		return configured
+	}
+	for _, ref := range []string{"beads-metadata", "origin/beads-metadata"} {
+		if exec.Command("git", "rev-parse", "--verify", ref).Run() == nil {
+			return "beads-metadata"
+		}
+	}
+	return ""
 }
 
 func printSoloSummary(localBranch string) {

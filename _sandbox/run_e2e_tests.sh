@@ -662,4 +662,26 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 23 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 24: Solo Wizard Reuses Existing Sync Branch (BeadsLog-a2l)"
+# ---------------------------------------------------------
+# init --solo option 2 must detect a pre-existing beads-metadata branch and
+# offer to continue from it instead of orphaning history on beads-local.
+A2L="$TEST_DIR/solo_reuse_branch"
+mkdir -p "$A2L" && cd "$A2L"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+git commit -q --allow-empty -m init
+git branch beads-metadata
+printf "2\ny\n" | "$BD_BIN" init --solo --prefix a2l --quiet --no-daemon > /dev/null 2>&1
+if ! grep -q 'sync-branch: "beads-metadata"' .beads/config.yaml; then
+    echo "❌ FAIL: solo wizard did not reuse existing beads-metadata branch"
+    grep "sync-branch" .beads/config.yaml || true
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 24 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
