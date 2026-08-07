@@ -2637,6 +2637,77 @@ from the text and restore its session links and architectural dependencies.`,
 	},
 }
 
+var devlogAliasesCmd = &cobra.Command{
+	Use:   "aliases",
+	Short: "Review and manage alias suggestions",
+	Long: `Review pending alias suggestions and manage the suggestion queue.
+
+Suggestions are entity pairs with both high session co-occurrence AND similar
+names. Merge a pair with 'bd devlog alias <canonical> <variant>', or reject it
+with 'bd devlog aliases dismiss <a> <b>' so it never resurfaces.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return devlogAliasesSuggestCmd.RunE(cmd, args)
+	},
+}
+
+var devlogAliasesSuggestCmd = &cobra.Command{
+	Use:   "suggest",
+	Short: "List pending alias suggestions, best candidates first",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		limit, _ := cmd.Flags().GetInt("limit")
+
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		suggestions, err := queries.GetAliasSuggestions(rootCtx, db, 0.8, limit)
+		if err != nil {
+			return fmt.Errorf("fetching suggestions: %w", err)
+		}
+
+		if jsonOutput {
+			outputJSON(suggestions)
+			return nil
+		}
+
+		if len(suggestions) == 0 {
+			fmt.Println("✅ No pending alias suggestions.")
+			return nil
+		}
+
+		fmt.Printf("Alias suggestions (%d shown, ranked by combined score):\n\n", len(suggestions))
+		for _, s := range suggestions {
+			fmt.Printf("  %s ↔ %s  (overlap %.0f%%, name %.0f%%)\n", s.EntityA, s.EntityB, s.Similarity*100, s.NameSimilarity*100)
+			fmt.Printf("    merge:   bd devlog alias %s %s\n", s.EntityA, s.EntityB)
+			fmt.Printf("    reject:  bd devlog aliases dismiss %s %s\n\n", s.EntityA, s.EntityB)
+		}
+		fmt.Println("💡 Use --limit N for more, --json for machine-readable output.")
+		return nil
+	},
+}
+
+var devlogAliasesDismissCmd = &cobra.Command{
+	Use:   "dismiss [entityA] [entityB]",
+	Short: "Reject a suggestion so this pair is never suggested again",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer store.Close()
+
+		if err := queries.DismissAliasPair(rootCtx, store.UnderlyingDB(), args[0], args[1], actor); err != nil {
+			return fmt.Errorf("recording dismissal: %w", err)
+		}
+		fmt.Printf("✅ Dismissed: '%s' ↔ '%s' will not be suggested again.\n", args[0], args[1])
+		return nil
+	},
+}
+
 var devlogPruneCmd = &cobra.Command{
 	Use:   "prune",
 	Short: "Remove ghost sessions that no longer exist on disk",
@@ -3277,6 +3348,11 @@ func init() {
 	devlogCmd.AddCommand(devlogSyncCmd)
 	devlogCmd.AddCommand(devlogAliasCmd)
 	devlogCmd.AddCommand(devlogUnaliasCmd)
+	devlogAliasesSuggestCmd.Flags().Int("limit", 10, "Maximum suggestions to show (0 = all)")
+	devlogAliasesCmd.Flags().Int("limit", 10, "Maximum suggestions to show (0 = all)")
+	devlogAliasesCmd.AddCommand(devlogAliasesSuggestCmd)
+	devlogAliasesCmd.AddCommand(devlogAliasesDismissCmd)
+	devlogCmd.AddCommand(devlogAliasesCmd)
 	devlogCmd.AddCommand(devlogPruneCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
@@ -3332,22 +3408,22 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 	return items
 }
 
+// showAliasHints prints a one-line count of pending alias suggestions.
+// Deliberately NOT gated on ui.IsTerminal(): agents reading piped output are
+// the primary audience for graph hygiene, and the old per-pair dump both
+// flooded interactive shells (thousands of lines) and was invisible in pipes.
 func showAliasHints(ctx context.Context, db *sql.DB) {
-	// Only show hints in terminal
-	if !ui.IsTerminal() {
-		return
-	}
-
-	suggestions, err := queries.GetAliasSuggestions(ctx, db, 0.8)
+	suggestions, err := queries.GetAliasSuggestions(ctx, db, 0.8, 0)
 	if err != nil || len(suggestions) == 0 {
 		return
 	}
 
-	for _, s := range suggestions {
-		fmt.Printf("\n%s OPPORTUNITY: '%s' and '%s' appear to be the same (%.0f%% session overlap).\n", 
-			ui.RenderAccent("💡"), s.EntityA, s.EntityB, s.Similarity*100)
-		fmt.Printf("   Run 'bd devlog alias %s %s' after verification.\n", s.EntityA, s.EntityB)
+	plural := "y"
+	if len(suggestions) > 1 {
+		plural = "ies"
 	}
+	fmt.Printf("\n%s %d alias opportunit%s detected — review: %s\n",
+		ui.RenderAccent("💡"), len(suggestions), plural, ui.RenderAccent("bd devlog aliases suggest"))
 }
 
 func flushMetadata(ctx context.Context) {

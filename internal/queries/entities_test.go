@@ -51,6 +51,13 @@ func setupTestDB(t *testing.T) *sql.DB {
 		FOREIGN KEY(to_entity) REFERENCES entities(id),
 		FOREIGN KEY(discovered_in) REFERENCES sessions(id)
 	);
+	CREATE TABLE alias_dismissals (
+		name_a TEXT NOT NULL,
+		name_b TEXT NOT NULL,
+		dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		dismissed_by TEXT,
+		PRIMARY KEY (name_a, name_b)
+	);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		t.Fatalf("failed to create schema: %v", err)
@@ -138,31 +145,51 @@ func TestGetAliasSuggestions(t *testing.T) {
 	_, _ = db.Exec("INSERT INTO sessions (id, title, timestamp) VALUES ('s1', 'Session 1', '2026-05-01T10:00:00Z')")
 	_, _ = db.Exec("INSERT INTO sessions (id, title, timestamp) VALUES ('s2', 'Session 2', '2026-05-02T10:00:00Z')")
 	_, _ = db.Exec("INSERT INTO sessions (id, title, timestamp) VALUES ('s3', 'Session 3', '2026-05-03T10:00:00Z')")
-	
-	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e1', 'A')")
-	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e2', 'B')")
-	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e3', 'C')")
 
-	// e1 and e2 appear together in all sessions (Similarity = 1.0)
-	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s1', 'e1')")
-	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s1', 'e2')")
-	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s2', 'e1')")
-	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s2', 'e2')")
+	// e1/e2: similar names (containment variant), co-occur in 2 sessions → suggested
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e1', 'ollama-extractor')")
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e2', 'ollamaextract')")
+	// e4/e5: dissimilar names, perfect co-occurrence → filtered (related ≠ identical)
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e4', 'cut-release')")
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e5', 'bump-version')")
+	// e6/e7: similar names but only ONE shared session → filtered (session floor)
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e6', 'auth-service')")
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e7', 'auth-services')")
 
-	// e1 and e3 overlap only in s1
-	_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES ('s1', 'e3')")
+	for _, pair := range [][2]string{{"s1", "e1"}, {"s1", "e2"}, {"s2", "e1"}, {"s2", "e2"},
+		{"s1", "e4"}, {"s1", "e5"}, {"s2", "e4"}, {"s2", "e5"},
+		{"s3", "e6"}, {"s3", "e7"}} {
+		_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES (?, ?)", pair[0], pair[1])
+	}
 
-	suggestions, err := GetAliasSuggestions(ctx, db, 0.8)
+	suggestions, err := GetAliasSuggestions(ctx, db, 0.8, 0)
 	if err != nil {
 		t.Fatalf("GetAliasSuggestions failed: %v", err)
 	}
 
 	if len(suggestions) != 1 {
-		t.Fatalf("Expected 1 suggestion, got %d", len(suggestions))
+		t.Fatalf("Expected 1 suggestion (similar names, 2+ sessions), got %d: %+v", len(suggestions), suggestions)
+	}
+	if suggestions[0].EntityA != "ollama-extractor" && suggestions[0].EntityB != "ollama-extractor" {
+		t.Errorf("Expected ollama pair, got %+v", suggestions[0])
+	}
+	if suggestions[0].Similarity != 1.0 {
+		t.Errorf("Expected session overlap 1.0, got %f", suggestions[0].Similarity)
+	}
+	if suggestions[0].NameSimilarity < 0.55 {
+		t.Errorf("Expected name similarity >= 0.55, got %f", suggestions[0].NameSimilarity)
 	}
 
-	if suggestions[0].Similarity != 1.0 {
-		t.Errorf("Expected similarity 1.0, got %f", suggestions[0].Similarity)
+	// Dismiss the pair — never suggested again, regardless of argument order
+	if err := DismissAliasPair(ctx, db, "ollamaextract", "ollama-extractor", "test"); err != nil {
+		t.Fatalf("DismissAliasPair failed: %v", err)
+	}
+	suggestions, err = GetAliasSuggestions(ctx, db, 0.8, 0)
+	if err != nil {
+		t.Fatalf("GetAliasSuggestions after dismissal failed: %v", err)
+	}
+	if len(suggestions) != 0 {
+		t.Fatalf("Expected 0 suggestions after dismissal, got %d: %+v", len(suggestions), suggestions)
 	}
 }
 
