@@ -6,7 +6,7 @@
 # Issue prefix for this repository (used by bd init)
 # If not set, bd init will auto-detect from directory name
 # Example: issue-prefix: "myproject" creates issues like "myproject-1", "myproject-2", etc.
-issue-prefix: "bd"
+issue-prefix: "BeadsLog"
 
 # Use no-db mode: load from JSONL, no SQLite, write back after each command
 # When true, bd will use .beads/issues.jsonl as the source of truth
@@ -69,4 +69,4 @@ devlog.author: "Gemini-Test-Agent"
 
 last-seen-changelog-version: 0.50.0
 
-last-remote-version-check: "2026-07-10T07:19:59+02:00"
+last-remote-version-check: "2026-08-07T09:38:24+02:00"
