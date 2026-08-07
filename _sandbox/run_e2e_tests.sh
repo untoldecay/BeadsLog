@@ -449,9 +449,10 @@ cat > .beads/issues.jsonl <<'JSONL'
 {"id":"newpfx-shared","title":"shared work","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-07T00:00:00Z"}
 {"id":"newpfx-fresh","title":"upstream fresh","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-07T00:00:00Z"}
 JSONL
-# Authoring = an uncommented issue-prefix in the committed config.yaml (bd init
-# leaves it commented, so the prefix normally lives only in the DB).
-printf '\nissue-prefix: "newpfx"\n' >> .beads/config.yaml
+# Authoring = updating the committed issue-prefix declaration (bd init pins it, so
+# the migrator replaces the existing value rather than appending a duplicate).
+sed -i.bak 's/^issue-prefix:.*/issue-prefix: "newpfx"/' .beads/config.yaml && rm -f .beads/config.yaml.bak
+grep -q '^issue-prefix: "newpfx"' .beads/config.yaml || { echo "❌ setup: failed to author newpfx in config.yaml"; exit 1; }
 git add -A && git commit -q -m "author migration: standardize on newpfx (config.yaml + issues)"
 
 SYNC_OUT=$("$BD_BIN" sync --no-daemon 2>&1 || true)
@@ -576,5 +577,41 @@ fi
 
 cd "$TEST_DIR"
 echo "✅ Test 21 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 22: init Pins Resolved Prefix In config.yaml (BeadsLog-bl1)"
+# ---------------------------------------------------------
+# bd init must write the resolved issue-prefix (uncommented) into config.yaml so
+# every clone shares one committed prefix — decoupled from the directory name and
+# ready to serve as the migration signature.
+PIN="$TEST_DIR/init_pin_explicit"
+mkdir -p "$PIN" && cd "$PIN"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix myproj > /dev/null 2>&1
+if ! grep -q '^issue-prefix: "myproj"' .beads/config.yaml; then
+    echo "❌ FAIL: init did not pin explicit prefix in config.yaml"
+    grep -n "issue-prefix" .beads/config.yaml
+    exit 1
+fi
+# Without --prefix, init must still pin *some* uncommented issue-prefix (the
+# resolved default). The exact value depends on init precedence (a parent
+# config.yaml can win over the dir name when nested), so assert only that an
+# uncommented declaration was written — that is what bl1 requires.
+PINDIR="$TEST_DIR/init_pin_dir/somedir"
+mkdir -p "$PINDIR" && cd "$PINDIR"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon > /dev/null 2>&1
+if ! grep -qE '^issue-prefix: "[^"]+"' .beads/config.yaml; then
+    echo "❌ FAIL: init did not pin any default prefix in config.yaml"
+    grep -n "issue-prefix" .beads/config.yaml
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 22 Passed."
 
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

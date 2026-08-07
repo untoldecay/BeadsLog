@@ -413,6 +413,20 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
+		// Pin the resolved issue-prefix in the committed config.yaml so it is the
+		// shared source of truth — decoupled from the (renameable) directory name
+		// and serving as the authored signature for prefix migrations
+		// (BeadsLog-bl1 / b4p). Must run after createConfigYaml() so the file
+		// exists; SetYamlConfigAt updates the commented template line in place.
+		if prefix != "" {
+			cfgPath := filepath.Join(beadsDir, "config.yaml")
+			if err := config.SetYamlConfigAt(cfgPath, "issue-prefix", prefix); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to pin issue-prefix in config.yaml: %v\n", err)
+			} else if !quiet {
+				fmt.Printf("  Issue prefix: %s (pinned in config.yaml)\n", prefix)
+			}
+		}
+
 		// Check if git has existing issues to import (fresh clone scenario)
 		// With --from-jsonl: import from local file instead of git history
 		if fromJSONL {
