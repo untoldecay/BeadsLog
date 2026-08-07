@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -267,7 +268,17 @@ NOTE: This is a rare operation. Most users never need this command.`,
 // appears in the JSONL without this declaration is treated as pollution and
 // errors). This is what turns a local rename-prefix into a shareable migration.
 func writePrefixSignature(newPrefix string) {
-	if err := config.SetYamlConfig("issue-prefix", newPrefix); err != nil {
+	// Resolve config.yaml next to the active database/JSONL (dbPath-derived), not
+	// by walking up from the cwd — that keeps the write deterministic and, in
+	// tests, confined to the temp .beads dir instead of the real repo.
+	jsonlPath := findJSONLPath()
+	if jsonlPath == "" {
+		fmt.Fprintf(os.Stderr, "Warning: renamed the database prefix but could not locate .beads to declare it in config.yaml.\n")
+		fmt.Fprintf(os.Stderr, "Teammates will NOT auto-adopt until config.yaml sets 'issue-prefix: \"%s\"'.\n", newPrefix)
+		return
+	}
+	configPath := filepath.Join(filepath.Dir(jsonlPath), "config.yaml")
+	if err := config.SetYamlConfigAt(configPath, "issue-prefix", newPrefix); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: renamed the database prefix but failed to declare it in config.yaml: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Teammates will NOT auto-adopt until config.yaml sets 'issue-prefix: \"%s\"'.\n", newPrefix)
 		return

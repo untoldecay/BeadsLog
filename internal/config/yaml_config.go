@@ -115,37 +115,47 @@ func normalizeYamlKey(key string) string {
 	return key
 }
 
-// SetYamlConfig sets a configuration value in the project's config.yaml file.
+// SetYamlConfig sets a configuration value in the project's config.yaml file,
+// located by walking up from the current working directory.
 // It handles both adding new keys and updating existing (possibly commented) keys.
 // Keys are normalized to their canonical yaml format (e.g., sync.branch -> sync-branch).
 func SetYamlConfig(key, value string) error {
-	// Validate specific keys (GH#995)
-	if err := validateYamlConfigValue(key, value); err != nil {
-		return err
-	}
-
 	configPath, err := findProjectConfigYaml()
 	if err != nil {
+		return err
+	}
+	return SetYamlConfigAt(configPath, key, value)
+}
+
+// SetYamlConfigAt sets a configuration value in the config.yaml at an explicit
+// path. Prefer this over SetYamlConfig when the config location is known (e.g.
+// derived from the active database directory) so the write is deterministic and
+// does not depend on the current working directory. Creates the file if absent.
+func SetYamlConfigAt(configPath, key, value string) error {
+	// Validate specific keys (GH#995)
+	if err := validateYamlConfigValue(key, value); err != nil {
 		return err
 	}
 
 	// Normalize key to canonical yaml format
 	normalizedKey := normalizeYamlKey(key)
 
-	// Read existing config
-	content, err := os.ReadFile(configPath) //nolint:gosec // configPath is from findProjectConfigYaml
-	if err != nil {
+	// Read existing config (empty is fine — the key is added to a fresh file)
+	content := ""
+	if b, err := os.ReadFile(configPath); err == nil { //nolint:gosec // caller-provided path
+		content = string(b)
+	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read config.yaml: %w", err)
 	}
 
 	// Update or add the key
-	newContent, err := updateYamlKey(string(content), normalizedKey, value)
+	newContent, err := updateYamlKey(content, normalizedKey, value)
 	if err != nil {
 		return err
 	}
 
 	// Write back
-	if err := os.WriteFile(configPath, []byte(newContent), 0600); err != nil { //nolint:gosec // configPath is validated
+	if err := os.WriteFile(configPath, []byte(newContent), 0600); err != nil { //nolint:gosec // caller-provided path
 		return fmt.Errorf("failed to write config.yaml: %w", err)
 	}
 
