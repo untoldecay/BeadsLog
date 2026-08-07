@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-08-07
+
+## [0.58.0] - 2026-08-10
+
+### Added
+- **Alias suggestion overhaul** - Suggestions now require both >= 2 shared sessions AND name similarity (containment/Levenshtein >= 0.55 on normalized names), cutting this repo's queue from 3,152 pairs (70% single-session noise) to 16 genuine candidates. New `bd devlog aliases suggest` (ranked, `--limit`, `--json`) and `bd devlog aliases dismiss <a> <b>` (persisted in new `alias_dismissals` table, migration 057 — rejected pairs never resurface, so reviews converge). `graph`/`search` now print a one-line opportunity count — visible in piped output too, so agents finally see the hint the protocol asks them to act on — instead of dumping every pair.
+- **Solo wizard sync-branch reuse** - `bd init --solo` (local branch option) detects an existing sync branch (config or `beads-metadata`, local or remote) and offers to continue from it instead of orphaning history on a fresh `beads-local`.
+
 ## [0.57.0] - 2026-08-07
 
 ## [0.57.0] - 2026-08-07

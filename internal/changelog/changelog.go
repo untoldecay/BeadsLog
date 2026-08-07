@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.57.0"
+const CurrentVersion = "0.58.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.58.0",
+		Date:    "2026-08-10",
+		Features: []string{
+			"Alias suggestions overhauled: pairs need >=2 shared sessions AND similar names; 'bd devlog aliases suggest' (--json/--limit) lists ranked candidates, 'bd devlog aliases dismiss <a> <b>' permanently rejects. graph/search show a one-line count instead of dumping every pair, and the hint is visible in piped (agent) output.",
+			"'bd init --solo' local-branch option detects an existing sync branch (config or beads-metadata) and offers to continue from it.",
+		},
+		Protocol: []string{
+			"When graph/search shows 'N alias opportunities', run 'bd devlog aliases suggest --json', then for each pair either merge ('bd devlog alias <canonical> <variant>') or reject ('bd devlog aliases dismiss <a> <b>') — dismissals are permanent, so always resolve pairs one way or the other.",
+		},
+	},
 	{
 		Version: "0.57.0",
 		Date:    "2026-08-07",

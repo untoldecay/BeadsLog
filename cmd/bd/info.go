@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.58.0",
+		Date:    "2026-08-10",
+		Changes: []string{
+			"NEW: 'bd devlog aliases suggest|dismiss' — reviewable, dismissible alias queue (3,152 -> 16 on this repo); graph/search show a count hint (also in pipes) instead of flooding",
+			"NEW: 'bd init --solo' offers to reuse an existing sync branch (beads-metadata) instead of creating beads-local blind",
+		},
+	},
+	{
 		Version: "0.57.0",
 		Date:    "2026-08-07",
 		Changes: []string{
