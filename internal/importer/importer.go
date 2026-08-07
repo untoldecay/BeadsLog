@@ -36,6 +36,8 @@ type Options struct {
 	SkipUpdate                 bool            // Skip updating existing issues (create-only mode)
 	Strict                     bool            // Fail on any error (dependencies, labels, etc.)
 	RenameOnImport             bool            // Rename imported issues to match database prefix
+	AutoAdoptPrefix            bool            // Adopt a single upstream prefix from the repo's own sync JSONL: repoint DB config + migrate local issues (BeadsLog-b4p)
+	AdoptTargetPrefix          string          // The committed config.yaml issue-prefix (the authored migration "signature"); auto-adopt only fires toward this exact prefix (BeadsLog-b4p)
 	SkipPrefixValidation       bool            // Skip prefix validation (for auto-import)
 	OrphanHandling             OrphanHandling  // How to handle missing parent issues (default: allow)
 	ClearDuplicateExternalRefs bool            // Clear duplicate external_ref values instead of erroring
@@ -55,6 +57,9 @@ type Result struct {
 	ExpectedPrefix      string            // Database configured prefix
 	MismatchPrefixes    map[string]int    // Map of mismatched prefixes to count
 	SkippedDependencies []string          // Dependencies skipped due to FK constraint violations
+	AdoptedPrefix       string            // Non-empty when auto-adopt repointed the DB prefix to this upstream prefix (BeadsLog-b4p)
+	AdoptedFrom         string            // The previous prefix replaced by auto-adopt
+	MigratedLocal       int               // Count of local issues migrated to the adopted prefix
 }
 
 // ImportIssues handles the core import logic used by both manual and auto-import.
@@ -284,6 +289,67 @@ func handlePrefixMismatch(ctx context.Context, sqliteStore *sqlite.SQLiteStorage
 	// If there are non-tombstone mismatches, we need to include all issues (tombstones too)
 	// but still report the error for non-tombstones
 	if result.PrefixMismatch {
+		// Auto-adopt (BeadsLog-b4p): when importing the repo's own sync JSONL and
+		// it carries exactly one upstream prefix that differs from this clone's
+		// configured prefix, adopt the upstream prefix instead of erroring. The
+		// clone must adopt it to keep working with the team, so a hard error is
+		// pure friction. We repoint the DB's configured prefix and migrate this
+		// clone's local issues to the upstream prefix (tombstoning the old IDs so
+		// the shared JSONL heals).
+		//
+		// Guards:
+		//   - opts.AutoAdoptPrefix: the repo's own sync JSONL, not an arbitrary
+		//     `bd import -i <foreign-file>`.
+		//   - single upstream prefix: a multi-prefix pull is ambiguous → error.
+		//   - !opts.RenameOnImport: rename-on-import is the opposite intent
+		//     (conform incoming TO the configured prefix) and takes precedence.
+		//   - newPrefix == opts.AdoptTargetPrefix: the upstream prefix must match
+		//     the committed config.yaml issue-prefix — the AUTHORED migration
+		//     signature (whoever committed that change signed it, recorded by git).
+		//     A prefix that merely appears in the JSONL but was not declared in the
+		//     shared config (test/CI pollution, a stray cross-project issue, a
+		//     stale-clone push) is NOT authored and still errors, so accidental
+		//     prefixes never silently repoint the repo.
+		if opts.AutoAdoptPrefix && !opts.RenameOnImport && !opts.DryRun &&
+			len(result.MismatchPrefixes) == 1 &&
+			opts.AdoptTargetPrefix != "" && singleKey(result.MismatchPrefixes) == opts.AdoptTargetPrefix {
+			newPrefix := singleKey(result.MismatchPrefixes)
+			if err := sqliteStore.SetConfig(ctx, "issue_prefix", newPrefix); err != nil {
+				return nil, fmt.Errorf("adopt prefix: failed to set issue_prefix to %q: %w", newPrefix, err)
+			}
+
+			// (1) Rename incoming old-prefix issues to the adopted prefix and
+			// tombstone the old IDs. `bd sync` 3-way-merges local into the
+			// incoming set before import, so this clone's local issues arrive
+			// here under their OLD prefix; renaming them completes the migration
+			// (the matching new-prefix rows then replace the DB rows via the
+			// cross-prefix path in upsertIssues).
+			idMap, err := RenameImportedIssuePrefixes(issues, newPrefix)
+			if err != nil {
+				return nil, fmt.Errorf("adopt prefix: failed to rename incoming issues: %w", err)
+			}
+			issues = appendRenameTombstones(issues, idMap, "prefix-adoption")
+
+			// (2) Migrate local DB issues that step (1) did not already handle:
+			// those whose old ID never arrived incoming (a direct `bd import` of
+			// pure-upstream JSONL, or unpushed local-only work). Each gets a
+			// tombstone; issues whose new ID also arrives incoming are migrated by
+			// the cross-prefix path, so only truly local-only ones are injected.
+			injected, localOnly, err := migrateLocalToPrefix(ctx, sqliteStore, configuredPrefix, newPrefix, issues, idMap)
+			if err != nil {
+				return nil, err
+			}
+			issues = append(issues, injected...)
+
+			result.AdoptedFrom = configuredPrefix
+			result.AdoptedPrefix = newPrefix
+			result.MigratedLocal = len(idMap) + localOnly
+			result.ExpectedPrefix = newPrefix
+			result.PrefixMismatch = false
+			result.MismatchPrefixes = make(map[string]int)
+			return issues, nil
+		}
+
 		// If not handling the mismatch, return error
 		if !opts.RenameOnImport && !opts.DryRun && !opts.SkipPrefixValidation {
 			return nil, fmt.Errorf("prefix mismatch detected: database uses '%s-' but found issues with prefixes: %v (use --rename-on-import to automatically fix)", configuredPrefix, GetPrefixList(result.MismatchPrefixes))
@@ -296,48 +362,7 @@ func handlePrefixMismatch(ctx context.Context, sqliteStore *sqlite.SQLiteStorage
 		if err != nil {
 			return nil, fmt.Errorf("failed to rename prefixes: %w", err)
 		}
-
-		// Persist the rename beyond the database (BeadsLog-1tz): tombstone every
-		// old ID so the export/merge pipeline replaces the stale live lines in
-		// the shared JSONL and teammates' clones delete their copies instead of
-		// resurrecting the old prefix on every sync. Old-prefix tombstones are
-		// already recognized as benign by this function ("all are tombstones"),
-		// so subsequent imports stop erroring, and TTL compaction purges them.
-		now := time.Now()
-		renamedByNewID := buildIDMap(issues)
-		// A rename is an update: bump UpdatedAt on renamed issues so LWW merge
-		// prefers the new-ID version over the stale old-ID line still in the
-		// JSONL — otherwise content-hash matching resolves toward the old ID,
-		// which then loses to its tombstone and the issue is silently dropped.
-		for _, newID := range idMapping {
-			if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
-				renamed.UpdatedAt = now
-			}
-		}
-		for oldID, newID := range idMapping {
-			tomb := &types.Issue{
-				ID:           oldID,
-				Title:        "[renamed] " + newID,
-				Status:       types.StatusTombstone,
-				UpdatedAt:    now, // newer than the stale live line so LWW keeps the tombstone
-				DeletedAt:    &now,
-				DeletedBy:    "rename-on-import",
-				DeleteReason: "Renamed to " + newID + " (prefix migration)",
-			}
-			if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
-				tomb.IssueType = renamed.IssueType
-				tomb.Priority = renamed.Priority
-				tomb.CreatedAt = renamed.CreatedAt
-				tomb.OriginalType = string(renamed.IssueType)
-			}
-			if tomb.IssueType == "" {
-				tomb.IssueType = types.TypeTask
-			}
-			if tomb.CreatedAt.IsZero() {
-				tomb.CreatedAt = now
-			}
-			issues = append(issues, tomb)
-		}
+		issues = appendRenameTombstones(issues, idMapping, "rename-on-import")
 
 		// After renaming, clear the mismatch flags since we fixed them
 		result.PrefixMismatch = false
@@ -347,6 +372,108 @@ func handlePrefixMismatch(ctx context.Context, sqliteStore *sqlite.SQLiteStorage
 
 	// Return original issues if no filtering needed
 	return issues, nil
+}
+
+// singleKey returns the only key of a one-element map. Callers must guarantee
+// len(m) == 1.
+func singleKey(m map[string]int) string {
+	for k := range m {
+		return k
+	}
+	return ""
+}
+
+// appendRenameTombstones bumps UpdatedAt on renamed issues and appends an
+// old-ID tombstone for every rename in idMapping, returning the extended slice
+// (BeadsLog-1tz). The tombstones make the export/merge pipeline replace the
+// stale old-prefix lines in the shared JSONL so teammates' clones delete their
+// copies instead of resurrecting the old prefix; they are already recognized as
+// benign on re-import and TTL compaction eventually purges them. Bumping
+// UpdatedAt makes LWW prefer the new-ID version over any stale old-ID live line
+// still in the JSONL — otherwise content-hash matching resolves toward the old
+// ID, which then loses to its own tombstone and the issue is silently dropped.
+func appendRenameTombstones(issues []*types.Issue, idMapping map[string]string, deletedBy string) []*types.Issue {
+	now := time.Now()
+	renamedByNewID := buildIDMap(issues)
+	for _, newID := range idMapping {
+		if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
+			renamed.UpdatedAt = now
+		}
+	}
+	for oldID, newID := range idMapping {
+		tomb := &types.Issue{
+			ID:           oldID,
+			Title:        "[renamed] " + newID,
+			Status:       types.StatusTombstone,
+			UpdatedAt:    now, // newer than the stale live line so LWW keeps the tombstone
+			DeletedAt:    &now,
+			DeletedBy:    deletedBy,
+			DeleteReason: "Renamed to " + newID + " (prefix migration)",
+		}
+		if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
+			tomb.IssueType = renamed.IssueType
+			tomb.Priority = renamed.Priority
+			tomb.CreatedAt = renamed.CreatedAt
+			tomb.OriginalType = string(renamed.IssueType)
+		}
+		if tomb.IssueType == "" {
+			tomb.IssueType = types.TypeTask
+		}
+		if tomb.CreatedAt.IsZero() {
+			tomb.CreatedAt = now
+		}
+		issues = append(issues, tomb)
+	}
+	return issues
+}
+
+// migrateLocalToPrefix migrates this clone's local DB issues from oldPrefix to
+// newPrefix for those NOT already handled by the incoming-rename step
+// (BeadsLog-b4p). handledOldIDs holds old IDs the caller already renamed and
+// tombstoned in the incoming set (their old IDs arrived incoming, e.g. via the
+// sync merge). For every remaining local issue this function tombstones the old
+// ID; it injects a live renamed copy only when the new ID is absent from the
+// incoming set (a truly local-only issue), since an issue whose new ID also
+// arrives incoming is migrated by the cross-prefix path in upsertIssues.
+// Returns the issues to inject and the count of local issues it migrated.
+func migrateLocalToPrefix(ctx context.Context, sqliteStore *sqlite.SQLiteStorage, oldPrefix, newPrefix string, incoming []*types.Issue, handledOldIDs map[string]string) ([]*types.Issue, int, error) {
+	local, err := sqliteStore.SearchIssues(ctx, "", types.IssueFilter{IDPrefix: oldPrefix + "-"})
+	if err != nil {
+		return nil, 0, fmt.Errorf("adopt prefix: failed to load local %q issues: %w", oldPrefix, err)
+	}
+	if len(local) == 0 {
+		return nil, 0, nil // nothing local to migrate
+	}
+
+	// Rename local copies to the new prefix (also rewrites cross-references).
+	// After this call each local issue's ID is its new-prefix ID.
+	idMapping, err := RenameImportedIssuePrefixes(local, newPrefix)
+	if err != nil {
+		return nil, 0, fmt.Errorf("adopt prefix: failed to rename local issues: %w", err)
+	}
+	newToOld := make(map[string]string, len(idMapping))
+	for oldID, newID := range idMapping {
+		newToOld[newID] = oldID
+	}
+
+	incomingIDs := make(map[string]bool, len(incoming))
+	for _, in := range incoming {
+		incomingIDs[in.ID] = true
+	}
+	var injected []*types.Issue
+	tombstoneMapping := make(map[string]string)
+	for _, li := range local {
+		oldID := newToOld[li.ID]
+		if _, alreadyHandled := handledOldIDs[oldID]; alreadyHandled {
+			continue // step (1) already renamed + tombstoned this one
+		}
+		tombstoneMapping[oldID] = li.ID // always tombstone the old ID
+		if !incomingIDs[li.ID] {
+			injected = append(injected, li) // truly local-only: inject the live copy
+		}
+	}
+	injected = appendRenameTombstones(injected, tombstoneMapping, "prefix-adoption")
+	return injected, len(tombstoneMapping), nil
 }
 
 // detectUpdates detects same-ID scenarios (which are updates with hash IDs, not collisions)

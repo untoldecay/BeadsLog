@@ -1860,3 +1860,231 @@ func TestHandlePrefixMismatch_BumpsUpdatedAtOnRename(t *testing.T) {
 		t.Errorf("tombstone UpdatedAt (%v) should not predate renamed issue (%v)", tomb.UpdatedAt, renamed.UpdatedAt)
 	}
 }
+
+// TestAutoAdoptPrefix_AdoptsUpstreamAndMigratesLocal is the main regression test
+// for BeadsLog-b4p. When importing the repo's own sync JSONL that standardized on
+// a single upstream prefix, the clone repoints its configured prefix and migrates
+// ALL its local issues to the upstream prefix (both those also present upstream
+// and local-only ones), tombstoning the old IDs so the shared JSONL heals.
+func TestAutoAdoptPrefix_AdoptsUpstreamAndMigratesLocal(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "old"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	// This clone's local issues under the OLD prefix: one is also standardized
+	// upstream (same suffix + content), one is local-only (never pushed).
+	shared := &types.Issue{ID: "old-shared", Title: "Shared work", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask}
+	onlyLocal := &types.Issue{ID: "old-onlylocal", Title: "Only-local work", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask}
+	if err := store.CreateIssue(ctx, shared, "test-setup"); err != nil {
+		t.Fatalf("create old-shared: %v", err)
+	}
+	if err := store.CreateIssue(ctx, onlyLocal, "test-setup"); err != nil {
+		t.Fatalf("create old-onlylocal: %v", err)
+	}
+
+	// Incoming pulled JSONL, standardized on the NEW prefix: the shared issue
+	// (same suffix + content as old-shared) and a brand-new issue.
+	incoming := []*types.Issue{
+		{ID: "new-shared", Title: "Shared work", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+		{ID: "new-fresh", Title: "Brand new upstream", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+	}
+
+	result, err := ImportIssues(ctx, tmpDB, store, incoming, Options{AutoAdoptPrefix: true, AdoptTargetPrefix: "new"})
+	if err != nil {
+		t.Fatalf("auto-adopt import should succeed: %v", err)
+	}
+
+	if result.AdoptedPrefix != "new" || result.AdoptedFrom != "old" {
+		t.Errorf("expected adopt old->new, got from=%q to=%q", result.AdoptedFrom, result.AdoptedPrefix)
+	}
+	if result.MigratedLocal != 2 {
+		t.Errorf("expected 2 local issues migrated, got %d", result.MigratedLocal)
+	}
+
+	// Config prefix must be repointed.
+	cfg, _ := store.GetConfig(ctx, "issue_prefix")
+	if cfg != "new" {
+		t.Errorf("configured prefix should be 'new', got %q", cfg)
+	}
+
+	all, err := store.SearchIssues(ctx, "", types.IssueFilter{IncludeTombstones: true})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	byID := make(map[string]*types.Issue, len(all))
+	for _, i := range all {
+		byID[i.ID] = i
+	}
+
+	// All three issues must be live under the new prefix.
+	for _, id := range []string{"new-shared", "new-fresh", "new-onlylocal"} {
+		got := byID[id]
+		if got == nil {
+			t.Errorf("expected %s to exist after adopt", id)
+			continue
+		}
+		if got.Status == types.StatusTombstone {
+			t.Errorf("%s should be live, got tombstone", id)
+		}
+	}
+
+	// Old IDs must be tombstoned so the shared JSONL heals, and no old-prefix
+	// issue may remain live (would re-pollute on export).
+	for _, id := range []string{"old-shared", "old-onlylocal"} {
+		got := byID[id]
+		if got == nil {
+			t.Errorf("expected tombstone for %s", id)
+			continue
+		}
+		if got.Status != types.StatusTombstone {
+			t.Errorf("%s should be a tombstone, got status %q", id, got.Status)
+		}
+	}
+	for _, i := range all {
+		if strings.HasPrefix(i.ID, "old-") && i.Status != types.StatusTombstone {
+			t.Errorf("no old-prefix issue should remain live, found %s (%s)", i.ID, i.Status)
+		}
+	}
+}
+
+// TestAutoAdoptPrefix_FreshCloneMigratesNothing covers the empty-DB path: adopt
+// the upstream prefix with zero local issues to migrate.
+func TestAutoAdoptPrefix_FreshCloneMigratesNothing(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "old"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	incoming := []*types.Issue{
+		{ID: "new-1", Title: "Upstream issue", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+	}
+	result, err := ImportIssues(ctx, tmpDB, store, incoming, Options{AutoAdoptPrefix: true, AdoptTargetPrefix: "new"})
+	if err != nil {
+		t.Fatalf("adopt should succeed: %v", err)
+	}
+	if result.AdoptedPrefix != "new" || result.MigratedLocal != 0 {
+		t.Errorf("expected adopt new with 0 migrated, got to=%q migrated=%d", result.AdoptedPrefix, result.MigratedLocal)
+	}
+	cfg, _ := store.GetConfig(ctx, "issue_prefix")
+	if cfg != "new" {
+		t.Errorf("configured prefix should be 'new', got %q", cfg)
+	}
+	got, err := store.GetIssue(ctx, "new-1")
+	if err != nil || got == nil {
+		t.Fatalf("new-1 should be imported live: %v", err)
+	}
+}
+
+// TestAutoAdoptPrefix_MultipleUpstreamPrefixesErrors verifies the single-prefix
+// guard: an ambiguous pull with more than one upstream prefix is NOT auto-adopted.
+func TestAutoAdoptPrefix_MultipleUpstreamPrefixesErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "old"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	incoming := []*types.Issue{
+		{ID: "new-1", Title: "One", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+		{ID: "other-1", Title: "Two", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+	}
+	_, err = ImportIssues(ctx, tmpDB, store, incoming, Options{AutoAdoptPrefix: true, AdoptTargetPrefix: "new"})
+	if err == nil {
+		t.Fatal("multiple upstream prefixes should NOT auto-adopt (expected error)")
+	}
+	if !strings.Contains(err.Error(), "prefix mismatch") {
+		t.Errorf("expected prefix mismatch error, got: %v", err)
+	}
+}
+
+// TestAutoAdoptPrefix_DisabledErrorsOnForeignImport verifies that without the
+// AutoAdoptPrefix opt-in (e.g. a manual `bd import -i <foreign-file>`), a single
+// differing prefix still errors rather than silently rewriting a foreign project.
+func TestAutoAdoptPrefix_DisabledErrorsOnForeignImport(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "old"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	incoming := []*types.Issue{
+		{ID: "foreign-1", Title: "Foreign", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+	}
+	_, err = ImportIssues(ctx, tmpDB, store, incoming, Options{}) // AutoAdoptPrefix false
+	if err == nil {
+		t.Fatal("foreign import without AutoAdoptPrefix should error on mismatch")
+	}
+	if !strings.Contains(err.Error(), "prefix mismatch") {
+		t.Errorf("expected prefix mismatch error, got: %v", err)
+	}
+}
+
+// TestAutoAdoptPrefix_UnsignedPrefixErrors verifies the authored-signature guard
+// (BeadsLog-b4p): a single differing prefix that is NOT the one declared in the
+// committed config.yaml (AdoptTargetPrefix) is treated as pollution — e.g. a
+// stray test/CI issue — and still errors rather than silently repointing the
+// repo's prefix to it.
+func TestAutoAdoptPrefix_UnsignedPrefixErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "old"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	// A stray non-tombstone issue under a prefix nobody authored. The committed
+	// config.yaml still declares "old" (AdoptTargetPrefix), so "stray" is not the
+	// signed migration target.
+	incoming := []*types.Issue{
+		{ID: "stray-1", Title: "accidental test issue", Status: types.StatusOpen, Priority: 2, IssueType: types.TypeTask},
+	}
+	_, err = ImportIssues(ctx, tmpDB, store, incoming, Options{AutoAdoptPrefix: true, AdoptTargetPrefix: "old"})
+	if err == nil {
+		t.Fatal("unsigned prefix (not the config.yaml declaration) should NOT auto-adopt; expected error")
+	}
+	if !strings.Contains(err.Error(), "prefix mismatch") {
+		t.Errorf("expected prefix mismatch error, got: %v", err)
+	}
+	// The repo's configured prefix must be untouched.
+	cfg, _ := store.GetConfig(ctx, "issue_prefix")
+	if cfg != "old" {
+		t.Errorf("configured prefix must stay 'old' for an unsigned mismatch, got %q", cfg)
+	}
+}

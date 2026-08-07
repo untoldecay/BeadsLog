@@ -426,4 +426,103 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 18 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 19: Prefix Auto-Adopt On Sync (BeadsLog-b4p)"
+# ---------------------------------------------------------
+# A clone whose DB uses an old prefix pulls a repo where the migration to a new
+# prefix was AUTHORED — the committed config.yaml declares the new prefix (the
+# signature). 'bd sync' must adopt it instead of erroring: repoint the DB prefix,
+# migrate this clone's local issue(s) to the new prefix, tombstone the old IDs,
+# and leave NO live old-prefix line. Guards against the 3-way-merge re-introducing
+# the local issue under its old ID.
+ADOPT="$TEST_DIR/prefix_adopt"
+mkdir -p "$ADOPT" && cd "$ADOPT"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix oldpfx > /dev/null 2>&1
+"$BD_BIN" create --title "my local only work" --type task -p 2 --no-daemon > /dev/null 2>&1
+git add -A && git commit -q -m "seed local oldpfx issue"
+# Upstream standardized on newpfx (a shared issue + a fresh one) AND authored the
+# migration by declaring newpfx in the committed config.yaml.
+cat > .beads/issues.jsonl <<'JSONL'
+{"id":"newpfx-shared","title":"shared work","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-07T00:00:00Z"}
+{"id":"newpfx-fresh","title":"upstream fresh","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-07T00:00:00Z"}
+JSONL
+# Authoring = an uncommented issue-prefix in the committed config.yaml (bd init
+# leaves it commented, so the prefix normally lives only in the DB).
+printf '\nissue-prefix: "newpfx"\n' >> .beads/config.yaml
+git add -A && git commit -q -m "author migration: standardize on newpfx (config.yaml + issues)"
+
+SYNC_OUT=$("$BD_BIN" sync --no-daemon 2>&1 || true)
+if ! echo "$SYNC_OUT" | grep -qi "Adopted upstream prefix 'newpfx-'"; then
+    echo "❌ FAIL: sync did not adopt upstream prefix"
+    echo "$SYNC_OUT"
+    exit 1
+fi
+if echo "$SYNC_OUT" | grep -qi "prefix mismatch detected"; then
+    echo "❌ FAIL: sync still raised prefix mismatch error"
+    exit 1
+fi
+# No live old-prefix line may remain in the JSONL (would re-pollute).
+if grep '"id":"oldpfx' .beads/issues.jsonl | grep -q '"status":"open"'; then
+    echo "❌ FAIL: a live oldpfx issue survived adoption"
+    grep '"id":"oldpfx' .beads/issues.jsonl
+    exit 1
+fi
+# The local issue must survive under the new prefix.
+LIST_OUT=$("$BD_BIN" list --no-daemon 2>&1 || true)
+if ! echo "$LIST_OUT" | grep -q "my local only work"; then
+    echo "❌ FAIL: local issue lost during prefix adoption"
+    exit 1
+fi
+if echo "$LIST_OUT" | grep "my local only work" | grep -q "oldpfx-"; then
+    echo "❌ FAIL: local issue still under old prefix after adoption"
+    exit 1
+fi
+# A second sync must be stable (no adopt, no mismatch).
+RESYNC_OUT=$("$BD_BIN" sync --no-daemon 2>&1 || true)
+if echo "$RESYNC_OUT" | grep -qi "prefix mismatch detected"; then
+    echo "❌ FAIL: second sync re-raised prefix mismatch"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 19 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 20: Unsigned Prefix Does NOT Auto-Adopt (BeadsLog-b4p guard)"
+# ---------------------------------------------------------
+# A stray issue under a prefix nobody authored (config.yaml still declares the
+# original prefix) must NOT be adopted — it errors like before, and the repo's
+# prefix stays put. This is the pollution / test-CI-contamination guard.
+POLL="$TEST_DIR/prefix_pollution"
+mkdir -p "$POLL" && cd "$POLL"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix realpfx > /dev/null 2>&1
+"$BD_BIN" create --title "legit work" --type task -p 2 --no-daemon > /dev/null 2>&1
+git add -A && git commit -q -m "seed"
+# A stray issue sneaks in under an UNauthored prefix; config.yaml still says realpfx.
+printf '{"id":"straypfx-1","title":"accidental","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-07T00:00:00Z"}\n' >> .beads/issues.jsonl
+git add -A && git commit -q -m "stray unauthored prefix"
+
+POLL_OUT=$("$BD_BIN" sync --no-daemon 2>&1 || true)
+if echo "$POLL_OUT" | grep -qi "Adopted upstream prefix 'straypfx-'"; then
+    echo "❌ FAIL: unsigned stray prefix was auto-adopted (should have errored)"
+    echo "$POLL_OUT"
+    exit 1
+fi
+# The repo's prefix must be unchanged: a newly created issue still uses realpfx.
+"$BD_BIN" create --title "after stray" --type task -p 2 --no-daemon > /dev/null 2>&1
+if ! "$BD_BIN" list --no-daemon 2>/dev/null | grep "after stray" | grep -q "realpfx-"; then
+    echo "❌ FAIL: repo prefix changed after an unsigned mismatch"
+    "$BD_BIN" list --no-daemon 2>/dev/null | grep "after stray"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 20 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

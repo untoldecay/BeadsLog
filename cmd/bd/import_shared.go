@@ -163,6 +163,8 @@ type ImportOptions struct {
 	SkipUpdate                 bool              // Skip updating existing issues (create-only mode)
 	Strict                     bool              // Fail on any error (dependencies, labels, etc.)
 	RenameOnImport             bool              // Rename imported issues to match database prefix
+	AutoAdoptPrefix            bool              // Adopt a single upstream prefix from the repo's own sync JSONL (BeadsLog-b4p)
+	AdoptTargetPrefix          string            // Committed config.yaml issue-prefix — the authored migration signature auto-adopt keys off (BeadsLog-b4p)
 	SkipPrefixValidation       bool              // Skip prefix validation (for auto-import)
 	ClearDuplicateExternalRefs bool              // Clear duplicate external_ref values instead of erroring
 	OrphanHandling             string            // Orphan handling mode: strict/resurrect/skip/allow (empty = use config)
@@ -182,6 +184,9 @@ type ImportResult struct {
 	ExpectedPrefix      string            // Database configured prefix
 	MismatchPrefixes    map[string]int    // Map of mismatched prefixes to count
 	SkippedDependencies []string          // Dependencies skipped due to FK constraint violations
+	AdoptedPrefix       string            // Non-empty when auto-adopt repointed the DB prefix (BeadsLog-b4p)
+	AdoptedFrom         string            // The previous prefix replaced by auto-adopt
+	MigratedLocal       int               // Count of local issues migrated to the adopted prefix
 }
 
 // importIssuesCore handles the core import logic used by both manual and auto-import.
@@ -218,6 +223,8 @@ func importIssuesCore(ctx context.Context, dbPath string, store storage.Storage,
 		SkipUpdate:                 opts.SkipUpdate,
 		Strict:                     opts.Strict,
 		RenameOnImport:             opts.RenameOnImport,
+		AutoAdoptPrefix:            opts.AutoAdoptPrefix,
+		AdoptTargetPrefix:          opts.AdoptTargetPrefix,
 		SkipPrefixValidation:       opts.SkipPrefixValidation,
 		ClearDuplicateExternalRefs: opts.ClearDuplicateExternalRefs,
 		OrphanHandling:             importer.OrphanHandling(orphanHandling),
@@ -243,6 +250,9 @@ func importIssuesCore(ctx context.Context, dbPath string, store storage.Storage,
 		ExpectedPrefix:      result.ExpectedPrefix,
 		MismatchPrefixes:    result.MismatchPrefixes,
 		SkippedDependencies: result.SkippedDependencies,
+		AdoptedPrefix:       result.AdoptedPrefix,
+		AdoptedFrom:         result.AdoptedFrom,
+		MigratedLocal:       result.MigratedLocal,
 	}, nil
 }
 

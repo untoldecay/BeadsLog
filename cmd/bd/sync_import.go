@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/debug"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/types"
@@ -36,7 +37,9 @@ func importFromJSONL(ctx context.Context, jsonlPath string, renameOnImport bool,
 
 	// Build args for import command
 	// Use --no-daemon to ensure subprocess uses direct mode, avoiding daemon connection issues
-	args := []string{"--no-daemon", "import", "-i", jsonlPath}
+	// This imports the repo's own tracked sync JSONL, so enable prefix auto-adopt
+	// (BeadsLog-b4p): a single differing upstream prefix is adopted rather than erroring.
+	args := []string{"--no-daemon", "import", "-i", jsonlPath, "--auto-adopt-prefix"}
 	if renameOnImport {
 		args = append(args, "--rename-on-import")
 	}
@@ -104,13 +107,22 @@ func importFromJSONLInline(ctx context.Context, jsonlPath string, renameOnImport
 		return fmt.Errorf("error reading JSONL: %w", err)
 	}
 
-	// Import using shared logic
+	// Import using shared logic. This imports the repo's own tracked sync JSONL,
+	// so enable prefix auto-adopt (BeadsLog-b4p): if the pulled JSONL standardized
+	// on a single upstream prefix that differs from this clone's, adopt it instead
+	// of erroring — the clone must adopt it to keep working with the team.
 	opts := ImportOptions{
-		RenameOnImport: renameOnImport,
+		RenameOnImport:    renameOnImport,
+		AutoAdoptPrefix:   true,
+		AdoptTargetPrefix: config.GetString("issue-prefix"), // authored migration signature (committed config.yaml)
 	}
 	result, err := importIssuesCore(ctx, dbPath, store, allIssues, opts)
 	if err != nil {
 		return fmt.Errorf("import failed: %w", err)
+	}
+	if result.AdoptedPrefix != "" {
+		fmt.Printf("✓ Adopted upstream prefix '%s-' (was '%s-'); migrated %d local issue(s)\n",
+			result.AdoptedPrefix, result.AdoptedFrom, result.MigratedLocal)
 	}
 
 	// Update staleness metadata (same as import.go lines 386-411)

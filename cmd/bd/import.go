@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/debug"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/types"
@@ -94,6 +95,7 @@ NOTE: Import requires direct database access and does not work with daemon mode.
 		strict, _ := cmd.Flags().GetBool("strict")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		renameOnImport, _ := cmd.Flags().GetBool("rename-on-import")
+		autoAdoptPrefix, _ := cmd.Flags().GetBool("auto-adopt-prefix")
 		dedupeAfter, _ := cmd.Flags().GetBool("dedupe-after")
 		clearDuplicateExternalRefs, _ := cmd.Flags().GetBool("clear-duplicate-external-refs")
 		orphanHandling, _ := cmd.Flags().GetString("orphan-handling")
@@ -258,6 +260,8 @@ NOTE: Import requires direct database access and does not work with daemon mode.
 			SkipUpdate:                 skipUpdate,
 			Strict:                     strict,
 			RenameOnImport:             renameOnImport,
+			AutoAdoptPrefix:            autoAdoptPrefix,
+			AdoptTargetPrefix:          config.GetString("issue-prefix"), // authored migration signature (committed config.yaml)
 			ClearDuplicateExternalRefs: clearDuplicateExternalRefs,
 			OrphanHandling:             orphanHandling,
 		}
@@ -418,6 +422,12 @@ NOTE: Import requires direct database access and does not work with daemon mode.
 		// Fix for: refusing to export: JSONL is newer than database (import first to avoid data loss)
 		if err := TouchDatabaseFile(dbPath, input); err != nil {
 			debug.Logf("Warning: failed to update database mtime: %v", err)
+		}
+
+		// Report prefix auto-adoption (BeadsLog-b4p) before the stats line.
+		if result.AdoptedPrefix != "" {
+			fmt.Fprintf(os.Stderr, "✓ Adopted upstream prefix '%s-' (was '%s-'); migrated %d local issue(s)\n",
+				result.AdoptedPrefix, result.AdoptedFrom, result.MigratedLocal)
 		}
 
 		// Print summary
@@ -785,6 +795,7 @@ func init() {
 	importCmd.Flags().Bool("dedupe-after", false, "Detect and report content duplicates after import")
 	importCmd.Flags().Bool("dry-run", false, "Preview collision detection without making changes")
 	importCmd.Flags().Bool("rename-on-import", false, "Rename imported issues to match database prefix (updates all references)")
+	importCmd.Flags().Bool("auto-adopt-prefix", false, "Adopt a single upstream prefix from the repo's own sync JSONL: repoint DB prefix and migrate local issues (used by bd sync)")
 	importCmd.Flags().Bool("clear-duplicate-external-refs", false, "Clear duplicate external_ref values (keeps first occurrence)")
 	importCmd.Flags().String("orphan-handling", "", "How to handle missing parent issues: strict/resurrect/skip/allow (default: use config or 'allow')")
 	importCmd.Flags().Bool("force", false, "Force metadata update even when database is already in sync with JSONL")
