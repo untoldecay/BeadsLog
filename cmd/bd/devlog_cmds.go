@@ -691,11 +691,16 @@ var devlogSyncCmd = &cobra.Command{
 // entities/relationships or containing placeholder text) and ghosts (index
 // entries whose markdown file no longer exists on disk).
 func devlogHealthCounts(db *sql.DB) (incomplete, ghosts int) {
+	// enrichment_status = 2 (ai_crystallized) is terminal: AI extraction already
+	// ran, so a session still lacking entities/deps has nothing left to extract
+	// and must not be flagged forever (BeadsLog-ftw). Stub-template sessions
+	// stay flagged regardless — that's an authoring problem, not extraction.
 	_ = db.QueryRow(`
 		SELECT COUNT(DISTINCT id)
 		FROM sessions
-		WHERE ((id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+		WHERE (((id NOT IN (SELECT DISTINCT session_id FROM session_entities)
 		OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+		AND IFNULL(enrichment_status, 0) != 2)
 		OR (narrative LIKE '%<!-- Describe the technical context -->%'
 		OR narrative LIKE '%- [ ] Task 1%'))
 		AND narrative NOT LIKE '%No architectural changes%'
@@ -2187,11 +2192,14 @@ var devlogVerifyCmd = &cobra.Command{
 		// ... (Skip missing check if targeting)
 
 		// 2. Sessions without entities OR relationships (INCOMPLETE)
+		// IFNULL(enrichment_status,0) != 2 — AI-crystallized sessions are
+		// terminal even with zero edges (BeadsLog-ftw): AI already ran.
 		query := `
 			SELECT DISTINCT id, title, filename, narrative
-			FROM sessions 
+			FROM sessions
 			WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
 			OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+			AND IFNULL(enrichment_status, 0) != 2
 			AND narrative NOT LIKE '%No architectural changes%'
 		`
 		var queryArgs []interface{}
@@ -2313,7 +2321,27 @@ var devlogVerifyCmd = &cobra.Command{
 						}
 					}
 				}
-				fmt.Println("✅ Backfill complete.")
+
+				// Honest completion report (BeadsLog-ftw): regex extraction can be
+				// fully noise-filtered, leaving sessions incomplete no matter how
+				// often --fix runs. Re-check and say so instead of claiming success.
+				var remaining int
+				_ = db.QueryRow(`
+					SELECT COUNT(DISTINCT id)
+					FROM sessions
+					WHERE (id NOT IN (SELECT DISTINCT session_id FROM session_entities)
+					OR id NOT IN (SELECT DISTINCT discovered_in FROM entity_deps))
+					AND IFNULL(enrichment_status, 0) != 2
+					AND narrative NOT LIKE '%No architectural changes%'
+				`).Scan(&remaining)
+				if remaining > 0 {
+					fmt.Printf("⚠️  %d session(s) still incomplete: their extracted entities/relationships were filtered as noise.\n", remaining)
+					fmt.Println("    Regex extraction cannot clear these. Instead:")
+					fmt.Println("    • Run 'bd devlog verify --fix-ai' or 'bd devlog enrich --all' (AI extraction), or")
+					fmt.Println("    • Add the '_No architectural changes_' marker to sessions with genuinely no edges.")
+				} else {
+					fmt.Println("✅ Backfill complete.")
+				}
 			}
 
 			if len(orphans) == 0 && len(incomplete) == 0 {

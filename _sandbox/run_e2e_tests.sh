@@ -349,4 +349,39 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 16 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 17: Verify --fix Noise Deadlock (BeadsLog-ftw regression)"
+# ---------------------------------------------------------
+# A session whose entities are all noise words can never be cleared by regex
+# backfill (the noise filter drops everything). --fix must say so honestly,
+# and an AI-crystallized session (enrichment_status=2) must stop being flagged.
+FTW="$TEST_DIR/ftw_noise"
+mkdir -p "$FTW" && cd "$FTW"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix ftw > /dev/null 2>&1
+mkdir -p _rules/_devlog
+printf '# Noise session\n\n## Problem\nfix the code and sync the database\n\n## Entities\n- code\n- database\n\n## Architectural Relationships\n- code -> database\n' > _rules/_devlog/2026-08-07_noise.md
+"$BD_BIN" devlog record --subject "noise test" --problem "test" --file "_rules/_devlog/2026-08-07_noise.md" --no-daemon > /dev/null 2>&1
+
+FIX_OUT=$("$BD_BIN" devlog verify --fix --fix-regex --no-daemon 2>&1 || true)
+if ! echo "$FIX_OUT" | grep -q "Regex extraction cannot clear these"; then
+    echo "❌ FAIL: --fix did not report the noise-filter deadlock honestly"
+    echo "$FIX_OUT" | tail -5
+    exit 1
+fi
+
+# Simulate AI crystallization: verify must then treat the session as terminal
+sqlite3 .beads/beads.db "PRAGMA trusted_schema=1; UPDATE sessions SET enrichment_status = 2;"
+VERIFY_OUT=$("$BD_BIN" devlog verify --no-daemon 2>&1 || true)
+if ! echo "$VERIFY_OUT" | grep -q "All sessions have linked entities"; then
+    echo "❌ FAIL: AI-crystallized session still flagged incomplete"
+    echo "$VERIFY_OUT" | tail -3
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 17 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
