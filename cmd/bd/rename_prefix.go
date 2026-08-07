@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/syncbranch"
@@ -183,6 +184,7 @@ NOTE: This is a rare operation. Most users never need this command.`,
 					fmt.Fprintf(os.Stderr, "Error: failed to update prefix: %v\n", err)
 					os.Exit(1)
 				}
+				writePrefixSignature(newPrefix)
 			}
 			return
 		}
@@ -209,6 +211,10 @@ NOTE: This is a rare operation. Most users never need this command.`,
 			fmt.Fprintf(os.Stderr, "Error: failed to rename prefix: %v\n", err)
 			os.Exit(1)
 		}
+
+		// Declare the new prefix in config.yaml so the migration is authored and
+		// teammates auto-adopt it on sync (BeadsLog-b4p).
+		writePrefixSignature(newPrefix)
 
 		// Force export to JSONL with new IDs
 		// Safe because we imported all JSONL issues before rename
@@ -253,6 +259,21 @@ NOTE: This is a rare operation. Most users never need this command.`,
 			_ = enc.Encode(result)
 		}
 	},
+}
+
+// writePrefixSignature records the new prefix in the committed config.yaml — the
+// authored migration "signature" (BeadsLog-b4p). Whoever commits this declares
+// the team's prefix, so teammates' `bd sync` auto-adopts it (a prefix that only
+// appears in the JSONL without this declaration is treated as pollution and
+// errors). This is what turns a local rename-prefix into a shareable migration.
+func writePrefixSignature(newPrefix string) {
+	if err := config.SetYamlConfig("issue-prefix", newPrefix); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: renamed the database prefix but failed to declare it in config.yaml: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Teammates will NOT auto-adopt until config.yaml sets 'issue-prefix: \"%s\"'.\n", newPrefix)
+		return
+	}
+	fmt.Printf("%s Declared 'issue-prefix: \"%s\"' in config.yaml (authored migration signature)\n", ui.RenderPass("✓"), newPrefix)
+	fmt.Printf("  Commit .beads/config.yaml + .beads/issues.jsonl and push so teammates auto-adopt on sync.\n")
 }
 
 func validatePrefix(prefix string) error {
@@ -437,6 +458,10 @@ func repairPrefixes(ctx context.Context, st storage.Storage, actorName string, t
 	if err := st.SetConfig(ctx, "issue_prefix", targetPrefix); err != nil {
 		return fmt.Errorf("failed to update config: %w", err)
 	}
+
+	// Declare the consolidated prefix in config.yaml so the migration is authored
+	// and teammates auto-adopt it on sync (BeadsLog-b4p).
+	writePrefixSignature(targetPrefix)
 
 	// Force export to JSONL with new IDs
 	// Safe because we imported all JSONL issues before repair (done in caller)

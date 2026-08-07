@@ -525,4 +525,56 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 20 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 21: rename-prefix Authors The Signature + Teammate Adopts (BeadsLog-b4p)"
+# ---------------------------------------------------------
+# Full round-trip: a migrator runs 'bd rename-prefix', which must both rename the
+# DB issues AND declare the new prefix in config.yaml (the signature). A teammate
+# clone still on the old prefix then adopts it on sync — including migrating the
+# teammate's own local work.
+MIG="$TEST_DIR/migrator"
+mkdir -p "$MIG" && cd "$MIG"
+git init -q -b main
+git config user.name "Migrator"
+git config user.email "mig@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix oldteam > /dev/null 2>&1
+"$BD_BIN" create --title "issue one" --type task -p 2 --no-daemon > /dev/null 2>&1
+RENAME_OUT=$("$BD_BIN" rename-prefix newteam --no-daemon 2>&1 || true)
+if ! echo "$RENAME_OUT" | grep -qi "Declared 'issue-prefix: \"newteam\"' in config.yaml"; then
+    echo "❌ FAIL: rename-prefix did not declare the signature in config.yaml"
+    echo "$RENAME_OUT"
+    exit 1
+fi
+if ! grep -q '^issue-prefix: "newteam"' .beads/config.yaml; then
+    echo "❌ FAIL: config.yaml missing uncommented issue-prefix after rename-prefix"
+    exit 1
+fi
+git add -A && git commit -q -m "migrate oldteam->newteam"
+
+# Teammate: independent clone still on oldteam with local work, then pulls.
+TMATE="$TEST_DIR/tmate"
+mkdir -p "$TMATE" && cd "$TMATE"
+git init -q -b main
+git config user.name "Teammate"
+git config user.email "tm@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix oldteam > /dev/null 2>&1
+"$BD_BIN" create --title "teammate wip" --type task -p 2 --no-daemon > /dev/null 2>&1
+git add -A && git commit -q -m "teammate local"
+cp "$MIG/.beads/config.yaml" .beads/config.yaml
+cp "$MIG/.beads/issues.jsonl" .beads/issues.jsonl
+git add -A && git commit -q -m "pull migrator standardization"
+TM_SYNC=$("$BD_BIN" sync --no-daemon 2>&1 || true)
+if ! echo "$TM_SYNC" | grep -qi "Adopted upstream prefix 'newteam-'"; then
+    echo "❌ FAIL: teammate did not auto-adopt the authored prefix"
+    echo "$TM_SYNC"
+    exit 1
+fi
+if "$BD_BIN" list --no-daemon 2>/dev/null | grep "teammate wip" | grep -q "oldteam-"; then
+    echo "❌ FAIL: teammate's local work not migrated to the new prefix"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 21 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
