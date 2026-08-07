@@ -163,14 +163,17 @@ func (fc *fieldComparator) checkFieldChanged(key string, existing *types.Issue, 
 //
 // All text references to old IDs in issue fields (title, description, notes, etc.) and
 // dependency relationships are updated to use the new IDs.
-func RenameImportedIssuePrefixes(issues []*types.Issue, targetPrefix string) error {
+//
+// Returns the oldID → newID mapping so callers can persist the rename beyond
+// the database (e.g., tombstone the old IDs so the shared JSONL heals too).
+func RenameImportedIssuePrefixes(issues []*types.Issue, targetPrefix string) (map[string]string, error) {
 	// Build a mapping of old IDs to new IDs
 	idMapping := make(map[string]string)
 
 	for _, issue := range issues {
 		oldPrefix := utils.ExtractIssuePrefix(issue.ID)
 		if oldPrefix == "" {
-			return fmt.Errorf("cannot rename issue %s: malformed ID (no hyphen found)", issue.ID)
+			return nil, fmt.Errorf("cannot rename issue %s: malformed ID (no hyphen found)", issue.ID)
 		}
 
 		if oldPrefix != targetPrefix {
@@ -179,7 +182,7 @@ func RenameImportedIssuePrefixes(issues []*types.Issue, targetPrefix string) err
 
 			// Validate that the suffix is valid (alphanumeric + dots for hierarchy)
 			if suffix == "" || !isValidIDSuffix(suffix) {
-				return fmt.Errorf("cannot rename issue %s: invalid suffix '%s'", issue.ID, suffix)
+				return nil, fmt.Errorf("cannot rename issue %s: invalid suffix '%s'", issue.ID, suffix)
 			}
 
 			newID := fmt.Sprintf("%s-%s", targetPrefix, suffix)
@@ -223,7 +226,7 @@ func RenameImportedIssuePrefixes(issues []*types.Issue, targetPrefix string) err
 		}
 	}
 
-	return nil
+	return idMapping, nil
 }
 
 // replaceIDReferences replaces all old issue ID references with new ones in text

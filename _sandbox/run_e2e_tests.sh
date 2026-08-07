@@ -384,4 +384,46 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 17 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 18: Prefix Rename Persists To JSONL (BeadsLog-1tz regression)"
+# ---------------------------------------------------------
+# 'bd sync --rename-on-import' must heal the shared JSONL permanently:
+# renamed issue survives under the new prefix, old ID becomes a tombstone,
+# and subsequent plain syncs never re-raise the prefix mismatch error.
+PFX="$TEST_DIR/prefix_migration"
+mkdir -p "$PFX" && cd "$PFX"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix newpfx > /dev/null 2>&1
+"$BD_BIN" create --title "native issue" --type task -p 2 --no-daemon > /dev/null 2>&1
+printf '{"id":"oldpfx-abc","title":"legacy issue","status":"open","priority":2,"issue_type":"task","created_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"}\n' >> .beads/issues.jsonl
+git add -A && git commit -q -m "seed with legacy prefix"
+
+"$BD_BIN" sync --rename-on-import --no-daemon > /dev/null 2>&1
+
+if ! grep -q '"id":"newpfx-abc"' .beads/issues.jsonl; then
+    echo "❌ FAIL: renamed issue newpfx-abc missing from JSONL (data loss)"
+    grep -o '"id":"[^"]*"' .beads/issues.jsonl
+    exit 1
+fi
+if ! grep '"id":"oldpfx-abc"' .beads/issues.jsonl | grep -q '"status":"tombstone"'; then
+    echo "❌ FAIL: old ID not tombstoned in JSONL"
+    exit 1
+fi
+
+RESYNC_OUT=$("$BD_BIN" sync --no-daemon 2>&1 || true)
+if echo "$RESYNC_OUT" | grep -q "prefix mismatch detected"; then
+    echo "❌ FAIL: plain re-sync still raises prefix mismatch"
+    exit 1
+fi
+LIST_OUT=$("$BD_BIN" list --no-daemon 2>&1 || true)
+if ! echo "$LIST_OUT" | grep -q "legacy issue"; then
+    echo "❌ FAIL: renamed legacy issue not listed after migration"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 18 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

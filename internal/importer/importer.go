@@ -292,9 +292,53 @@ func handlePrefixMismatch(ctx context.Context, sqliteStore *sqlite.SQLiteStorage
 
 	// Handle rename-on-import if requested
 	if result.PrefixMismatch && opts.RenameOnImport && !opts.DryRun {
-		if err := RenameImportedIssuePrefixes(issues, configuredPrefix); err != nil {
+		idMapping, err := RenameImportedIssuePrefixes(issues, configuredPrefix)
+		if err != nil {
 			return nil, fmt.Errorf("failed to rename prefixes: %w", err)
 		}
+
+		// Persist the rename beyond the database (BeadsLog-1tz): tombstone every
+		// old ID so the export/merge pipeline replaces the stale live lines in
+		// the shared JSONL and teammates' clones delete their copies instead of
+		// resurrecting the old prefix on every sync. Old-prefix tombstones are
+		// already recognized as benign by this function ("all are tombstones"),
+		// so subsequent imports stop erroring, and TTL compaction purges them.
+		now := time.Now()
+		renamedByNewID := buildIDMap(issues)
+		// A rename is an update: bump UpdatedAt on renamed issues so LWW merge
+		// prefers the new-ID version over the stale old-ID line still in the
+		// JSONL — otherwise content-hash matching resolves toward the old ID,
+		// which then loses to its tombstone and the issue is silently dropped.
+		for _, newID := range idMapping {
+			if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
+				renamed.UpdatedAt = now
+			}
+		}
+		for oldID, newID := range idMapping {
+			tomb := &types.Issue{
+				ID:           oldID,
+				Title:        "[renamed] " + newID,
+				Status:       types.StatusTombstone,
+				UpdatedAt:    now, // newer than the stale live line so LWW keeps the tombstone
+				DeletedAt:    &now,
+				DeletedBy:    "rename-on-import",
+				DeleteReason: "Renamed to " + newID + " (prefix migration)",
+			}
+			if renamed, ok := renamedByNewID[newID]; ok && renamed != nil {
+				tomb.IssueType = renamed.IssueType
+				tomb.Priority = renamed.Priority
+				tomb.CreatedAt = renamed.CreatedAt
+				tomb.OriginalType = string(renamed.IssueType)
+			}
+			if tomb.IssueType == "" {
+				tomb.IssueType = types.TypeTask
+			}
+			if tomb.CreatedAt.IsZero() {
+				tomb.CreatedAt = now
+			}
+			issues = append(issues, tomb)
+		}
+
 		// After renaming, clear the mismatch flags since we fixed them
 		result.PrefixMismatch = false
 		result.MismatchPrefixes = make(map[string]int)
@@ -508,6 +552,10 @@ func upsertIssues(ctx context.Context, sqliteStore *sqlite.SQLiteStorage, issues
 	dbByHash := buildHashMap(dbIssues)
 	dbByID := buildIDMap(dbIssues)
 
+	// Used to tell prefix-migration renames apart from cross-project duplicates
+	// in the content-hash match phase (BeadsLog-1tz).
+	configuredPrefix, _ := sqliteStore.GetConfig(ctx, "issue_prefix")
+
 	// Build external_ref map for O(1) lookup
 	dbByExternalRef := make(map[string]*types.Issue)
 	for _, issue := range dbIssues {
@@ -636,11 +684,27 @@ func upsertIssues(ctx context.Context, sqliteStore *sqlite.SQLiteStorage, issues
 				incomingPrefix := utils.ExtractIssuePrefix(incoming.ID)
 
 				if existingPrefix != incomingPrefix {
-					// Cross-prefix content match: same content but different projects/prefixes.
-					// This is NOT a rename - it's a duplicate from another project.
-					// Skip the incoming issue and keep the existing one unchanged.
-					// Calling handleRename would fail because CreateIssue validates prefix.
-					result.Skipped++
+					if configuredPrefix != "" && incomingPrefix == configuredPrefix && !opts.SkipUpdate {
+						// The incoming ID carries the database's configured prefix and
+						// the existing row doesn't: this is a prefix-migration rename
+						// (e.g. --rename-on-import after auto-import let a foreign
+						// prefix in). Adopt the canonical ID and drop the old one —
+						// skipping here silently loses the renamed issue (BeadsLog-1tz).
+						deletedID, err := handleRename(ctx, sqliteStore, existing, incoming)
+						if err != nil {
+							return fmt.Errorf("failed to handle prefix-migration rename %s -> %s: %w", existing.ID, incoming.ID, err)
+						}
+						if deletedID != "" {
+							delete(dbByID, deletedID)
+						}
+						result.Updated++
+					} else {
+						// Cross-prefix content match: same content but different projects/prefixes.
+						// This is NOT a rename - it's a duplicate from another project.
+						// Skip the incoming issue and keep the existing one unchanged.
+						// Calling handleRename would fail because CreateIssue validates prefix.
+						result.Skipped++
+					}
 				} else if !opts.SkipUpdate {
 					// Same prefix, different ID suffix - this is a true rename
 					deletedID, err := handleRename(ctx, sqliteStore, existing, incoming)

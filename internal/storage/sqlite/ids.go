@@ -228,7 +228,10 @@ func EnsureIDs(ctx context.Context, conn *sql.Conn, prefix string, issues []*typ
 
 			// Validate that explicitly provided ID matches the configured prefix (bd-177)
 			// Skip validation during import to allow issues with different prefixes (e.g., from renamed repos)
-			if !skipPrefixValidation {
+			// Tombstones are exempt: they are deletions, not new work, and old-prefix
+			// tombstones are the mechanism by which prefix renames propagate to the
+			// shared JSONL and teammates' clones (BeadsLog-1tz).
+			if !skipPrefixValidation && !issues[i].IsTombstone() {
 				if err := ValidateIssueIDPrefix(issues[i].ID, prefix); err != nil {
 					return wrapDBErrorf(err, "validate ID prefix for %s", issues[i].ID)
 				}

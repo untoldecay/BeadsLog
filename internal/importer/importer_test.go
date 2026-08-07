@@ -269,7 +269,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -286,7 +286,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			{ID: "other-3", Title: "Issue 3"},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -317,7 +317,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -346,7 +346,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -380,7 +380,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -395,7 +395,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			{ID: "nohyphen", Title: "Invalid"},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err == nil {
 			t.Error("Expected error for malformed ID")
 		}
@@ -407,7 +407,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			{ID: "old-a3f8", Title: "Hash suffix issue"},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "new")
+		_, err := RenameImportedIssuePrefixes(issues, "new")
 		if err != nil {
 			t.Errorf("Unexpected error for hash-based suffix: %v", err)
 		}
@@ -421,7 +421,7 @@ func TestRenameImportedIssuePrefixes(t *testing.T) {
 			{ID: "same-1", Title: "Issue 1"},
 		}
 
-		err := RenameImportedIssuePrefixes(issues, "same")
+		_, err := RenameImportedIssuePrefixes(issues, "same")
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -1707,4 +1707,156 @@ func TestMultiRepoPrefixValidation(t *testing.T) {
 			t.Error("Multi-repo mode should not report prefix mismatch")
 		}
 	})
+}
+
+// TestRenameOnImport_EmitsTombstonesForOldIDs is a regression test for BeadsLog-1tz.
+//
+// Bug: `bd sync --rename-on-import` renamed prefixes only on the DB side. The
+// stale old-prefix lines in the shared JSONL were never neutralized, so the
+// mismatch recurred on every import and teammates resurrected the old prefix
+// via LWW merge.
+//
+// Fix: rename-on-import now emits a tombstone for every old ID so the export
+// pipeline replaces the stale live lines and clones delete their copies. This
+// test asserts that after a rename-on-import, the renamed issue is live under
+// the configured prefix AND a tombstone exists for the old ID.
+func TestRenameOnImport_EmitsTombstonesForOldIDs(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	// Database is configured for "bd", but the incoming issue carries the stale
+	// "old" prefix (the pollution --rename-on-import is meant to migrate).
+	if err := store.SetConfig(ctx, "issue_prefix", "bd"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	issues := []*types.Issue{
+		{
+			ID:        "old-1t",
+			Title:     "Needs migrating",
+			Status:    types.StatusOpen,
+			Priority:  2,
+			IssueType: types.TypeBug,
+		},
+	}
+
+	result, err := ImportIssues(ctx, tmpDB, store, issues, Options{RenameOnImport: true})
+	if err != nil {
+		t.Fatalf("rename-on-import should succeed: %v", err)
+	}
+	if result.PrefixMismatch {
+		t.Error("PrefixMismatch should be cleared after rename-on-import")
+	}
+
+	all, err := store.SearchIssues(ctx, "", types.IssueFilter{IncludeTombstones: true})
+	if err != nil {
+		t.Fatalf("Failed to search issues: %v", err)
+	}
+
+	var renamed, tomb *types.Issue
+	for _, i := range all {
+		switch i.ID {
+		case "bd-1t":
+			renamed = i
+		case "old-1t":
+			tomb = i
+		}
+	}
+
+	// The renamed issue must be live under the configured prefix.
+	if renamed == nil {
+		t.Fatal("expected renamed issue bd-1t to exist after rename-on-import")
+	}
+	if renamed.Status == types.StatusTombstone {
+		t.Error("renamed issue bd-1t should be live, not a tombstone")
+	}
+	if renamed.Title != "Needs migrating" {
+		t.Errorf("renamed issue should preserve title, got %q", renamed.Title)
+	}
+
+	// The old ID must survive as a tombstone so the shared JSONL heals and
+	// teammates delete their old-prefix copy instead of resurrecting it.
+	if tomb == nil {
+		t.Fatal("expected a tombstone for old ID old-1t after rename-on-import (BeadsLog-1tz)")
+	}
+	if tomb.Status != types.StatusTombstone {
+		t.Errorf("old-1t should be a tombstone, got status %q", tomb.Status)
+	}
+	if tomb.DeletedBy != "rename-on-import" {
+		t.Errorf("tombstone DeletedBy should be 'rename-on-import', got %q", tomb.DeletedBy)
+	}
+	if !strings.Contains(tomb.DeleteReason, "bd-1t") {
+		t.Errorf("tombstone DeleteReason should reference the new ID, got %q", tomb.DeleteReason)
+	}
+}
+
+// TestHandlePrefixMismatch_BumpsUpdatedAtOnRename is a regression test for the
+// LWW half of BeadsLog-1tz. The old-ID tombstone and the still-present stale
+// old-ID live line both flow through merge; the renamed issue must carry a
+// fresh UpdatedAt so LWW prefers the new-ID version instead of resolving toward
+// the old ID (which would then lose to its own tombstone and drop the issue).
+func TestHandlePrefixMismatch_BumpsUpdatedAtOnRename(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDB := t.TempDir() + "/test.db"
+	store, err := sqlite.New(context.Background(), tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetConfig(ctx, "issue_prefix", "bd"); err != nil {
+		t.Fatalf("Failed to set prefix: %v", err)
+	}
+
+	stale := time.Now().Add(-48 * time.Hour)
+	issues := []*types.Issue{
+		{
+			ID:        "old-1t",
+			Title:     "Needs migrating",
+			Status:    types.StatusOpen,
+			Priority:  2,
+			IssueType: types.TypeBug,
+			CreatedAt: stale,
+			UpdatedAt: stale, // stale timestamp from the old-prefix era
+		},
+	}
+
+	result := &Result{PrefixMismatch: true, MismatchPrefixes: map[string]int{"old": 1}}
+	out, err := handlePrefixMismatch(ctx, store, issues, Options{RenameOnImport: true}, result)
+	if err != nil {
+		t.Fatalf("handlePrefixMismatch failed: %v", err)
+	}
+
+	var renamed, tomb *types.Issue
+	for _, i := range out {
+		switch i.ID {
+		case "bd-1t":
+			renamed = i
+		case "old-1t":
+			tomb = i
+		}
+	}
+	if renamed == nil {
+		t.Fatal("expected renamed issue bd-1t in output")
+	}
+	if tomb == nil {
+		t.Fatal("expected old-1t tombstone in output")
+	}
+	// The rename counts as an update: UpdatedAt must be bumped past the stale
+	// value so LWW keeps the new-ID version.
+	if !renamed.UpdatedAt.After(stale) {
+		t.Errorf("renamed issue UpdatedAt should be bumped past stale %v, got %v", stale, renamed.UpdatedAt)
+	}
+	// The tombstone must be at least as new as the renamed issue so it outranks
+	// any stale old-ID live line still in the JSONL.
+	if tomb.UpdatedAt.Before(renamed.UpdatedAt) {
+		t.Errorf("tombstone UpdatedAt (%v) should not predate renamed issue (%v)", tomb.UpdatedAt, renamed.UpdatedAt)
+	}
 }
