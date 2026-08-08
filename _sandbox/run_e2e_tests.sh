@@ -696,14 +696,14 @@ git config user.name "E2E Tester"
 git config user.email "e2e@example.com"
 "$BD_BIN" init --quiet --no-daemon --prefix q9o > /dev/null 2>&1
 
-# Machine A acks
-"$BD_BIN" upgrade ack --no-daemon > /dev/null 2>&1
+# Machine A: onboard records seen-state per-machine
+"$BD_BIN" onboard --no-daemon > /dev/null 2>&1
 if [ ! -f .beads/.local_changelog_seen ]; then
-    echo "❌ FAIL: ack did not write per-machine .local_changelog_seen"
+    echo "❌ FAIL: onboard did not write per-machine .local_changelog_seen"
     exit 1
 fi
 if grep -q "last-seen-changelog" .beads/config.yaml 2>/dev/null; then
-    echo "❌ FAIL: ack wrote seen-state into committed config.yaml (leaks across clones)"
+    echo "❌ FAIL: seen-state written into committed config.yaml (leaks across clones)"
     exit 1
 fi
 if git status --porcelain 2>/dev/null | grep -q "local_changelog_seen"; then
@@ -725,5 +725,28 @@ fi
 
 cd "$TEST_DIR"
 echo "✅ Test 25 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 26: bd upgrade Consolidated To Single Command (BeadsLog-q9o.2)"
+# ---------------------------------------------------------
+# status/review/ack/check subcommands must be gone; the root command reports
+# current version. Network-tolerant: --json always carries current_version.
+HELP_OUT=$("$BD_BIN" upgrade --help --no-daemon 2>&1 || true)
+for sub in "status" "review" "ack" "check"; do
+    # Match a subcommand listing line (indented "  <name> "), not prose mentions
+    if echo "$HELP_OUT" | grep -qE "^\s+$sub\s"; then
+        echo "❌ FAIL: 'bd upgrade' still exposes removed subcommand '$sub'"
+        exit 1
+    fi
+done
+JSON_OUT=$("$BD_BIN" upgrade --json --no-daemon 2>&1 || true)
+if ! echo "$JSON_OUT" | grep -q '"current_version"'; then
+    echo "❌ FAIL: 'bd upgrade --json' missing current_version"
+    echo "$JSON_OUT" | tail -3
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 26 Passed."
 
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

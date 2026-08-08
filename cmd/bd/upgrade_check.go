@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/changelog"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -22,61 +21,61 @@ const (
 	UpdateCommand      = "go install github.com/untoldecay/BeadsLog/cmd/bd@main"
 )
 
-var upgradeCheckCmd = &cobra.Command{
-	Use:   "check",
-	Short: "Check for new tool versions on GitHub",
-	Run: func(cmd *cobra.Command, args []string) {
-		force, _ := cmd.Flags().GetBool("force")
-		install, _ := cmd.Flags().GetBool("install")
-
-		fmt.Printf("Checking for updates at %s...\n", RemoteChangelogURL)
-		
-		latestVersion, err := fetchRemoteVersion()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking remote version: %v\n", err)
-			os.Exit(1)
-		}
-
-		if !changelog.IsNewer(latestVersion, Version) && !force {
-			fmt.Printf("✓ You are up to date (v%s)\n", Version)
-			return
-		}
-
-		fmt.Printf("✨ New version available: %s (Current: %s)\n", latestVersion, Version)
-		fmt.Println("\nTo update, run:")
-		fmt.Printf("  %s\n", ui.RenderAccent(UpdateCommand))
-
-		if install || ui.PromptYesNo("Do you want to install the update now?", false) {
-			runUpdate()
-		}
-	},
-}
-
-func fetchRemoteVersion() (string, error) {
+// fetchRemoteChangelog fetches the remote changelog.go once and returns the
+// latest version plus a best-effort list of that version's Features bullets,
+// so `bd upgrade` can surface what's new without the new binary installed.
+func fetchRemoteChangelog() (version string, features []string, err error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(RemoteChangelogURL)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch remote changelog: %s", resp.Status)
+		return "", nil, fmt.Errorf("failed to fetch remote changelog: %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
+	text := string(body)
 
-	// Regex to extract const CurrentVersion = "X.Y.Z"
 	re := regexp.MustCompile(`const\s+CurrentVersion\s+=\s+"([^"]+)"`)
-	matches := re.FindStringSubmatch(string(body))
+	matches := re.FindStringSubmatch(text)
 	if len(matches) < 2 {
-		return "", fmt.Errorf("could not find version string in remote changelog")
+		return "", nil, fmt.Errorf("could not find version string in remote changelog")
 	}
+	return matches[1], extractLatestFeatures(text), nil
+}
 
-	return matches[1], nil
+// extractLatestFeatures pulls the quoted strings from the FIRST Features block
+// in the changelog source (entries are newest-first, so that's the latest
+// version). Best-effort — returns nil if the shape doesn't match.
+func extractLatestFeatures(text string) []string {
+	start := strings.Index(text, "Features: []string{")
+	if start == -1 {
+		return nil
+	}
+	rest := text[start:]
+	end := strings.Index(rest, "}")
+	if end == -1 {
+		return nil
+	}
+	quoted := regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`).FindAllStringSubmatch(rest[:end], -1)
+	var features []string
+	for _, m := range quoted {
+		features = append(features, strings.ReplaceAll(m[1], `\"`, `"`))
+	}
+	return features
+}
+
+// fetchRemoteVersion is the thin version-only wrapper used by the background
+// update check.
+func fetchRemoteVersion() (string, error) {
+	v, _, err := fetchRemoteChangelog()
+	return v, err
 }
 
 func runUpdate() {
@@ -120,13 +119,7 @@ func maybeCheckForUpdates() {
 
 		if changelog.IsNewer(latest, Version) {
 			fmt.Printf("\n%s A new version of BeadsLog is available: %s (Current: %s)\n", ui.RenderAccent("✨"), latest, Version)
-			fmt.Printf("   Run %s to update.\n", ui.RenderAccent("bd upgrade check --install"))
+			fmt.Printf("   Run %s to review and install.\n", ui.RenderAccent("bd upgrade"))
 		}
 	}()
-}
-
-func init() {
-	upgradeCheckCmd.Flags().Bool("force", false, "Force check even if already on latest version")
-	upgradeCheckCmd.Flags().Bool("install", false, "Automatically install if an update is found")
-	upgradeCmd.AddCommand(upgradeCheckCmd)
 }

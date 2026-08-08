@@ -171,8 +171,7 @@ func maybeShowUpgradeNotification() {
 
 	// Display notification
 	fmt.Printf("🔄 bd upgraded from v%s to v%s since last use\n", previousVersion, Version)
-	fmt.Println("💡 Run 'bd upgrade review' to see what changed")
-	fmt.Println("💊 Run 'bd doctor' to verify upgrade completed cleanly")
+	fmt.Println("💡 Run 'bd refresh' to sync your repo to the new version")
 
 	fmt.Println()
 }
