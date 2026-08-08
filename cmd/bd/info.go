@@ -297,6 +297,15 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.59.0",
+		Date:    "2026-08-08",
+		Changes: []string{
+			"NEW: 'bd refresh' — run once after a binary update; orchestrates daemon restart, migrations, doctor, and team-mode namespace adoption (never pushes)",
+			"CHANGED: 'bd upgrade' is now a single command (status/review/ack/check removed) that checks GitHub and offers to install",
+			"FIX: changelog what's-new state is per-machine now (.local_changelog_seen), no cross-clone ack leak",
+		},
+	},
+	{
 		Version: "0.58.0",
 		Date:    "2026-08-10",
 		Changes: []string{

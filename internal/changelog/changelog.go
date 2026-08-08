@@ -14,10 +14,22 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.58.0"
+const CurrentVersion = "0.59.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.59.0",
+		Date:    "2026-08-08",
+		Features: []string{
+			"bd refresh: one command after a binary update — reports version/what's-new, confirms migrations, restarts the daemon, runs doctor, and (team mode only) adopts a signed remote prefix migration (fetch only, never push). Opt-in --fix and --devlog.",
+			"bd upgrade consolidated: no more status/review/ack/check subcommands — 'bd upgrade' checks GitHub, shows the new version's changelog, and prompts to install.",
+			"Fix: changelog 'what's new' state is now per-machine (gitignored .local_changelog_seen), so acking on one clone no longer suppresses it for teammates.",
+		},
+		Protocol: []string{
+			"After updating the bd binary, run 'bd refresh' in the repo (or follow onboard Step 0). It is safe, never pushes, and prints a summary of what it did.",
+		},
+	},
 	{
 		Version: "0.58.0",
 		Date:    "2026-08-10",

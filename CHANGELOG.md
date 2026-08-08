@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-08-08
+
+## [0.59.0] - 2026-08-08
+
+### Added
+- **`bd refresh` — one-command post-update.** After updating the binary, `bd refresh` runs the mandatory steps in one shot and prints a `devlog status`-style summary: version + what's-new, schema migrations (already applied on DB open), daemon restart onto the new binary, curated doctor checks, and — in team mode only — a remote namespace probe that adopts a signed prefix migration (fetch only, never a push). Solo/local-only repos skip the network step by mode, not remote-presence. Opt-in `--fix` (doctor fixes) and `--devlog` (re-index + graph repair). Wired into `bd onboard` (Step 0) and the `bd upgrade` install tail.
+
+### Changed
+- **`bd upgrade` consolidated into a single command.** The `status`/`review`/`ack`/`check` subcommands are gone. `bd upgrade` now shows the current version, checks GitHub for a newer one, surfaces that version's changelog features, and prompts to install (`--install` to skip the prompt, `--json` for `{current, latest, upgrade_available}`).
+
+### Fixed
+- **Changelog "what's new" no longer leaks across clones.** Version-seen/ack state moved off committed files (`config.yaml` `last-seen-changelog-version`, `metadata.json` `LastBdVersion`) onto a gitignored, per-machine `.local_changelog_seen`. Acknowledging on one machine no longer suppresses the changelog for teammates — each machine gets its own report.
+
+
 ## [0.58.0] - 2026-08-07
 
 ## [0.58.0] - 2026-08-10
