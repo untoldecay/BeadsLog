@@ -47,6 +47,7 @@ var (
 	primeMCPMode     bool
 	primeStealthMode bool
 	primeExportMode  bool
+	primeHookMode    bool
 )
 
 var primeCmd = &cobra.Command{
@@ -82,6 +83,19 @@ Workflow customization:
 
 		// Detect MCP mode (unless overridden by flags)
 		mcpMode := isMCPActive()
+
+		// SessionStart dedupe (BeadsLog-29q): at session start the harness
+		// already loads the full <beads_protocol> block from CLAUDE.md/AGENTS.md,
+		// so re-emitting it here doubles ~738 tokens. In --hook mode, drop to the
+		// lean reminder IF an agent file actually carries the protocol; otherwise
+		// stay full so nothing is lost (e.g. stealth setups without agent files).
+		// Plain 'bd prime' (PreCompact) is unaffected — it still restores the full
+		// protocol after compaction truncates it.
+		if primeHookMode && agentProtocolPresent() {
+			mcpMode = true
+		}
+
+		// Explicit flags win over --hook detection.
 		if primeFullMode {
 			mcpMode = false
 		}
@@ -128,7 +142,21 @@ func init() {
 	primeCmd.Flags().BoolVar(&primeMCPMode, "mcp", false, "Force MCP mode (minimal output)")
 	primeCmd.Flags().BoolVar(&primeStealthMode, "stealth", false, "Stealth mode (no git operations, flush only)")
 	primeCmd.Flags().BoolVar(&primeExportMode, "export", false, "Output default content (ignores PRIME.md override)")
+	primeCmd.Flags().BoolVar(&primeHookMode, "hook", false, "SessionStart hook mode: emit the lean reminder when agent files already carry the full protocol (dedupes the double-injection)")
 	rootCmd.AddCommand(primeCmd)
+}
+
+// agentProtocolPresent reports whether any agent instruction file already
+// carries the <beads_protocol> block — meaning the harness will load the full
+// protocol at session start, so the SessionStart hook can safely go lean.
+func agentProtocolPresent() bool {
+	for _, f := range Candidates {
+		// #nosec G304 -- Candidates is a fixed allowlist of agent filenames
+		if b, err := os.ReadFile(f); err == nil && strings.Contains(string(b), ProtocolStartTag) {
+			return true
+		}
+	}
+	return false
 }
 
 // isMCPActive detects if MCP server is currently active

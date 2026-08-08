@@ -801,4 +801,34 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 27 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 28: prime --hook SessionStart Dedupe (BeadsLog-29q)"
+# ---------------------------------------------------------
+# In a repo whose agent files carry the protocol block, 'bd prime --hook' must
+# emit the lean reminder (much smaller than full 'bd prime'), while plain
+# 'bd prime' stays full. Prevents the SessionStart double-injection.
+HOOK_T="$TEST_DIR/prime_hook"
+mkdir -p "$HOOK_T" && cd "$HOOK_T"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix hook > /dev/null 2>&1
+# Ensure an agent file carries the protocol block (finalize onboarding path).
+"$BD_BIN" ready --no-daemon > /dev/null 2>&1 || true
+
+FULL_BYTES=$("$BD_BIN" prime --no-daemon 2>/dev/null | wc -c | tr -d ' ')
+HOOK_BYTES=$("$BD_BIN" prime --hook --no-daemon 2>/dev/null | wc -c | tr -d ' ')
+if [ "$HOOK_BYTES" -ge "$FULL_BYTES" ]; then
+    echo "❌ FAIL: prime --hook ($HOOK_BYTES B) not smaller than full prime ($FULL_BYTES B)"
+    exit 1
+fi
+# Lean output should still name the session-close protocol (core reminder kept).
+if ! "$BD_BIN" prime --hook --no-daemon 2>/dev/null | grep -qi "close protocol"; then
+    echo "❌ FAIL: prime --hook dropped the session-close reminder"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 28 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
