@@ -831,4 +831,32 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 28 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 29: bd devlog graph with no entity — whole graph (BeadsLog-xuv)"
+# ---------------------------------------------------------
+# No-arg graph must work: terminal summary (counts + hubs) without --html, and
+# a full interactive export with --html. Uses the main e2e repo which already
+# has entities + an explicit edge (FragmentA -> TargetB from Test 3).
+cd "$TEST_DIR"
+SUMMARY=$(./bd devlog graph 2>&1 || true)
+if ! echo "$SUMMARY" | grep -q "Whole Graph"; then
+    echo "❌ FAIL: no-arg graph did not print the whole-graph summary"
+    echo "$SUMMARY" | head -5
+    exit 1
+fi
+if ! echo "$SUMMARY" | grep -qiE "Entities: [0-9]+|Explicit edges: [0-9]+"; then
+    echo "❌ FAIL: summary missing entity/edge counts"
+    exit 1
+fi
+./bd devlog graph --html "$TEST_DIR/fullgraph.html" > /dev/null 2>&1
+if [ ! -s "$TEST_DIR/fullgraph.html" ]; then
+    echo "❌ FAIL: --html did not produce a non-empty full-graph file"
+    exit 1
+fi
+if ! grep -q '"nodes":' "$TEST_DIR/fullgraph.html"; then
+    echo "❌ FAIL: exported graph has no nodes array"
+    exit 1
+fi
+echo "✅ Test 29 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

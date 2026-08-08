@@ -946,10 +946,13 @@ var devlogGraphCmd = &cobra.Command{
 	Long: `Display the architectural graph for a given entity.
 This includes:
 - Explicit Dependencies: Linked via arrows in devlogs (A -> B).
-- Implicit Relationships: Inferred from frequent session co-occurrence.`,
-	Args:  cobra.ExactArgs(1),
+- Implicit Relationships: Inferred from frequent session co-occurrence.
+
+With no entity, operates on the WHOLE graph:
+  bd devlog graph --html out.html   Export the entire graph (interactive viz)
+  bd devlog graph                   Print a summary (counts + most-connected)`,
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		term := args[0]
 		depth, _ := cmd.Flags().GetInt("depth")
 		strict, _ := cmd.Flags().GetBool("strict")
 		limit, _ := cmd.Flags().GetInt("limit")
@@ -963,6 +966,13 @@ This includes:
 		}
 		defer store.Close()
 		db := store.UnderlyingDB()
+
+		// No entity → whole-graph mode.
+		if len(args) == 0 {
+			runFullGraph(rootCtx, db, htmlPath, relType)
+			return
+		}
+		term := args[0]
 
 		var targets []queries.ResolvedEntity
 

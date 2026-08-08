@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/untoldecay/BeadsLog/internal/queries"
+	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 // graphExport is one resolved entity with its explicit graph and co-occurrence
@@ -144,3 +147,79 @@ ForceGraph()(document.getElementById('graph'))
 </body>
 </html>
 `
+
+// runFullGraph handles `bd devlog graph` with no entity: the whole graph.
+// With htmlPath set, it exports every edge as an interactive force-graph
+// (reusing the per-entity path over each edge source). Without it, it prints a
+// compact summary — a 1000-node ASCII tree would be unreadable, so the terminal
+// path deliberately summarizes rather than dumps.
+func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string) {
+	if htmlPath != "" {
+		// Every entity that is the source of an edge becomes a root; depth 1 so
+		// each contributes its direct edges. writeGraphHTML de-dupes into the
+		// union = the full graph.
+		rows, err := db.QueryContext(ctx,
+			`SELECT DISTINCT COALESCE(e.preferred_name, e.name)
+			 FROM entity_deps d JOIN entities e ON d.from_entity = e.id`)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading graph: %v\n", err)
+			os.Exit(1)
+		}
+		var sources []string
+		for rows.Next() {
+			var n string
+			if rows.Scan(&n) == nil {
+				sources = append(sources, n)
+			}
+		}
+		rows.Close()
+
+		var exports []graphExport
+		for _, name := range sources {
+			g, _ := queries.GetEntityGraphExact(ctx, db, strings.ToLower(name), 1, relType)
+			if g != nil && len(g.Nodes) > 1 {
+				exports = append(exports, graphExport{Root: name, Graph: g})
+			}
+		}
+		if len(exports) == 0 {
+			fmt.Println("Graph is empty — no explicit dependencies recorded yet.")
+			return
+		}
+		if err := writeGraphHTML(htmlPath, exports); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing HTML graph: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Full graph exported: %s (%d source entities)\n", htmlPath, len(exports))
+		return
+	}
+
+	// Terminal summary.
+	var entityCount, edgeCount int
+	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM entities").Scan(&entityCount)
+	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM entity_deps").Scan(&edgeCount)
+
+	fmt.Printf("\n=== Whole Graph ===\n")
+	fmt.Printf("Entities: %d   Explicit edges: %d\n", entityCount, edgeCount)
+
+	rows, err := db.QueryContext(ctx,
+		`SELECT COALESCE(e.preferred_name, e.name) AS name, COUNT(*) AS deg
+		 FROM entity_deps d JOIN entities e ON d.from_entity = e.id
+		 GROUP BY d.from_entity ORDER BY deg DESC LIMIT 15`)
+	if err == nil {
+		defer rows.Close()
+		fmt.Printf("\nMost-connected entities (by outgoing edges):\n")
+		any := false
+		for rows.Next() {
+			var name string
+			var deg int
+			if rows.Scan(&name, &deg) == nil {
+				any = true
+				fmt.Printf("  %-32s %d\n", name, deg)
+			}
+		}
+		if !any {
+			fmt.Println("  (no explicit edges yet)")
+		}
+	}
+	fmt.Printf("\n%s Tip: run with --html <path> to export the full interactive graph, or pass an entity to focus.\n", ui.RenderAccent("💡"))
+}
