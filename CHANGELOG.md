@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.59.0] - 2026-08-08
 
+## [0.59.0] - 2026-08-08
+
 ### Added
 - **`bd refresh` — one-command post-update.** After updating the binary, `bd refresh` runs the mandatory steps in one shot and prints a `devlog status`-style summary: version + what's-new, schema migrations (already applied on DB open), daemon restart onto the new binary, curated doctor checks, and — in team mode only — a remote namespace probe that adopts a signed prefix migration (fetch only, never a push). Solo/local-only repos skip the network step by mode, not remote-presence. Opt-in `--fix` (doctor fixes) and `--devlog` (re-index + graph repair). Wired into `bd onboard` (Step 0) and the `bd upgrade` install tail.
 
