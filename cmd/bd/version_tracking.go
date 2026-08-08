@@ -82,6 +82,36 @@ func writeLocalVersion(path, version string) error {
 	return os.WriteFile(path, []byte(version+"\n"), 0600)
 }
 
+// localChangelogSeenFile stores, per-machine (gitignored), the last changelog
+// version whose "what's new" block was shown on THIS machine. Kept out of
+// committed files (config.yaml/metadata.json) so acknowledging on one clone
+// never suppresses the changelog on another — each machine gets its own
+// personalised report (BeadsLog-q9o.3).
+const localChangelogSeenFile = ".local_changelog_seen"
+
+// readLocalChangelogSeen returns the changelog version last shown on this
+// machine, or "" if never (so the changelog shows once per machine per bump).
+func readLocalChangelogSeen(beadsDir string) string {
+	if beadsDir == "" {
+		return ""
+	}
+	// #nosec G304 - path is beadsDir + constant
+	data, err := os.ReadFile(filepath.Join(beadsDir, localChangelogSeenFile))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// writeLocalChangelogSeen records that this machine has seen the given
+// changelog version. Best-effort; failures are silent.
+func writeLocalChangelogSeen(beadsDir, version string) {
+	if beadsDir == "" {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(beadsDir, localChangelogSeenFile), []byte(version+"\n"), 0600)
+}
+
 // getVersionsSince returns all version changes since the given version.
 // If sinceVersion is empty, returns all known versions.
 // Returns changes in chronological order (oldest first).

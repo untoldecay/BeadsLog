@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/changelog"
-	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -46,12 +46,16 @@ var AgentToolCandidates = []AgentTool{
 }
 
 func maybeShowChangelog() {
-	lastSeen := config.GetString("last-seen-changelog-version")
+	// Per-machine seen-state (gitignored .local_changelog_seen), NOT config.yaml:
+	// a shared/committed marker would let acking on one clone suppress the
+	// changelog on every other clone (BeadsLog-q9o.3).
+	beadsDir := beads.FindBeadsDir()
+	lastSeen := readLocalChangelogSeen(beadsDir)
 	current := changelog.CurrentVersion
 
 	if changelog.IsNewer(current, lastSeen) {
 		fmt.Println(changelog.RenderLatest())
-		_ = config.SetYamlConfig("last-seen-changelog-version", current)
+		writeLocalChangelogSeen(beadsDir, current)
 	}
 }
 

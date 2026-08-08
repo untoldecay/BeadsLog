@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/untoldecay/BeadsLog/internal/beads"
-	"github.com/untoldecay/BeadsLog/internal/configfile"
 )
 
 var upgradeCmd = &cobra.Command{
@@ -161,22 +160,12 @@ Examples:
 			return
 		}
 
-		cfg, err := configfile.Load(beadsDir)
-		if err != nil {
-			fmt.Printf("Error loading metadata.json: %v\n", err)
-			return
-		}
-		if cfg == nil {
-			cfg = configfile.DefaultConfig()
-		}
-
-		lastSeenVersion := cfg.LastBdVersion
-		cfg.LastBdVersion = Version
-
-		if err := cfg.Save(beadsDir); err != nil {
-			fmt.Printf("Error saving metadata.json: %v\n", err)
-			return
-		}
+		// Ack is per-machine (gitignored .local_changelog_seen), NOT the
+		// committed metadata.json LastBdVersion (deprecated) — otherwise
+		// acking here would suppress the changelog for every teammate on their
+		// next pull (BeadsLog-q9o.3).
+		lastSeenVersion := readLocalChangelogSeen(beadsDir)
+		writeLocalChangelogSeen(beadsDir, Version)
 
 		// Mark as acknowledged in current session
 		upgradeAcknowledged = true

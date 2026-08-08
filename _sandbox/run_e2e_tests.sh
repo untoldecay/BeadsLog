@@ -684,4 +684,46 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 24 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 25: Per-Machine Changelog Ack — No Cross-Clone Leak (BeadsLog-q9o.3)"
+# ---------------------------------------------------------
+# Ack must write per-machine (.local_changelog_seen, gitignored), never a
+# committed file — so acking on one clone can't suppress the changelog on another.
+Q9O="$TEST_DIR/per_machine_ack"
+mkdir -p "$Q9O" && cd "$Q9O"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix q9o > /dev/null 2>&1
+
+# Machine A acks
+"$BD_BIN" upgrade ack --no-daemon > /dev/null 2>&1
+if [ ! -f .beads/.local_changelog_seen ]; then
+    echo "❌ FAIL: ack did not write per-machine .local_changelog_seen"
+    exit 1
+fi
+if grep -q "last-seen-changelog" .beads/config.yaml 2>/dev/null; then
+    echo "❌ FAIL: ack wrote seen-state into committed config.yaml (leaks across clones)"
+    exit 1
+fi
+if git status --porcelain 2>/dev/null | grep -q "local_changelog_seen"; then
+    echo "❌ FAIL: .local_changelog_seen is tracked/visible to git (should be ignored)"
+    exit 1
+fi
+
+# Machine B (fresh clone): the gitignored ack file did not travel, so onboard must still show the changelog
+rm -f .beads/.local_changelog_seen
+ONBOARD_OUT=$("$BD_BIN" onboard --no-daemon 2>&1 || true)
+if ! echo "$ONBOARD_OUT" | grep -qiE "what's new|new in|v0\.[0-9]"; then
+    echo "❌ FAIL: changelog suppressed on a fresh clone (cross-machine leak)"
+    exit 1
+fi
+if [ ! -f .beads/.local_changelog_seen ]; then
+    echo "❌ FAIL: onboard did not record per-machine seen-state"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 25 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

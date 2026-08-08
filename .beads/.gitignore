@@ -17,6 +17,8 @@ last-touched
 
 # Local version tracking (prevents upgrade notification spam after git ops)
 .local_version
+# Per-machine changelog-seen state (personalised "what's new"; never shared)
+.local_changelog_seen
 
 # Legacy database files
 db.sqlite
