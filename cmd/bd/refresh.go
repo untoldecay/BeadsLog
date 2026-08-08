@@ -79,7 +79,17 @@ Flags:
 			runDoctorFix(path)
 		}
 
-		// 5. Namespace — team mode only, fetch-only.
+		// 5. Protocol — re-inject the agent protocol block only if it drifted
+		// from this binary's embedded version (acknowledge a new protocol
+		// without the heavyweight full onboard).
+		if drifted := refreshProtocol(true); len(drifted) > 0 {
+			fmt.Printf("Protocol:   updated agent instructions (%s)\n", strings.Join(drifted, ", "))
+			changed = true
+		} else {
+			fmt.Println("Protocol:   agent instructions current")
+		}
+
+		// 6. Namespace — team mode only, fetch-only.
 		fmt.Printf("Namespace:  %s\n", refreshNamespace(beadsDir))
 
 		// Optional: devlog re-index + graph repair (slow).
@@ -157,13 +167,47 @@ func refreshNamespace(beadsDir string) string {
 	if err != nil {
 		return fmt.Sprintf("check failed (%v) — run 'bd sync' manually", err)
 	}
+	// Report ONLY a real adoption. Do not surface sync's internal
+	// "Ignoring prefix mismatches (all are tombstones)" line — that's benign
+	// old-prefix tombstone cleanup, not a namespace change.
 	for _, line := range strings.Split(out, "\n") {
-		l := strings.ToLower(line)
-		if strings.Contains(l, "adopt") || strings.Contains(l, "prefix") {
-			return strings.TrimSpace(line)
+		if strings.Contains(strings.ToLower(line), "adopted") {
+			return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "✓ "))
 		}
 	}
 	return "in sync (no namespace change)"
+}
+
+// refreshProtocol re-injects the agent protocol block ONLY when the version in
+// the agent files drifts from the binary's embedded FullBootloader. It touches
+// just the block between the protocol tags — never PROJECT_CONTEXT or user
+// prose — so an update acknowledges a new protocol without the full onboard.
+// Returns the files that were (or would be) updated.
+func refreshProtocol(reinject bool) []string {
+	desired := ProtocolStartTag + "\n" + restoreCodeBlocks(FullBootloader) + "\n" + ProtocolEndTag
+	var drifted []string
+	for _, file := range Candidates {
+		content, err := os.ReadFile(file) // #nosec G304 - Candidates is a fixed allowlist
+		if err != nil {
+			continue
+		}
+		s := string(content)
+		start := strings.Index(s, ProtocolStartTag)
+		end := strings.Index(s, ProtocolEndTag)
+		if start == -1 || end == -1 || end < start {
+			continue // no protocol block here — that's onboard's job, not refresh's
+		}
+		current := s[start : end+len(ProtocolEndTag)]
+		if current == desired {
+			continue
+		}
+		drifted = append(drifted, file)
+		if reinject {
+			newContent := s[:start] + desired + s[end+len(ProtocolEndTag):]
+			_ = os.WriteFile(file, []byte(newContent), 0644) // #nosec G306 - agent instruction file
+		}
+	}
+	return drifted
 }
 
 // runSelfCommand execs this same bd binary for a subcommand, streaming output.

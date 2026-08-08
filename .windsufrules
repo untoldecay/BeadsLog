@@ -22,7 +22,11 @@ CORE REASONING LOOP - FOLLOW IN ORDER EVERY TASK:
    - CHECK: Observe lifecycle status in search results ([🟢 VALIDATED], [⏸ PAUSED], [🚫 ABANDONED])
    - PAUSED/ABANDONED: Read reason FIRST. Do NOT assume side-branch code is in baseline truth.
 3. TASK: Run bd ready → bd update "id" --status in-progress --json (claim work)
-4. IMPLEMENT: Code changes → Tests → bd devlog record --subject "[fix] message" --problem "desc" --file "path/to/log.md"
+4. IMPLEMENT: 
+   - Code changes → Tests.
+   - Run bd now to get current timestamp.
+   - Write full devlog FIRST (follow _generate-devlog.md).
+   - Run bd devlog record --file "path/to/log.md" to index your work.
 5. CLOSE: Run bd close "id" --reason "Done" → bd sync → bd devlog sync (persist everything)
 
 RESILIENCE POLICY (ANTI-PANIC):

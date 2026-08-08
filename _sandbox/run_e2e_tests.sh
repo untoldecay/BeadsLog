@@ -764,7 +764,7 @@ git config user.email "e2e@example.com"
 git commit -q --allow-empty -m init
 printf "1\n" | "$BD_BIN" init --solo --prefix rfs --quiet --no-daemon > /dev/null 2>&1
 RF_OUT=$("$BD_BIN" refresh --no-daemon 2>&1 || true)
-for token in "bd refresh" "Migrations:" "Doctor:" "Namespace:" "✨"; do
+for token in "bd refresh" "Migrations:" "Doctor:" "Protocol:" "Namespace:" "✨"; do
     if ! echo "$RF_OUT" | grep -qF "$token"; then
         echo "❌ FAIL: refresh summary missing '$token'"
         echo "$RF_OUT"
@@ -774,6 +774,13 @@ done
 if ! echo "$RF_OUT" | grep -q "Namespace:.*skipped (solo"; then
     echo "❌ FAIL: solo refresh did not skip the namespace probe"
     echo "$RF_OUT" | grep Namespace
+    exit 1
+fi
+# Fresh repo just had its protocol injected by init with the same binary, so
+# refresh must report it CURRENT (no drift, no needless rewrite).
+if ! echo "$RF_OUT" | grep -q "Protocol:.*current"; then
+    echo "❌ FAIL: refresh should report protocol current on a freshly-inited repo"
+    echo "$RF_OUT" | grep Protocol
     exit 1
 fi
 
