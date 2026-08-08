@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.59.0"
+const CurrentVersion = "0.59.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.59.1",
+		Date:    "2026-08-08",
+		Features: []string{
+			"bd refresh: Namespace line reports a real adoption or 'no namespace change' instead of leaking sync's benign tombstone-cleanup noise.",
+			"bd refresh: protocol-drift check re-injects the agent protocol block only when it drifts from this binary's embedded version — block-only, never PROJECT_CONTEXT — so an update acknowledges a new protocol without a full onboard.",
+		},
+		Protocol: []string{
+			"After 'bd refresh' reports 'Protocol: updated agent instructions', re-read the protocol block in your agent file — it was brought up to this binary's version.",
+		},
+	},
 	{
 		Version: "0.59.0",
 		Date:    "2026-08-08",

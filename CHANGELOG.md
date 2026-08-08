@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.1] - 2026-08-08
+
+## [0.59.1] - 2026-08-08
+
+### Fixed
+- **`bd refresh` Namespace line no longer prints internal noise.** It surfaced `bd sync`'s benign "Ignoring prefix mismatches (all are tombstones)" cleanup line as if it were a namespace verdict. It now reports a real prefix adoption or "in sync (no namespace change)".
+
+### Added
+- **`bd refresh` protocol-drift check.** After a binary update, refresh compares the agent protocol block (between the `<beads_protocol>` tags) in each agent file against the binary's embedded protocol and re-injects only that block if it drifted — never touching PROJECT_CONTEXT or your prose. This lets an update acknowledge a new protocol without the heavyweight full `bd onboard`.
+
+
 ## [0.59.0] - 2026-08-08
 
 ## [0.59.0] - 2026-08-08

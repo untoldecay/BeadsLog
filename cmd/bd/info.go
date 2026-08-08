@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.59.1",
+		Date:    "2026-08-08",
+		Changes: []string{
+			"FIX: 'bd refresh' Namespace line no longer prints sync's tombstone-cleanup noise; reports real adoption or 'no namespace change'",
+			"NEW: 'bd refresh' re-injects the agent protocol block only when it drifts from the binary (block-only, never PROJECT_CONTEXT) — no full onboard needed on update",
+		},
+	},
+	{
 		Version: "0.59.0",
 		Date:    "2026-08-08",
 		Changes: []string{
