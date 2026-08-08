@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.59.1"
+const CurrentVersion = "0.59.2"
 
 
 var entries = []Entry{
+	{
+		Version: "0.59.2",
+		Date:    "2026-08-09",
+		Features: []string{
+			"bd prime --hook dedupes the SessionStart protocol injection: emits the lean ~155-tok reminder when an agent file already carries the protocol (harness loads it anyway), instead of re-emitting the full ~738 tok. Falls back to full if no agent file has it. Plain 'bd prime' (PreCompact) unchanged. ~600 tok/session saved.",
+		},
+		Protocol: []string{
+			"No agent action needed. SessionStart hooks that call 'bd prime --hook' automatically use the lean form after this update.",
+		},
+	},
 	{
 		Version: "0.59.1",
 		Date:    "2026-08-08",

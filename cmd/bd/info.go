@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.59.2",
+		Date:    "2026-08-09",
+		Changes: []string{
+			"PERF: 'bd prime --hook' emits the lean reminder when agent files already carry the protocol (dedupes SessionStart double-injection, ~600 tok/session); plain 'bd prime' unchanged",
+		},
+	},
+	{
 		Version: "0.59.1",
 		Date:    "2026-08-08",
 		Changes: []string{

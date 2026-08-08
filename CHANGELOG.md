@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.2] - 2026-08-09
+
+## [0.59.2] - 2026-08-09
+
+### Changed
+- **`bd prime --hook` dedupes the SessionStart protocol injection.** At session start the harness already loads the `<beads_protocol>` block from CLAUDE.md/AGENTS.md, so re-emitting the full ~738-token protocol was pure duplication. `bd prime --hook` now emits the lean (~155-token) reminder when an agent file already carries the protocol (falls back to full if none does, so nothing is lost). Plain `bd prime` (the PreCompact hook) is unchanged — it still restores the full protocol after compaction. Saves ~600 tokens per session start. Also fixes `bd prime --hook` previously erroring with "unknown flag".
+
+
 ## [0.59.1] - 2026-08-08
 
 ## [0.59.1] - 2026-08-08
