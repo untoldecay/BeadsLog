@@ -164,7 +164,12 @@ func executeOnboard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("------------------------------------------------------------\n")
 	fmt.Printf("⚠️ **STOP**: Follow these steps in order to initialize your memory.\n")
 	fmt.Printf("Do NOT perform manual file searching (ls/grep) until Step 4.\n\n")
-	
+
+	// Step 0: if the binary was updated since last use, sync the repo to it first.
+	if versionUpgradeDetected {
+		fmt.Printf("0. **Post-Update**: bd was upgraded — run %s first to sync this repo to the new version.\n", ui.RenderAccent("bd refresh"))
+	}
+
 	fmt.Printf("1. **Sync Database**: Run %s to get latest issues.\n", ui.RenderAccent("bd sync"))
 	fmt.Printf("2. **Sync Knowledge**: Run %s to ingest all devlog history.\n", ui.RenderAccent("bd devlog sync"))
 	fmt.Printf("3. **Verify Graph**: Run %s to ensure graph integrity.\n", ui.RenderAccent("bd devlog verify --fix"))

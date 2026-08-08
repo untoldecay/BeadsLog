@@ -749,4 +749,49 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 26 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 27: bd refresh — One-Command Post-Update (BeadsLog-q9o.1)"
+# ---------------------------------------------------------
+# Deterministic orchestration + mode gating (no network). Adoption itself is
+# covered by the prefix tests (18-22) that refresh reuses.
+
+# Solo repo: namespace step must be gated OFF by local-only mode.
+RF_SOLO="$TEST_DIR/refresh_solo"
+mkdir -p "$RF_SOLO" && cd "$RF_SOLO"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+git commit -q --allow-empty -m init
+printf "1\n" | "$BD_BIN" init --solo --prefix rfs --quiet --no-daemon > /dev/null 2>&1
+RF_OUT=$("$BD_BIN" refresh --no-daemon 2>&1 || true)
+for token in "bd refresh" "Migrations:" "Doctor:" "Namespace:" "✨"; do
+    if ! echo "$RF_OUT" | grep -qF "$token"; then
+        echo "❌ FAIL: refresh summary missing '$token'"
+        echo "$RF_OUT"
+        exit 1
+    fi
+done
+if ! echo "$RF_OUT" | grep -q "Namespace:.*skipped (solo"; then
+    echo "❌ FAIL: solo refresh did not skip the namespace probe"
+    echo "$RF_OUT" | grep Namespace
+    exit 1
+fi
+
+# Non-team repo with no remote: namespace skipped for lack of remote.
+RF_PLAIN="$TEST_DIR/refresh_plain"
+mkdir -p "$RF_PLAIN" && cd "$RF_PLAIN"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --prefix rfp --no-daemon > /dev/null 2>&1
+RF_OUT2=$("$BD_BIN" refresh --no-daemon 2>&1 || true)
+if ! echo "$RF_OUT2" | grep -q "Namespace:.*skipped (no git remote)"; then
+    echo "❌ FAIL: no-remote refresh did not skip the namespace probe"
+    echo "$RF_OUT2" | grep Namespace
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 27 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

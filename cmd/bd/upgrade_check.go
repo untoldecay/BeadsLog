@@ -92,7 +92,7 @@ func runUpdate() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("\n%s Update complete! Please restart your agent session to use the new version.\n", ui.RenderPass("✅"))
+	fmt.Printf("\n%s Update complete! Then run %s in your repo to sync it to the new version.\n", ui.RenderPass("✅"), ui.RenderAccent("bd refresh"))
 }
 
 // maybeCheckForUpdates is a non-blocking check for the onboarding flow
