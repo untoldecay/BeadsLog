@@ -46,3 +46,11 @@ planning compliance. Round 3 (long-context) proposed, not yet run.
   wrong).
 - A short imperative core + on-demand references preserves compliance; prominence
   matters for optional context loading (a buried bullet gets skipped half the time).
+
+## Round 3 addendum (long-context pressure)
+Seeded subagents with a ~30k-token sanitized prior-session context, then the
+protocol variant + a context-switch task. 2 arms × 3 trials. BOTH arms 6.0/6 —
+no degradation. The lean protocol's predicted weak point (surviving context
+pressure) showed no weakness. Consolidated verdict + recommendations in
+_rules/_analysis/ABTest/SUMMARY.md. Top rec: dedupe the SessionStart
+double-injection (~700 tok/session, free), then live-A/B a lean .beads/PRIME.md.
