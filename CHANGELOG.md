@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-08-09
+
+## [0.62.0] - 2026-08-09
+
+### Added
+- **Relationship suggestions + manual links.** `bd devlog links suggest` proposes entity pairs that co-occur strongly in devlogs but have no explicit dependency edge (a `🔗 N relationship opportunities` hint also appears after `graph`/`search`); `bd devlog links dismiss <a> <b>` rejects a pair permanently. `bd devlog link <from> <to> --relationship uses` records an explicit edge that is sticky (survives re-extraction) and shareable — exported to `.beads/links.jsonl` and re-applied on sync, so it travels to teammates like aliases.
+
+### Changed
+- **Graph viewer detail panel restyled** (shadcn-inspired, still a single dependency-free HTML file): relationship groups are collapsible accordion sections with a count, neighbor rows carry pill degree badges with hover, the connection count is a badge, and the latest-devlog card has a cleaner muted style.
+
+
 ## [0.61.1] - 2026-08-09
 
 ## [0.61.1] - 2026-08-09

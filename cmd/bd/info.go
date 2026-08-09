@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.62.0",
+		Date:    "2026-08-09",
+		Changes: []string{
+			"NEW: relationship suggestions — 'bd devlog links suggest|dismiss' + 'bd devlog link A B --relationship uses' promotes strong co-occurrence into sticky, shareable explicit edges (links.jsonl)",
+			"UI: graph viewer detail panel restyled shadcn-style (accordion sections, pill badges, devlog card)",
+		},
+	},
+	{
 		Version: "0.61.1",
 		Date:    "2026-08-09",
 		Changes: []string{

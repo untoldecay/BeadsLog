@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.61.1"
+const CurrentVersion = "0.62.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.62.0",
+		Date:    "2026-08-09",
+		Features: []string{
+			"Relationship suggestions: 'bd devlog links suggest' proposes strongly co-occurring entities that lack an explicit edge (🔗 hint after graph/search); 'bd devlog link A B --relationship uses' creates a sticky, shareable edge (exported to links.jsonl, re-applied on sync); 'bd devlog links dismiss A B' rejects permanently.",
+			"Graph viewer panel restyled shadcn-style: collapsible accordion relationship groups, pill degree badges, connection-count badge, cleaner devlog card — still one dependency-free HTML file.",
+		},
+		Protocol: []string{
+			"When graph/search shows '🔗 N relationship opportunities', run 'bd devlog links suggest', then for each pair either promote it ('bd devlog link A B --relationship uses') or reject it ('bd devlog links dismiss A B').",
+		},
+	},
 	{
 		Version: "0.61.1",
 		Date:    "2026-08-09",
