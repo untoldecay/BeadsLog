@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-08-09
+
+## [0.61.1] - 2026-08-09
+
+### Fixed
+- **Graph viewer no longer crashes on malformed entity names.** A garbage entity name containing the ` → ` relationship arrow produced phantom link endpoints (force-graph "node not found"), breaking the whole viewer. The exporter now drops any link whose endpoints aren't real nodes (so existing projects render immediately), and the noise filter rejects names containing an arrow or 5+ word fragments so they never become entities (auto-pruned on the next `bd devlog sync`). Real names like `auth-service` and file paths are unaffected.
+
+
 ## [0.61.0] - 2026-08-09
 
 ## [0.61.0] - 2026-08-09

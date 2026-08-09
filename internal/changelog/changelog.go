@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.61.0"
+const CurrentVersion = "0.61.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.61.1",
+		Date:    "2026-08-09",
+		Features: []string{
+			"Fix: graph viewer no longer crashes on malformed entity names — links to phantom nodes are dropped, and names with the ' → ' arrow or 5+ word fragments are filtered as noise (auto-pruned on sync).",
+		},
+		Protocol: []string{
+			"If a project's graph previously crashed, install this version and run 'bd devlog prune --noise' to clear the garbage entities.",
+		},
+	},
 	{
 		Version: "0.61.0",
 		Date:    "2026-08-09",

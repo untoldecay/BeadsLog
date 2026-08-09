@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.61.1",
+		Date:    "2026-08-09",
+		Changes: []string{
+			"FIX: graph viewer crash ('node not found') from entity names containing the arrow delimiter — dangling links dropped; arrow/fragment names filtered as noise",
+		},
+	},
+	{
 		Version: "0.61.0",
 		Date:    "2026-08-09",
 		Changes: []string{
