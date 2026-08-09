@@ -8,10 +8,9 @@
 {"alias_name":"bd verify","canonical_name":"bd-verify"}
 {"alias_name":"config.yaml","canonical_name":"config-yaml"}
 {"alias_name":"devlog_core","canonical_name":"devlog-core"}
+{"alias_name":"devlog_sync","canonical_name":"devlog-sync"}
 {"alias_name":"devlogcmds.go","canonical_name":"devlog_cmds.go"}
 {"alias_name":"devlogcore.go","canonical_name":"devlog_core.go"}
-{"alias_name":"devlog sync","canonical_name":"devlog_sync"}
-{"alias_name":"devlogsync","canonical_name":"devlog_sync"}
 {"alias_name":"devlog_verify","canonical_name":"devlogverify"}
 {"alias_name":"entity_extraction","canonical_name":"entityextraction"}
 {"alias_name":"extraction_log","canonical_name":"extraction-log"}
