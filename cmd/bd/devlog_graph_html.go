@@ -198,19 +198,34 @@ const graphHTMLTemplate = `<!DOCTYPE html>
   #toolbar { position: absolute; top: 10px; right: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; }
   #toolbar input[type=text] { background: #313244; border: 1px solid #45475a; color: #cdd6f4; border-radius: 6px; padding: 4px 8px; font-size: 12px; width: 150px; outline: none; }
   #toolbar button, #toolbar label { background: #313244; border: 1px solid #45475a; color: #cdd6f4; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; user-select: none; }
-  #panel { position: absolute; top: 0; right: -340px; width: 300px; height: 100%; background: rgba(24,24,37,0.96); color: #cdd6f4; z-index: 3; padding: 16px 18px; box-sizing: border-box; overflow-y: auto; transition: right .18s ease; box-shadow: -2px 0 14px #0007; font-size: 13px; }
+  /* Panel — shadcn-inspired: card sections, muted foreground, accordion groups */
+  #panel { position: absolute; top: 0; right: -360px; width: 320px; height: 100%; background: rgba(17,17,27,0.97); color: #cdd6f4; z-index: 3; padding: 18px 16px; box-sizing: border-box; overflow-y: auto; transition: right .18s ease; box-shadow: -1px 0 0 #313244, -8px 0 24px #0008; font-size: 13px; }
   #panel.open { right: 0; }
-  #panel h3 { margin: 4px 0 2px; color: #89b4fa; word-break: break-all; font-size: 15px; }
-  #panel .deg { color: #a6adc8; font-size: 11px; margin-bottom: 8px; }
-  #panel .rel { margin-top: 12px; color: #f9e2af; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-  #panel a.nb { display: block; padding: 3px 0; color: #cdd6f4; text-decoration: none; cursor: pointer; border-bottom: 1px solid #2a2a3a; word-break: break-all; }
-  #panel a.nb:hover { color: #89b4fa; }
-  #panel a.nb span { color: #6c7086; float: right; margin-left: 8px; }
-  #panel .pclose { float: right; cursor: pointer; color: #6c7086; font-size: 20px; line-height: 1; }
-  #panel .devlog { margin-top: 14px; padding: 10px; background: #11111b; border-radius: 6px; border-left: 3px solid #cba6f7; }
-  #panel .devlog .dl-sub { color: #cba6f7; font-size: 12px; font-weight: 600; }
+  #panel .phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  #panel h3 { margin: 0; color: #cdd6f4; word-break: break-all; font-size: 15px; font-weight: 600; line-height: 1.3; }
+  #panel .pclose { cursor: pointer; color: #6c7086; font-size: 18px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+  #panel .pclose:hover { color: #cdd6f4; background: #313244; }
+  #panel .badge { display: inline-block; margin-top: 6px; padding: 1px 8px; font-size: 10px; font-weight: 500; color: #a6adc8; background: #313244; border: 1px solid #45475a; border-radius: 999px; }
+  /* Accordion group */
+  #panel .acc { margin-top: 10px; border: 1px solid #313244; border-radius: 8px; overflow: hidden; background: #181825; }
+  #panel .acc-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; user-select: none; }
+  #panel .acc-head:hover { background: #1e1e2e; }
+  #panel .acc-head .chev { color: #6c7086; font-size: 10px; transition: transform .15s; transform: rotate(90deg); }
+  #panel .acc.collapsed .acc-head .chev { transform: rotate(0deg); }
+  #panel .acc-head .rel { flex: 1; color: #f9e2af; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  #panel .acc-head .cnt { color: #6c7086; font-size: 10px; }
+  #panel .acc-body { padding: 2px 10px 8px; }
+  #panel .acc.collapsed .acc-body { display: none; }
+  #panel a.nb { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px; margin: 0 -6px; color: #bac2de; text-decoration: none; cursor: pointer; border-radius: 5px; word-break: break-all; }
+  #panel a.nb:hover { color: #89b4fa; background: #1e1e2e; }
+  #panel a.nb .dir { color: #6c7086; margin-right: 4px; }
+  #panel a.nb .pill { flex: none; color: #6c7086; font-size: 10px; padding: 0 6px; background: #11111b; border: 1px solid #313244; border-radius: 999px; }
+  /* Devlog card */
+  #panel .devlog { margin-top: 12px; padding: 10px 12px; background: #181825; border: 1px solid #313244; border-left: 3px solid #cba6f7; border-radius: 8px; }
+  #panel .devlog .dl-cap { color: #6c7086; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+  #panel .devlog .dl-sub { color: #cba6f7; font-size: 12px; font-weight: 600; margin-top: 3px; }
   #panel .devlog .dl-date { color: #6c7086; font-size: 10px; margin: 2px 0 6px; }
-  #panel .devlog .dl-snip { color: #a6adc8; font-size: 11px; line-height: 1.45; }
+  #panel .devlog .dl-snip { color: #a6adc8; font-size: 11px; line-height: 1.5; }
   #searchcount { color: #6c7086; font-size: 11px; min-width: 34px; text-align: center; }
 </style>
 </head>
@@ -338,31 +353,46 @@ function showPanel(id) {
   nb.sort(function(a, b) { return (degree[b.id] || 0) - (degree[a.id] || 0); });
   var byRel = {};
   nb.forEach(function(n) { (byRel[n.rel] = byRel[n.rel] || []).push(n); });
-  var h = '<div class="pclose" onclick="closePanel()">&times;</div>';
-  h += '<h3>' + id + '</h3>';
-  h += '<div class="deg">' + (degree[id] || 0) + ' connection(s)</div>';
-  Object.keys(byRel).forEach(function(rel) {
-    h += '<div class="rel">' + (rel || 'related') + '</div>';
+
+  var h = '<div class="phead"><h3>' + esc(id) + '</h3><div class="pclose" onclick="closePanel()">&times;</div></div>';
+  h += '<div><span class="badge">' + (degree[id] || 0) + ' connection' + ((degree[id] || 0) === 1 ? '' : 's') + '</span></div>';
+
+  // Each relationship is a collapsible accordion section (largest groups open).
+  var rels = Object.keys(byRel).sort(function(a, b) { return byRel[b].length - byRel[a].length; });
+  rels.forEach(function(rel, idx) {
+    var cls = idx >= 3 ? ' collapsed' : ''; // keep the first few open, collapse the rest
+    h += '<div class="acc' + cls + '">';
+    h += '<div class="acc-head"><span class="chev">&#9656;</span><span class="rel">' + esc(rel || 'related') + '</span><span class="cnt">' + byRel[rel].length + '</span></div>';
+    h += '<div class="acc-body">';
     byRel[rel].forEach(function(n) {
-      h += '<a class="nb" data-id="' + n.id + '">' + (n.dir === 'out' ? '&rarr; ' : '&larr; ') + n.id + ' <span>' + (degree[n.id] || 0) + '</span></a>';
+      h += '<a class="nb" data-id="' + esc(n.id) + '"><span><span class="dir">' + (n.dir === 'out' ? '&rarr;' : '&larr;') + '</span>' + esc(n.id) + '</span><span class="pill">' + (degree[n.id] || 0) + '</span></a>';
     });
+    h += '</div></div>';
   });
+
   var m = nodeMeta[id];
   if (m && m.subject) {
-    h += '<div class="devlog"><div class="rel" style="margin-top:0">last devlog</div>';
+    h += '<div class="devlog"><div class="dl-cap">last devlog</div>';
     h += '<div class="dl-sub">' + esc(m.subject) + '</div>';
     if (m.date) { h += '<div class="dl-date">' + esc(m.date) + '</div>'; }
     if (m.snippet) { h += '<div class="dl-snip">' + esc(m.snippet) + '</div>'; }
     h += '</div>';
   }
+
   var p = document.getElementById('panel');
   p.innerHTML = h;
   p.classList.add('open');
+  // Accordion toggles.
+  var heads = p.querySelectorAll('.acc-head');
+  for (var j = 0; j < heads.length; j++) {
+    heads[j].onclick = function() { this.parentNode.classList.toggle('collapsed'); };
+  }
+  // Neighbor navigation.
   var links = p.querySelectorAll('a.nb');
   for (var i = 0; i < links.length; i++) {
     links[i].onclick = function() {
       var nn = nodeById(this.getAttribute('data-id'));
-      if (nn) { Graph.centerAt(nn.x, nn.y, 500); Graph.zoom(5, 500); showPanel(nn.id); }
+      if (nn) { Graph.centerAt(nn.x, nn.y, 500); Graph.zoom(5, 500); focusId = nn.id; recomputeActive(); showPanel(nn.id); }
     };
   }
 }
