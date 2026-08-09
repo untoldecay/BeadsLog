@@ -857,6 +857,13 @@ if ! grep -q '"nodes":' "$TEST_DIR/fullgraph.html"; then
     echo "❌ FAIL: exported graph has no nodes array"
     exit 1
 fi
+# Interactive viewer v1 controls must be present in the exported HTML.
+for ctrl in 'id="search"' 'id="panel"' 'id="coToggle"' 'onNodeClick' 'showPanel'; do
+    if ! grep -q "$ctrl" "$TEST_DIR/fullgraph.html"; then
+        echo "❌ FAIL: exported viewer missing control '$ctrl'"
+        exit 1
+    fi
+done
 echo "✅ Test 29 Passed."
 
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
