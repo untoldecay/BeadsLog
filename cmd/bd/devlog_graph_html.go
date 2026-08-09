@@ -90,7 +90,14 @@ func writeGraphHTML(path string, exports []graphExport) error {
 	if err != nil {
 		return err
 	}
-	title, _ := json.Marshal("BeadsLog Graph: " + strings.Join(roots, ", "))
+	// Title lists the focused entities, but only when there are a few — a
+	// whole-graph export has one "root" per source entity, and joining all of
+	// them produced a screen-filling wall of names.
+	label := "BeadsLog Graph"
+	if len(roots) > 0 && len(roots) <= 4 {
+		label += ": " + strings.Join(roots, ", ")
+	}
+	title, _ := json.Marshal(label)
 
 	html := strings.NewReplacer("__DATA__", string(data), "__TITLE__", string(title)).Replace(graphHTMLTemplate)
 
@@ -110,7 +117,7 @@ const graphHTMLTemplate = `<!DOCTYPE html>
 <script src="https://unpkg.com/force-graph@1"></script>
 <style>
   body { margin: 0; background: #1e1e2e; font-family: -apple-system, sans-serif; overflow: hidden; }
-  #title { position: absolute; top: 12px; left: 16px; color: #cdd6f4; z-index: 1; font-size: 14px; opacity: 0.8; max-width: 60%; }
+  #title { position: absolute; top: 12px; left: 16px; color: #cdd6f4; z-index: 1; font-size: 14px; opacity: 0.8; max-width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #legend { position: absolute; bottom: 12px; left: 16px; color: #6c7086; z-index: 1; font-size: 11px; }
   #stats { position: absolute; bottom: 12px; right: 14px; color: #6c7086; z-index: 1; font-size: 11px; }
   #toolbar { position: absolute; top: 10px; right: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; }
