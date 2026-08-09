@@ -101,6 +101,27 @@ func TestIsNoiseGenericProseNouns(t *testing.T) {
 	}
 }
 
+func TestIsNoiseArrowAndFragments(t *testing.T) {
+	// Names containing the relationship arrow or long sentence fragments are junk
+	// (BeadsLog-jip — these crashed the graph viewer).
+	for _, n := range []string{
+		"noteid → relative index for --stagger-index css variable",
+		"A → B",
+		"handler -> service",
+		"run the app and take a screenshot",
+	} {
+		if !IsNoise(n) {
+			t.Errorf("IsNoise(%q) = false, want true (arrow/fragment)", n)
+		}
+	}
+	// Real multi-word command/entity names (≤4 tokens, no arrow) still survive.
+	for _, n := range []string{"bd devlog enrich", "internal/storage/sqlite/migrations", "bd devlog graph"} {
+		if IsNoise(n) {
+			t.Errorf("IsNoise(%q) = true, want false (legit name)", n)
+		}
+	}
+}
+
 func TestGroundExtraction(t *testing.T) {
 	text := "BeadsLog was initialized to track the PaymentGateway rollout."
 	entities := []Entity{

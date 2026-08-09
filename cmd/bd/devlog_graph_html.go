@@ -143,6 +143,19 @@ func writeGraphHTML(path string, exports []graphExport, meta map[string]entityMe
 			}
 		}
 	}
+	// Crash guard: force-graph throws if a link points at a node it never saw.
+	// Malformed entity names (e.g. ones containing the ' → ' delimiter we split
+	// Path on) can yield phantom endpoints — drop any link whose ends aren't
+	// both real nodes (BeadsLog-jip).
+	validLinks := links[:0]
+	for _, l := range links {
+		if _, okS := nodes[l.Source]; okS {
+			if _, okT := nodes[l.Target]; okT {
+				validLinks = append(validLinks, l)
+			}
+		}
+	}
+	links = validLinks
 	data, err := json.Marshal(map[string]interface{}{"nodes": nodeList, "links": links})
 	if err != nil {
 		return err

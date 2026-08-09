@@ -53,6 +53,17 @@ func IsNoise(name string) bool {
 		strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
 		return true
 	}
+	// A real entity name never contains the relationship arrow — if it does, the
+	// extraction swallowed a whole "A → B" phrase, which also corrupts the graph
+	// exporter's Path parsing (BeadsLog-jip).
+	if strings.Contains(name, "→") || strings.Contains(name, "->") {
+		return true
+	}
+	// 5+ space-separated tokens is a sentence fragment, not an identifier
+	// (file paths and code names have no spaces; commands are ≤4 tokens).
+	if len(strings.Fields(name)) >= 5 {
+		return true
+	}
 
 	allDigits := true
 	for _, r := range name {
