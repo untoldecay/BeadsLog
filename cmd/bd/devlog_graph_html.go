@@ -207,6 +207,7 @@ const graphHTMLTemplate = `<!DOCTYPE html>
   <input type="text" id="search" placeholder="search entity…" autocomplete="off" />
   <span id="searchcount"></span>
   <button id="fit" title="Fit graph to screen">Fit</button>
+  <label title="Hide nodes with fewer connections (tames big graphs)">min&nbsp;<input type="range" id="degSlider" min="0" max="10" value="0" style="vertical-align:middle;width:70px" /> <span id="degVal">0</span></label>
   <label><input type="checkbox" id="coToggle" checked /> co-occ</label>
 </div>
 <div id="legend">solid = explicit dependency &nbsp;·&nbsp; dashed = co-occurrence &nbsp;·&nbsp; hover/click to focus &nbsp;·&nbsp; Enter cycles search</div>
@@ -235,30 +236,31 @@ Object.keys(degree).sort(function(a, b) { return degree[b] - degree[a]; }).slice
   .forEach(function(id) { hubIds[id] = true; });
 
 // Highlight state. Hover is transient; click sets a persistent focus. The
-// "active" node for dimming/blue-links is whichever is engaged (hover wins).
-var hoverId = null, focusId = null, selId = null, search = '', showCo = true;
-
-function endId(e) { return (e && e.id !== undefined) ? e.id : e; }
-function activeId() { return hoverId || focusId; }
-function isNeighbor(aid, id) {
-  if (!aid) return false;
-  var ns = neighbors[aid] || [];
-  for (var i = 0; i < ns.length; i++) { if (ns[i].id === id) return true; }
-  return false;
+// active node + its neighbor set are recomputed only on change, so per-frame
+// rendering is O(1) — essential for large graphs to stay smooth.
+var hoverId = null, focusId = null, selId = null, search = '', showCo = true, minDeg = 0, frozen = false;
+var activeCur = null, activeSet = {};
+function recomputeActive() {
+  activeCur = hoverId || focusId;
+  activeSet = {};
+  if (activeCur) { (neighbors[activeCur] || []).forEach(function(n) { activeSet[n.id] = true; }); }
 }
+function endId(e) { return (e && e.id !== undefined) ? e.id : e; }
 function linkTouches(l, aid) { return endId(l.source) === aid || endId(l.target) === aid; }
+function nodeShown(id) { return (degree[id] || 0) >= minDeg; }
 
 var Graph = ForceGraph()(document.getElementById('graph'))
   .graphData(data)
   .backgroundColor('#1e1e2e')
-  .autoPauseRedraw(false) // keep repainting so hover/click highlight always shows
+  .cooldownTime(6000)
+  .autoPauseRedraw(false) // draw-only repaints (physics is frozen after layout) → reliable highlight, cheap
   .nodeVal(function(n) { return Math.max(2, (degree[n.id] || 0)); })
   .nodeLabel(function(n) { return n.id + ' (' + (degree[n.id] || 0) + ')'; })
+  .nodeVisibility(function(n) { return nodeShown(n.id); })
   .nodeCanvasObject(function(node, ctx, scale) {
-    var aid = activeId();
     var deg = degree[node.id] || 0;
     var r = Math.max(2, Math.sqrt(deg + 1) * 1.7);
-    var active = !aid || node.id === aid || isNeighbor(aid, node.id);
+    var active = !activeCur || node.id === activeCur || activeSet[node.id];
     ctx.globalAlpha = active ? 1 : 0.12;
     ctx.beginPath();
     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
@@ -268,7 +270,7 @@ var Graph = ForceGraph()(document.getElementById('graph'))
     ctx.fill();
     var isHub = hubIds[node.id];
     var labelIt = active && (isHub || node.id === selId
-      || (aid && (node.id === aid || isNeighbor(aid, node.id)))
+      || (activeCur && (node.id === activeCur || activeSet[node.id]))
       || (search && node.id.toLowerCase().indexOf(search) >= 0)
       || scale > 2.2);
     if (labelIt) {
@@ -279,27 +281,37 @@ var Graph = ForceGraph()(document.getElementById('graph'))
     }
     ctx.globalAlpha = 1;
   })
-  .linkVisibility(function(l) { return showCo || !l.dashed; })
+  .linkVisibility(function(l) {
+    return (showCo || !l.dashed) && nodeShown(endId(l.source)) && nodeShown(endId(l.target));
+  })
   .linkColor(function(l) {
-    var aid = activeId();
-    if (!aid) return '#45475a';
-    return linkTouches(l, aid) ? '#89b4fa' : '#26263a';
+    if (!activeCur) return '#45475a';
+    return linkTouches(l, activeCur) ? '#89b4fa' : '#26263a';
   })
   .linkWidth(function(l) {
-    var aid = activeId();
-    if (!aid) return 0.6;
-    return linkTouches(l, aid) ? 1.6 : 0.4;
+    if (!activeCur) return 0.6;
+    return linkTouches(l, activeCur) ? 1.6 : 0.4;
   })
   .linkLabel('label')
   .linkDirectionalArrowLength(function(l) { return l.dashed ? 0 : 3; })
   .linkLineDash(function(l) { return l.dashed ? [2, 2] : null; })
   .onNodeHover(function(node) {
     hoverId = node ? node.id : null;
+    recomputeActive();
     document.getElementById('graph').style.cursor = node ? 'pointer' : '';
   })
-  .onNodeClick(function(node) { focusId = node.id; showPanel(node.id); })
+  .onNodeClick(function(node) { focusId = node.id; recomputeActive(); showPanel(node.id); })
+  .onNodeDrag(function(n) { n.fx = n.x; n.fy = n.y; })
   .onNodeDragEnd(function(n) { n.fx = n.x; n.fy = n.y; })
-  .onBackgroundClick(function() { focusId = null; closePanel(); });
+  .onBackgroundClick(function() { focusId = null; recomputeActive(); closePanel(); })
+  // Once the initial layout settles, pin every node so dragging one node
+  // doesn't reheat the whole n-body simulation — the fix for large graphs
+  // locking up on drag.
+  .onEngineStop(function() {
+    if (frozen) return;
+    frozen = true;
+    Graph.graphData().nodes.forEach(function(n) { n.fx = n.x; n.fy = n.y; });
+  });
 
 function nodeById(id) {
   var ns = Graph.graphData().nodes;
@@ -377,6 +389,11 @@ document.getElementById('fit').addEventListener('click', function() { Graph.zoom
 document.getElementById('coToggle').addEventListener('change', function(e) {
   showCo = e.target.checked;
   Graph.linkVisibility(Graph.linkVisibility()); // re-set accessor to force a refresh
+});
+document.getElementById('degSlider').addEventListener('input', function(e) {
+  minDeg = parseInt(e.target.value, 10) || 0;
+  document.getElementById('degVal').textContent = minDeg;
+  Graph.nodeVisibility(Graph.nodeVisibility()); // re-apply node + link visibility
 });
 
 document.getElementById('stats').textContent = data.nodes.length + ' nodes · ' + data.links.length + ' links';
