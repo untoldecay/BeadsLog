@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.62.0"
+const CurrentVersion = "0.62.1"
 
 
 var entries = []Entry{
+	{
+		Version: "0.62.1",
+		Date:    "2026-08-09",
+		Features: []string{
+			"Fix: 'bd devlog links suggest' no longer drowns in noise — user/uses/app/data and friends are filtered (auto-pruned on sync), suggestions drop noise endpoints, and ranking by Jaccard overlap surfaces tight architectural pairs over ubiquitous hubs.",
+		},
+		Protocol: []string{
+			"If a project's link suggestions look noisy, run 'bd devlog sync' once (auto-prunes the new stopwords), then 'bd devlog links suggest'.",
+		},
+	},
 	{
 		Version: "0.62.0",
 		Date:    "2026-08-09",

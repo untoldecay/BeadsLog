@@ -297,6 +297,13 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.62.1",
+		Date:    "2026-08-09",
+		Changes: []string{
+			"FIX: relationship suggestions cleaned up — noise stopwords (user/uses/app/data...) filtered + auto-pruned, noise endpoints excluded, ranked by Jaccard overlap so tight pairs beat hubs",
+		},
+	},
+	{
 		Version: "0.62.0",
 		Date:    "2026-08-09",
 		Changes: []string{

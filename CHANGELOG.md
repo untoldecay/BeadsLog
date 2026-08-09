@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.62.1] - 2026-08-09
+
+## [0.62.1] - 2026-08-09
+
+### Fixed
+- **Relationship suggestions were dominated by noise.** Generic prose terms — notably `user` and `uses` (a verb that had become an entity) — buried the real pairs. They're now in the noise stoplist (auto-pruned on sync), link suggestions defensively drop any pair with a noise endpoint, and suggestions rank by Jaccard overlap so tight architectural pairs beat ubiquitous hubs. Run `bd devlog sync` once to clear the backlog, then `bd devlog links suggest`.
+
+
 ## [0.62.0] - 2026-08-09
 
 ## [0.62.0] - 2026-08-09
