@@ -14,10 +14,21 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.60.0"
+const CurrentVersion = "0.61.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.61.0",
+		Date:    "2026-08-09",
+		Features: []string{
+			"Graph viewer smooth on large graphs: layout freezes after settling (dragging a node no longer reheats the whole sim), O(1) highlight, and a 'min connections' slider to hide low-degree noise.",
+			"Prose-noise filtering: generic nouns (config/component/service/system/module/feature/state/technologies) no longer become entities (both extractors); specific names like auth-service survive. Existing noise is auto-pruned on every 'bd devlog sync' (self-limiting).",
+		},
+		Protocol: []string{
+			"Graphs stay clean automatically now. To clean an existing project's backlog immediately, run 'bd devlog prune --noise'.",
+		},
+	},
 	{
 		Version: "0.60.0",
 		Date:    "2026-08-09",

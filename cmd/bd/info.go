@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.61.0",
+		Date:    "2026-08-09",
+		Changes: []string{
+			"PERF: graph viewer smooth on large graphs (freeze-on-drag, O(1) highlight, min-connections slider)",
+			"NEW: generic prose-noise (config/component/service/...) filtered from the graph for both extractors; auto-pruned on each 'bd devlog sync' (self-limiting)",
+		},
+	},
+	{
 		Version: "0.60.0",
 		Date:    "2026-08-09",
 		Changes: []string{

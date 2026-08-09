@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-08-09
+
+## [0.61.0] - 2026-08-09
+
+### Changed
+- **Graph viewer stays smooth on large graphs.** After the initial layout settles the node positions are frozen, so dragging one node no longer reheats the whole force simulation (fixes big graphs locking up on drag). Hover/click highlighting is now O(1) per frame, and a new "min connections" slider hides the long tail of low-degree nodes to tame very large graphs.
+- **Generic prose-noise is filtered out of the graph.** Bare generic nouns (`config`, `component`, `service`, `system`, `module`, `feature`, `state`, `technologies`, …) no longer become entities — the extraction noise filter now catches them for both the regex and AI extractors, while specific compound names (`auth-service`, `UserService`) still survive. Existing noise is swept out automatically on each `bd devlog sync` (self-limiting), so the graph can't accumulate junk over time. Run `bd devlog prune --noise` to clean an existing project immediately.
+
+
 ## [0.60.0] - 2026-08-09
 
 ## [0.60.0] - 2026-08-09
