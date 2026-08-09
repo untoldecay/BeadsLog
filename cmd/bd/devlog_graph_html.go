@@ -38,7 +38,58 @@ type htmlGraphLink struct {
 
 // writeGraphHTML renders an Obsidian-style interactive force-directed graph
 // to a standalone HTML file (force-graph via CDN).
-func writeGraphHTML(path string, exports []graphExport) error {
+// entityMeta is the per-entity detail shown in the viewer's click panel.
+type entityMeta struct {
+	Subject string `json:"subject"`
+	Date    string `json:"date"`
+	Snippet string `json:"snippet"`
+}
+
+// buildEntityMeta maps each entity name to its most recent (non-ghost) devlog
+// session — the subject, date, and a short narrative snippet — for the viewer's
+// click panel. Keyed by the same displayed name the graph nodes use
+// (preferred_name || name). Best-effort: returns nil on error.
+func buildEntityMeta(ctx context.Context, db *sql.DB) map[string]entityMeta {
+	rows, err := db.QueryContext(ctx, `
+		SELECT COALESCE(e.preferred_name, e.name) AS name, s.title, s.timestamp, s.narrative
+		FROM entities e
+		JOIN session_entities se ON se.entity_id = e.id
+		JOIN sessions s ON s.id = se.session_id
+		WHERE COALESCE(s.is_ghost, 0) = 0
+		ORDER BY s.timestamp DESC`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	meta := make(map[string]entityMeta)
+	for rows.Next() {
+		var name, title, ts, narrative string
+		if rows.Scan(&name, &title, &ts, &narrative) != nil {
+			continue
+		}
+		if _, seen := meta[name]; seen {
+			continue // rows are newest-first, so the first per name is the latest
+		}
+		date := ts
+		if len(ts) >= 10 {
+			date = ts[:10]
+		}
+		meta[name] = entityMeta{Subject: title, Date: date, Snippet: snippetOf(narrative, 220)}
+	}
+	return meta
+}
+
+// snippetOf returns a single-line, length-capped excerpt of s.
+func snippetOf(s string, max int) string {
+	s = strings.TrimSpace(strings.Join(strings.Fields(s), " "))
+	if len(s) > max {
+		s = strings.TrimSpace(s[:max]) + "…"
+	}
+	return s
+}
+
+func writeGraphHTML(path string, exports []graphExport, meta map[string]entityMeta) error {
 	nodes := make(map[string]htmlGraphNode)
 	seenLinks := make(map[string]bool)
 	var links []htmlGraphLink
@@ -83,13 +134,20 @@ func writeGraphHTML(path string, exports []graphExport) error {
 	}
 
 	nodeList := make([]htmlGraphNode, 0, len(nodes))
+	metaOut := make(map[string]entityMeta)
 	for _, n := range nodes {
 		nodeList = append(nodeList, n)
+		if meta != nil {
+			if m, ok := meta[n.ID]; ok {
+				metaOut[n.ID] = m
+			}
+		}
 	}
 	data, err := json.Marshal(map[string]interface{}{"nodes": nodeList, "links": links})
 	if err != nil {
 		return err
 	}
+	metaJSON, _ := json.Marshal(metaOut)
 	// Title lists the focused entities, but only when there are a few — a
 	// whole-graph export has one "root" per source entity, and joining all of
 	// them produced a screen-filling wall of names.
@@ -99,7 +157,11 @@ func writeGraphHTML(path string, exports []graphExport) error {
 	}
 	title, _ := json.Marshal(label)
 
-	html := strings.NewReplacer("__DATA__", string(data), "__TITLE__", string(title)).Replace(graphHTMLTemplate)
+	html := strings.NewReplacer(
+		"__DATA__", string(data),
+		"__TITLE__", string(title),
+		"__NODEMETA__", string(metaJSON),
+	).Replace(graphHTMLTemplate)
 
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -132,22 +194,29 @@ const graphHTMLTemplate = `<!DOCTYPE html>
   #panel a.nb:hover { color: #89b4fa; }
   #panel a.nb span { color: #6c7086; float: right; margin-left: 8px; }
   #panel .pclose { float: right; cursor: pointer; color: #6c7086; font-size: 20px; line-height: 1; }
+  #panel .devlog { margin-top: 14px; padding: 10px; background: #11111b; border-radius: 6px; border-left: 3px solid #cba6f7; }
+  #panel .devlog .dl-sub { color: #cba6f7; font-size: 12px; font-weight: 600; }
+  #panel .devlog .dl-date { color: #6c7086; font-size: 10px; margin: 2px 0 6px; }
+  #panel .devlog .dl-snip { color: #a6adc8; font-size: 11px; line-height: 1.45; }
+  #searchcount { color: #6c7086; font-size: 11px; min-width: 34px; text-align: center; }
 </style>
 </head>
 <body>
 <div id="title"></div>
 <div id="toolbar">
   <input type="text" id="search" placeholder="search entity…" autocomplete="off" />
+  <span id="searchcount"></span>
   <button id="fit" title="Fit graph to screen">Fit</button>
   <label><input type="checkbox" id="coToggle" checked /> co-occ</label>
 </div>
-<div id="legend">solid = explicit dependency &nbsp;·&nbsp; dashed = co-occurrence &nbsp;·&nbsp; hover to focus &nbsp;·&nbsp; click for details</div>
+<div id="legend">solid = explicit dependency &nbsp;·&nbsp; dashed = co-occurrence &nbsp;·&nbsp; hover/click to focus &nbsp;·&nbsp; Enter cycles search</div>
 <div id="stats"></div>
 <div id="panel"></div>
 <div id="graph"></div>
 <script>
 var data = __DATA__;
 var title = __TITLE__;
+var nodeMeta = __NODEMETA__;
 document.getElementById('title').textContent = title;
 var palette = ['#f38ba8', '#89b4fa', '#a6e3a1', '#f9e2af', '#cba6f7', '#94e2d5'];
 
@@ -165,19 +234,31 @@ var hubIds = {};
 Object.keys(degree).sort(function(a, b) { return degree[b] - degree[a]; }).slice(0, 12)
   .forEach(function(id) { hubIds[id] = true; });
 
-var hoverNode = null, hoverSet = {}, selId = null, search = '', showCo = true;
+// Highlight state. Hover is transient; click sets a persistent focus. The
+// "active" node for dimming/blue-links is whichever is engaged (hover wins).
+var hoverId = null, focusId = null, selId = null, search = '', showCo = true;
 
 function endId(e) { return (e && e.id !== undefined) ? e.id : e; }
+function activeId() { return hoverId || focusId; }
+function isNeighbor(aid, id) {
+  if (!aid) return false;
+  var ns = neighbors[aid] || [];
+  for (var i = 0; i < ns.length; i++) { if (ns[i].id === id) return true; }
+  return false;
+}
+function linkTouches(l, aid) { return endId(l.source) === aid || endId(l.target) === aid; }
 
 var Graph = ForceGraph()(document.getElementById('graph'))
   .graphData(data)
   .backgroundColor('#1e1e2e')
+  .autoPauseRedraw(false) // keep repainting so hover/click highlight always shows
   .nodeVal(function(n) { return Math.max(2, (degree[n.id] || 0)); })
   .nodeLabel(function(n) { return n.id + ' (' + (degree[n.id] || 0) + ')'; })
   .nodeCanvasObject(function(node, ctx, scale) {
+    var aid = activeId();
     var deg = degree[node.id] || 0;
     var r = Math.max(2, Math.sqrt(deg + 1) * 1.7);
-    var active = !hoverNode || node.id === hoverNode.id || hoverSet[node.id];
+    var active = !aid || node.id === aid || isNeighbor(aid, node.id);
     ctx.globalAlpha = active ? 1 : 0.12;
     ctx.beginPath();
     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
@@ -187,7 +268,7 @@ var Graph = ForceGraph()(document.getElementById('graph'))
     ctx.fill();
     var isHub = hubIds[node.id];
     var labelIt = active && (isHub || node.id === selId
-      || (hoverNode && (node.id === hoverNode.id || hoverSet[node.id]))
+      || (aid && (node.id === aid || isNeighbor(aid, node.id)))
       || (search && node.id.toLowerCase().indexOf(search) >= 0)
       || scale > 2.2);
     if (labelIt) {
@@ -200,25 +281,25 @@ var Graph = ForceGraph()(document.getElementById('graph'))
   })
   .linkVisibility(function(l) { return showCo || !l.dashed; })
   .linkColor(function(l) {
-    if (!hoverNode) return '#45475a';
-    return (endId(l.source) === hoverNode.id || endId(l.target) === hoverNode.id) ? '#89b4fa' : '#26263a';
+    var aid = activeId();
+    if (!aid) return '#45475a';
+    return linkTouches(l, aid) ? '#89b4fa' : '#26263a';
   })
   .linkWidth(function(l) {
-    if (!hoverNode) return 0.6;
-    return (endId(l.source) === hoverNode.id || endId(l.target) === hoverNode.id) ? 1.6 : 0.4;
+    var aid = activeId();
+    if (!aid) return 0.6;
+    return linkTouches(l, aid) ? 1.6 : 0.4;
   })
   .linkLabel('label')
   .linkDirectionalArrowLength(function(l) { return l.dashed ? 0 : 3; })
   .linkLineDash(function(l) { return l.dashed ? [2, 2] : null; })
   .onNodeHover(function(node) {
-    hoverNode = node || null;
-    hoverSet = {};
-    if (node) { (neighbors[node.id] || []).forEach(function(n) { hoverSet[n.id] = true; }); }
+    hoverId = node ? node.id : null;
     document.getElementById('graph').style.cursor = node ? 'pointer' : '';
   })
-  .onNodeClick(function(node) { showPanel(node.id); })
+  .onNodeClick(function(node) { focusId = node.id; showPanel(node.id); })
   .onNodeDragEnd(function(n) { n.fx = n.x; n.fy = n.y; })
-  .onBackgroundClick(function() { closePanel(); });
+  .onBackgroundClick(function() { focusId = null; closePanel(); });
 
 function nodeById(id) {
   var ns = Graph.graphData().nodes;
@@ -241,6 +322,14 @@ function showPanel(id) {
       h += '<a class="nb" data-id="' + n.id + '">' + (n.dir === 'out' ? '&rarr; ' : '&larr; ') + n.id + ' <span>' + (degree[n.id] || 0) + '</span></a>';
     });
   });
+  var m = nodeMeta[id];
+  if (m && m.subject) {
+    h += '<div class="devlog"><div class="rel" style="margin-top:0">last devlog</div>';
+    h += '<div class="dl-sub">' + esc(m.subject) + '</div>';
+    if (m.date) { h += '<div class="dl-date">' + esc(m.date) + '</div>'; }
+    if (m.snippet) { h += '<div class="dl-snip">' + esc(m.snippet) + '</div>'; }
+    h += '</div>';
+  }
   var p = document.getElementById('panel');
   p.innerHTML = h;
   p.classList.add('open');
@@ -254,14 +343,35 @@ function showPanel(id) {
 }
 function closePanel() { document.getElementById('panel').classList.remove('open'); selId = null; }
 
-document.getElementById('search').addEventListener('input', function(e) {
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+// Search cycles through ALL matching entities: type to filter, Enter for next.
+var matches = [], matchIdx = -1;
+function updateSearchCount() {
+  var el = document.getElementById('searchcount');
+  el.textContent = search ? (matches.length ? (matchIdx + 1) + '/' + matches.length : '0/0') : '';
+}
+function gotoMatch(i) {
+  if (!matches.length) return;
+  matchIdx = ((i % matches.length) + matches.length) % matches.length;
+  var n = matches[matchIdx];
+  Graph.centerAt(n.x, n.y, 500);
+  Graph.zoom(5, 500);
+  updateSearchCount();
+}
+var searchEl = document.getElementById('search');
+searchEl.addEventListener('input', function(e) {
   search = e.target.value.trim().toLowerCase();
-  if (search) {
-    var ns = Graph.graphData().nodes;
-    for (var i = 0; i < ns.length; i++) {
-      if (ns[i].id.toLowerCase().indexOf(search) >= 0) { Graph.centerAt(ns[i].x, ns[i].y, 500); Graph.zoom(5, 500); break; }
-    }
-  }
+  matches = search ? Graph.graphData().nodes.filter(function(n) { return n.id.toLowerCase().indexOf(search) >= 0; }) : [];
+  matchIdx = -1;
+  if (matches.length) { gotoMatch(0); } else { updateSearchCount(); }
+});
+searchEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); gotoMatch(matchIdx + (e.shiftKey ? -1 : 1)); }
 });
 document.getElementById('fit').addEventListener('click', function() { Graph.zoomToFit(500, 40); });
 document.getElementById('coToggle').addEventListener('change', function(e) {
@@ -313,7 +423,7 @@ func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string, ope
 			fmt.Println("Graph is empty — no explicit dependencies recorded yet.")
 			return
 		}
-		if err := writeGraphHTML(htmlPath, exports); err != nil {
+		if err := writeGraphHTML(htmlPath, exports, buildEntityMeta(ctx, db)); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing HTML graph: %v\n", err)
 			os.Exit(1)
 		}

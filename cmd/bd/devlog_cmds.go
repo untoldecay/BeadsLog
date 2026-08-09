@@ -1022,7 +1022,7 @@ With no entity, operates on the WHOLE graph:
 				fmt.Println("No graph or co-occurrence data to export.")
 				return
 			}
-			if err := writeGraphHTML(htmlPath, matches); err != nil {
+			if err := writeGraphHTML(htmlPath, matches, buildEntityMeta(rootCtx, db)); err != nil {
 				fmt.Fprintf(os.Stderr, "Error writing HTML graph: %v\n", err)
 				os.Exit(1)
 			}
