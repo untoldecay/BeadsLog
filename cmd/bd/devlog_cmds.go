@@ -958,6 +958,7 @@ With no entity, operates on the WHOLE graph:
 		limit, _ := cmd.Flags().GetInt("limit")
 		relType, _ := cmd.Flags().GetString("type")
 		htmlPath, _ := cmd.Flags().GetString("html")
+		openBrowser, _ := cmd.Flags().GetBool("open")
 
 		store, err := sqlite.New(rootCtx, dbPath)
 		if err != nil {
@@ -969,7 +970,7 @@ With no entity, operates on the WHOLE graph:
 
 		// No entity → whole-graph mode.
 		if len(args) == 0 {
-			runFullGraph(rootCtx, db, htmlPath, relType)
+			runFullGraph(rootCtx, db, htmlPath, relType, openBrowser)
 			return
 		}
 		term := args[0]
@@ -1026,6 +1027,9 @@ With no entity, operates on the WHOLE graph:
 				os.Exit(1)
 			}
 			fmt.Printf("✅ Interactive graph exported: %s\n", htmlPath)
+			if openBrowser {
+				openExportedGraph(htmlPath)
+			}
 			return
 		}
 
@@ -3307,6 +3311,7 @@ func init() {
 	devlogGraphCmd.Flags().Int("limit", 25, "Max matching entities to show")
 	devlogGraphCmd.Flags().String("type", "", "Filter by relationship type (e.g., uses, contains)")
 	devlogGraphCmd.Flags().String("html", "", "Export an interactive force-graph HTML file to the given path (e.g. --html output/graph.html)")
+	devlogGraphCmd.Flags().Bool("open", false, "After --html export, open the file in the default browser")
 	devlogPruneCmd.Flags().Bool("noise", false, "Also purge junk entities (truncation artifacts, phrase fragments)")
 
 	devlogImpactCmd.Flags().Bool("strict", false, "Disable fuzzy matching")

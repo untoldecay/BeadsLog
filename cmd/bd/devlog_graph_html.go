@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/untoldecay/BeadsLog/internal/queries"
@@ -153,7 +155,7 @@ ForceGraph()(document.getElementById('graph'))
 // (reusing the per-entity path over each edge source). Without it, it prints a
 // compact summary — a 1000-node ASCII tree would be unreadable, so the terminal
 // path deliberately summarizes rather than dumps.
-func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string) {
+func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string, openBrowser bool) {
 	if htmlPath != "" {
 		// Every entity that is the source of an edge becomes a root; depth 1 so
 		// each contributes its direct edges. writeGraphHTML de-dupes into the
@@ -190,6 +192,9 @@ func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string) {
 			os.Exit(1)
 		}
 		fmt.Printf("✅ Full graph exported: %s (%d source entities)\n", htmlPath, len(exports))
+		if openBrowser {
+			openExportedGraph(htmlPath)
+		}
 		return
 	}
 
@@ -222,4 +227,33 @@ func runFullGraph(ctx context.Context, db *sql.DB, htmlPath, relType string) {
 		}
 	}
 	fmt.Printf("\n%s Tip: run with --html <path> to export the full interactive graph, or pass an entity to focus.\n", ui.RenderAccent("💡"))
+}
+
+// browserOpenCommand returns the platform command + args to open a path in the
+// default application. Pure (goos-parameterized) so it can be unit-tested
+// without launching anything.
+func browserOpenCommand(goos, path string) (string, []string) {
+	switch goos {
+	case "darwin":
+		return "open", []string{path}
+	case "windows":
+		return "rundll32", []string{"url.dll,FileProtocolHandler", path}
+	default: // linux, bsd, etc.
+		return "xdg-open", []string{path}
+	}
+}
+
+// openInBrowser best-effort launches the default handler for path. Failures are
+// returned so callers can hint, but never fatal — export already succeeded.
+func openInBrowser(path string) error {
+	name, args := browserOpenCommand(runtime.GOOS, path)
+	return exec.Command(name, args...).Start() // #nosec G204 - fixed opener + local file path
+}
+
+// openExportedGraph opens an exported graph file, printing a non-fatal hint if
+// the platform opener isn't available (e.g. headless server).
+func openExportedGraph(path string) {
+	if err := openInBrowser(path); err != nil {
+		fmt.Fprintf(os.Stderr, "  (could not open browser: %v — open %s manually)\n", err, path)
+	}
 }
