@@ -14,10 +14,22 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.59.2"
+const CurrentVersion = "0.60.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.60.0",
+		Date:    "2026-08-09",
+		Features: []string{
+			"'bd devlog graph' with no entity loads the whole graph: terminal summary (counts + most-connected), or '--html out.html' for the full interactive viewer.",
+			"'bd devlog graph --open' opens the exported HTML in the default browser (opt-in, best-effort).",
+			"Interactive graph viewer: hover/click-to-focus (dim + blue connections), detail panel with neighbors-by-importance and the node's latest devlog (subject/date/snippet), size-by-degree, search that cycles all matches, Fit, co-occurrence toggle, pin-on-drag.",
+		},
+		Protocol: []string{
+			"To eyeball architecture: 'bd devlog graph --html /tmp/g.html --open' (whole graph) or pass an entity to focus. No entity + no --html prints a quick summary.",
+		},
+	},
 	{
 		Version: "0.59.2",
 		Date:    "2026-08-09",

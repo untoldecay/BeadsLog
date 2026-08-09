@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-08-09
+
+## [0.60.0] - 2026-08-09
+
+### Added
+- **`bd devlog graph` with no entity loads the whole graph.** `bd devlog graph` prints a summary (entity/edge counts + most-connected entities); `bd devlog graph --html out.html` exports the entire graph as an interactive force-directed viewer.
+- **`bd devlog graph --open`** launches the exported HTML in your default browser (macOS `open`, Linux `xdg-open`, Windows). Opt-in, best-effort — default stays file-only for headless/CI.
+- **Interactive graph viewer.** The exported HTML is now a real exploration tool: top-hub anchor labels with hover/click-to-focus (dims the rest, highlights the connections in blue), a slide-in detail panel showing a node's neighbors grouped by relationship and sorted by importance plus its most recent devlog (subject, date, snippet), node size by degree, a search box that cycles through all matches (Enter / Shift+Enter), a Fit button, a co-occurrence on/off toggle, and pin-on-drag.
+
+
 ## [0.59.2] - 2026-08-09
 
 ## [0.59.2] - 2026-08-09
