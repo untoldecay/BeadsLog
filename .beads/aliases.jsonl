@@ -17,7 +17,9 @@
 {"alias_name":"extraction_log","canonical_name":"extraction-log"}
 {"alias_name":"extractionlog","canonical_name":"extraction-log"}
 {"alias_name":"extractionpipeline","canonical_name":"extraction-pipeline"}
+{"alias_name":"fullgraph","canonical_name":"full-graph"}
 {"alias_name":"gemini-cli","canonical_name":"geminicli"}
+{"alias_name":"in-browser","canonical_name":"inbrowser"}
 {"alias_name":"in-process","canonical_name":"inprocess"}
 {"alias_name":"memory health","canonical_name":"memory-health"}
 {"alias_name":"multiselect","canonical_name":"multi-select"}
