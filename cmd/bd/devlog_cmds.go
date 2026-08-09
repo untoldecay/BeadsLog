@@ -2776,9 +2776,27 @@ const linkMinCooccur = 4
 
 // showLinkHints prints a one-line count of pending relationship suggestions —
 // entity pairs that co-occur strongly but have no explicit edge yet.
+// filterNoiseLinks drops suggestions where either endpoint is a noise entity —
+// a safety net so a DB that predates the current stoplist (not yet re-pruned)
+// still gets clean suggestions instead of "user ↔ uses" junk (BeadsLog-rob).
+func filterNoiseLinks(sugs []queries.LinkSuggestion) []queries.LinkSuggestion {
+	out := sugs[:0]
+	for _, s := range sugs {
+		if extractor.IsNoise(s.EntityA) || extractor.IsNoise(s.EntityB) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 func showLinkHints(ctx context.Context, db *sql.DB) {
 	suggestions, err := queries.GetLinkSuggestions(ctx, db, linkMinCooccur, 0)
-	if err != nil || len(suggestions) == 0 {
+	if err != nil {
+		return
+	}
+	suggestions = filterNoiseLinks(suggestions)
+	if len(suggestions) == 0 {
 		return
 	}
 	suffix := "ies"
@@ -2843,9 +2861,15 @@ var devlogLinksSuggestCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
-		suggestions, err := queries.GetLinkSuggestions(rootCtx, db, linkMinCooccur, limit)
+		// Fetch all (limit applied after noise filtering so we don't return a
+		// short list padded with junk).
+		suggestions, err := queries.GetLinkSuggestions(rootCtx, db, linkMinCooccur, 0)
 		if err != nil {
 			return fmt.Errorf("fetching suggestions: %w", err)
+		}
+		suggestions = filterNoiseLinks(suggestions)
+		if limit > 0 && len(suggestions) > limit {
+			suggestions = suggestions[:limit]
 		}
 		if jsonOutput {
 			outputJSON(suggestions)

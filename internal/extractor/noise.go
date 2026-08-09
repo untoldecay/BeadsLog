@@ -38,6 +38,9 @@ var commonWords = map[string]bool{
 	"service": true, "services": true, "module": true, "modules": true,
 	"feature": true, "features": true, "system": true, "systems": true,
 	"technology": true, "technologies": true, "functionality": true, "state": true,
+	// more generic prose nouns / verb inflections that leaked in as entities
+	"user": true, "users": true, "uses": true, "app": true, "application": true,
+	"data": true, "value": true, "values": true, "item": true, "items": true,
 }
 
 // IsNoise reports whether an extracted entity name is junk that should never

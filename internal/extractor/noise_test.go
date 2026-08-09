@@ -87,7 +87,8 @@ func TestIsNoiseSingleCommonWords(t *testing.T) {
 func TestIsNoiseGenericProseNouns(t *testing.T) {
 	// Bare generic nouns are prose noise (BeadsLog-4qu).
 	for _, n := range []string{"config", "component", "service", "services",
-		"technologies", "system", "module", "feature", "state"} {
+		"technologies", "system", "module", "feature", "state",
+		"user", "users", "uses", "app", "data"} {
 		if !IsNoise(n) {
 			t.Errorf("IsNoise(%q) = false, want true (generic prose noun)", n)
 		}

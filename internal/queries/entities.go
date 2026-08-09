@@ -358,7 +358,7 @@ func GetLinkSuggestions(ctx context.Context, db *sql.DB, minCo, limit int) ([]Li
 			WHERE (d.from_entity = o.e1 AND d.to_entity = o.e2)
 			   OR (d.from_entity = o.e2 AND d.to_entity = o.e1)
 		  )
-		ORDER BY o.co DESC, overlap DESC
+		ORDER BY overlap DESC, o.co DESC
 	`
 	rows, err := db.QueryContext(ctx, query, minCo)
 	if err != nil {
