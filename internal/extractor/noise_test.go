@@ -84,6 +84,23 @@ func TestIsNoiseSingleCommonWords(t *testing.T) {
 	}
 }
 
+func TestIsNoiseGenericProseNouns(t *testing.T) {
+	// Bare generic nouns are prose noise (BeadsLog-4qu).
+	for _, n := range []string{"config", "component", "service", "services",
+		"technologies", "system", "module", "feature", "state"} {
+		if !IsNoise(n) {
+			t.Errorf("IsNoise(%q) = false, want true (generic prose noun)", n)
+		}
+	}
+	// Specific compound names carrying an uncommon token must still survive.
+	for _, n := range []string{"auth-service", "config.yaml", "drawerpanelview",
+		"UserService", "payment-gateway"} {
+		if IsNoise(n) {
+			t.Errorf("IsNoise(%q) = true, want false (specific name must survive)", n)
+		}
+	}
+}
+
 func TestGroundExtraction(t *testing.T) {
 	text := "BeadsLog was initialized to track the PaymentGateway rollout."
 	entities := []Entity{

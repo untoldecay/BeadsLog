@@ -675,6 +675,12 @@ var devlogSyncCmd = &cobra.Command{
 			fmt.Printf("🔗 Auto-merged %d duplicate entity variant(s) (undo: bd devlog unalias <name>)\n", mergedCount)
 		}
 
+		// AUTO-PRUNE NOISE: sweep out generic prose-term entities so the graph
+		// can't accumulate junk over time. Self-limiting: no-op once clean.
+		if removed := pruneNoiseEntities(rootCtx, db); removed > 0 {
+			fmt.Printf("🧹 Removed %d noise entity(ies) (generic prose terms)\n", removed)
+		}
+
 		// RECONCILIATION SUMMARY: surface repair needs instead of burying them in per-file warnings
 		incomplete, ghosts := devlogHealthCounts(store.UnderlyingDB())
 		if ghosts > 0 {
@@ -690,6 +696,33 @@ var devlogSyncCmd = &cobra.Command{
 // devlogHealthCounts returns sessions needing repair: incomplete (missing
 // entities/relationships or containing placeholder text) and ghosts (index
 // entries whose markdown file no longer exists on disk).
+// pruneNoiseEntities removes every entity whose name is noise per the
+// extraction filter (generic prose terms, fragments, truncations) along with
+// its session links and edges. Returns the count removed. Cheap and
+// self-limiting — once the backlog is clean, subsequent calls are no-ops — so
+// it is safe to run automatically on each sync to keep the graph from
+// accumulating junk (BeadsLog-4qu).
+func pruneNoiseEntities(ctx context.Context, db *sql.DB) int {
+	rows, err := db.QueryContext(ctx, "SELECT id, name FROM entities")
+	if err != nil {
+		return 0
+	}
+	var noiseIDs []string
+	for rows.Next() {
+		var id, name string
+		if rows.Scan(&id, &name) == nil && extractor.IsNoise(name) {
+			noiseIDs = append(noiseIDs, id)
+		}
+	}
+	rows.Close()
+	for _, id := range noiseIDs {
+		_, _ = db.ExecContext(ctx, "DELETE FROM session_entities WHERE entity_id = ?", id)
+		_, _ = db.ExecContext(ctx, "DELETE FROM entity_deps WHERE from_entity = ? OR to_entity = ?", id, id)
+		_, _ = db.ExecContext(ctx, "DELETE FROM entities WHERE id = ?", id)
+	}
+	return len(noiseIDs)
+}
+
 func devlogHealthCounts(db *sql.DB) (incomplete, ghosts int) {
 	// enrichment_status = 2 (ai_crystallized) is terminal: AI extraction already
 	// ran, so a session still lacking entities/deps has nothing left to extract
@@ -2737,25 +2770,8 @@ var devlogPruneCmd = &cobra.Command{
 		// --noise: purge junk entities (truncation artifacts, phrase fragments)
 		// that predate extraction-time filtering.
 		if noiseFlag, _ := cmd.Flags().GetBool("noise"); noiseFlag {
-			rows, qErr := db.QueryContext(rootCtx, "SELECT id, name FROM entities")
-			if qErr != nil {
-				fmt.Fprintf(os.Stderr, "Error listing entities: %v\n", qErr)
-				os.Exit(1)
-			}
-			var noiseIDs []string
-			for rows.Next() {
-				var id, name string
-				if rows.Scan(&id, &name) == nil && extractor.IsNoise(name) {
-					noiseIDs = append(noiseIDs, id)
-				}
-			}
-			rows.Close()
-			for _, id := range noiseIDs {
-				_, _ = db.Exec("DELETE FROM session_entities WHERE entity_id = ?", id)
-				_, _ = db.Exec("DELETE FROM entity_deps WHERE from_entity = ? OR to_entity = ?", id, id)
-				_, _ = db.Exec("DELETE FROM entities WHERE id = ?", id)
-			}
-			fmt.Printf("✅ Pruned %d noise entit(ies).\n", len(noiseIDs))
+			removed := pruneNoiseEntities(rootCtx, db)
+			fmt.Printf("✅ Pruned %d noise entit(ies).\n", removed)
 		}
 
 		// Remove the ghosts' rows from _index.md first — otherwise the next

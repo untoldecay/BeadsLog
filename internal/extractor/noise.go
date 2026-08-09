@@ -31,6 +31,13 @@ var commonWords = map[string]bool{
 	"will": true, "with": true, "work": true, "you": true, "your": true,
 	// trunk branch names — never architectural entities on their own
 	"main": true, "master": true, "develop": true, "branch": true,
+	// generic architecture-prose nouns: a real component name is specific
+	// (auth-service, drawerpanelview) and survives because it carries an
+	// uncommon token; the bare word alone is prose noise (BeadsLog-4qu).
+	"config": true, "configuration": true, "component": true, "components": true,
+	"service": true, "services": true, "module": true, "modules": true,
+	"feature": true, "features": true, "system": true, "systems": true,
+	"technology": true, "technologies": true, "functionality": true, "state": true,
 }
 
 // IsNoise reports whether an extracted entity name is junk that should never
