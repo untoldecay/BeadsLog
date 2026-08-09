@@ -12,6 +12,8 @@ daemon.pid
 daemon-*.log
 daemon-*.log.gz
 bd.sock
+bd.sock.startlock
+bd.sock.*
 sync-state.json
 last-touched
 
