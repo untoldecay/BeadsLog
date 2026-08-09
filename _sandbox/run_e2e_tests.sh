@@ -866,4 +866,46 @@ for ctrl in 'id="search"' 'id="panel"' 'id="coToggle"' 'onNodeClick' 'showPanel'
 done
 echo "✅ Test 29 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 30: Relationship suggestions + manual link (BeadsLog-58r)"
+# ---------------------------------------------------------
+# Two entities co-occurring in 4 sessions with no explicit edge -> suggested;
+# 'bd devlog link' creates it (removing the suggestion) and exports links.jsonl;
+# the edge is re-applied on sync (survives re-extraction).
+LK="$TEST_DIR/links_feature"
+mkdir -p "$LK" && cd "$LK"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --no-daemon --prefix lkf > /dev/null 2>&1
+sqlite3 .beads/beads.db "PRAGMA trusted_schema=1;
+INSERT INTO entities(id,name,mention_count) VALUES('e-ed','wysiwygeditor',10),('e-sl','slashcommandmenu',8);
+INSERT INTO sessions(id,title,timestamp) VALUES('ls1','a','2026-01-01'),('ls2','b','2026-01-02'),('ls3','c','2026-01-03'),('ls4','d','2026-01-04');
+INSERT INTO session_entities(session_id,entity_id) VALUES
+ ('ls1','e-ed'),('ls1','e-sl'),('ls2','e-ed'),('ls2','e-sl'),('ls3','e-ed'),('ls3','e-sl'),('ls4','e-ed'),('ls4','e-sl');"
+
+SUG=$("$BD_BIN" devlog links suggest --no-daemon 2>&1 || true)
+if ! echo "$SUG" | grep -q "wysiwygeditor"; then
+    echo "❌ FAIL: no relationship suggestion for the co-occurring pair"
+    echo "$SUG" | head -5
+    exit 1
+fi
+"$BD_BIN" devlog link wysiwygeditor slashcommandmenu --relationship uses --no-daemon > /dev/null 2>&1
+AFTER=$("$BD_BIN" devlog links suggest --no-daemon 2>&1 || true)
+if ! echo "$AFTER" | grep -qi "No pending"; then
+    echo "❌ FAIL: suggestion did not disappear after linking"
+    echo "$AFTER" | head -5
+    exit 1
+fi
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+if ! grep -q '"from":"wysiwygeditor"' .beads/links.jsonl 2>/dev/null; then
+    echo "❌ FAIL: manual link not exported to links.jsonl"
+    exit 1
+fi
+# dismiss makes a pair never resurface
+"$BD_BIN" devlog links dismiss wysiwygeditor slashcommandmenu --no-daemon > /dev/null 2>&1
+
+cd "$TEST_DIR"
+echo "✅ Test 30 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

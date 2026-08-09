@@ -46,12 +46,20 @@ func setupTestDB(t *testing.T) *sql.DB {
 		to_entity TEXT,
 		relationship TEXT,
 		discovered_in TEXT,
+		source TEXT DEFAULT 'manual',
 		PRIMARY KEY(from_entity, to_entity, relationship),
 		FOREIGN KEY(from_entity) REFERENCES entities(id),
 		FOREIGN KEY(to_entity) REFERENCES entities(id),
 		FOREIGN KEY(discovered_in) REFERENCES sessions(id)
 	);
 	CREATE TABLE alias_dismissals (
+		name_a TEXT NOT NULL,
+		name_b TEXT NOT NULL,
+		dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		dismissed_by TEXT,
+		PRIMARY KEY (name_a, name_b)
+	);
+	CREATE TABLE link_dismissals (
 		name_a TEXT NOT NULL,
 		name_b TEXT NOT NULL,
 		dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -242,5 +250,59 @@ func TestAutoAliasDuplicates(t *testing.T) {
 	_ = db.QueryRow("SELECT COUNT(*) FROM entities WHERE id = 'e3'").Scan(&n)
 	if n != 1 {
 		t.Error("near-match 'ollama' was wrongly merged")
+	}
+}
+
+func TestLinkSuggestionsAndManualLink(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	for _, s := range []string{"s1", "s2", "s3", "s4"} {
+		_, _ = db.Exec("INSERT INTO sessions (id, title, timestamp) VALUES (?, ?, '2026-01-01')", s, s)
+	}
+	_, _ = db.Exec("INSERT INTO entities (id, name) VALUES ('e-ed','editor'),('e-sl','slashmenu'),('e-x','lonely')")
+	// editor & slashmenu co-occur in 4 sessions, no explicit edge.
+	for _, p := range [][2]string{{"s1", "e-ed"}, {"s1", "e-sl"}, {"s2", "e-ed"}, {"s2", "e-sl"},
+		{"s3", "e-ed"}, {"s3", "e-sl"}, {"s4", "e-ed"}, {"s4", "e-sl"}, {"s1", "e-x"}} {
+		_, _ = db.Exec("INSERT INTO session_entities (session_id, entity_id) VALUES (?, ?)", p[0], p[1])
+	}
+
+	sug, err := GetLinkSuggestions(ctx, db, 4, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sug) != 1 || sug[0].CoSessions != 4 {
+		t.Fatalf("expected 1 suggestion with 4 shared sessions, got %+v", sug)
+	}
+
+	// Creating the edge removes the suggestion.
+	if err := AddManualLink(ctx, db, "editor", "slashmenu", "uses"); err != nil {
+		t.Fatalf("AddManualLink: %v", err)
+	}
+	sug, _ = GetLinkSuggestions(ctx, db, 4, 0)
+	if len(sug) != 0 {
+		t.Fatalf("expected 0 suggestions after linking, got %+v", sug)
+	}
+
+	// The manual link exports under source='user-link' (not extracted edges).
+	links, _ := GetManualLinks(ctx, db)
+	if len(links) != 1 || links[0].FromName != "editor" || links[0].ToName != "slashmenu" {
+		t.Fatalf("expected 1 manual link editor->slashmenu, got %+v", links)
+	}
+
+	// Unknown entity errors.
+	if err := AddManualLink(ctx, db, "editor", "ghost", "uses"); err == nil {
+		t.Error("expected error linking to unknown entity")
+	}
+
+	// Dismissal removes a pair from suggestions permanently.
+	_, _ = db.Exec("DELETE FROM entity_deps") // reset so editor/slashmenu resurfaces
+	if err := DismissLinkPair(ctx, db, "slashmenu", "editor", "test"); err != nil {
+		t.Fatal(err)
+	}
+	sug, _ = GetLinkSuggestions(ctx, db, 4, 0)
+	if len(sug) != 0 {
+		t.Fatalf("expected 0 suggestions after dismissal, got %+v", sug)
 	}
 }

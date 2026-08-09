@@ -681,6 +681,17 @@ var devlogSyncCmd = &cobra.Command{
 			fmt.Printf("🧹 Removed %d noise entity(ies) (generic prose terms)\n", removed)
 		}
 
+		// RE-APPLY MANUAL LINKS: entities were just (re)extracted, so now the
+		// manual edges from links.jsonl can resolve their endpoints and be
+		// re-inserted — this is what makes them survive a DB rebuild and arrive
+		// from a teammate's clone (BeadsLog-58r).
+		if bDir := beads.FindBeadsDir(); bDir != "" {
+			linksPath := filepath.Join(bDir, "links.jsonl")
+			if _, statErr := os.Stat(linksPath); statErr == nil {
+				_ = importLinksFromJSONL(rootCtx, store, linksPath)
+			}
+		}
+
 		// RECONCILIATION SUMMARY: surface repair needs instead of burying them in per-file warnings
 		incomplete, ghosts := devlogHealthCounts(store.UnderlyingDB())
 		if ghosts > 0 {
@@ -1084,6 +1095,7 @@ With no entity, operates on the WHOLE graph:
 			fmt.Println("No graph or co-occurrence data found.")
 		}
 		showAliasHints(rootCtx, db)
+		showLinkHints(rootCtx, db)
 		fmt.Printf("\n%s Tip: Use --help for depth and filtering options.\n", ui.RenderAccent("💡"))
 	},
 }
@@ -1574,6 +1586,7 @@ Examples:
 			// Found direct results (sessions and/or related entities)
 			fmt.Println(ui.RenderResultsWithContext(query, convertSearchResultsToUI(response.Results), response.RelatedEntities, graphNeighbors, ui.GetWidth(), response.Strategy, explain))
 			showAliasHints(rootCtx, db)
+		showLinkHints(rootCtx, db)
 			fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 			return
 		}
@@ -1596,6 +1609,7 @@ Examples:
 				if err == nil && len(correctedResponse.Results) > 0 {
 					fmt.Println(ui.RenderTypoCorrection(query, first.Name, convertSearchResultsToUI(correctedResponse.Results), ui.GetWidth()))
 					showAliasHints(rootCtx, db)
+		showLinkHints(rootCtx, db)
 					fmt.Printf("\n%s Tip: Use --limit to cap results, --preview for snippets, or --help for filters.\n", ui.RenderAccent("💡"))
 				} else {
 					fmt.Printf("No results found for corrected query '%s'.\n", first.Name)
@@ -1610,12 +1624,14 @@ Examples:
 			}
 			fmt.Println(ui.RenderNoResults(query, suggestionNames, ui.GetWidth()))
 			showAliasHints(rootCtx, db)
+		showLinkHints(rootCtx, db)
 			fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 			return
 		}
 
 		fmt.Println(ui.RenderNoResults(query, nil, ui.GetWidth()))
 		showAliasHints(rootCtx, db)
+		showLinkHints(rootCtx, db)
 		fmt.Printf("\n%s Tip: Not finding what you expect? Run %s to ingest latest logs, or use --help for search filters.\n", ui.RenderAccent("💡"), ui.RenderAccent("bd devlog sync"))
 	},
 }
@@ -2755,6 +2771,119 @@ var devlogAliasesDismissCmd = &cobra.Command{
 	},
 }
 
+// linkMinCooccur is the minimum shared sessions for a relationship suggestion.
+const linkMinCooccur = 4
+
+// showLinkHints prints a one-line count of pending relationship suggestions —
+// entity pairs that co-occur strongly but have no explicit edge yet.
+func showLinkHints(ctx context.Context, db *sql.DB) {
+	suggestions, err := queries.GetLinkSuggestions(ctx, db, linkMinCooccur, 0)
+	if err != nil || len(suggestions) == 0 {
+		return
+	}
+	suffix := "ies"
+	if len(suggestions) == 1 {
+		suffix = "y"
+	}
+	fmt.Printf("\n%s %d relationship opportunit%s detected — review: %s\n",
+		ui.RenderAccent("🔗"), len(suggestions), suffix,
+		ui.RenderAccent("bd devlog links suggest"))
+}
+
+var devlogLinkCmd = &cobra.Command{
+	Use:   "link [from] [to]",
+	Short: "Create an explicit relationship edge between two entities",
+	Long: `Record an explicit dependency edge (from -> to) between two existing
+entities. The edge is marked as manual, so it survives re-extraction and is
+exported to .beads/links.jsonl (shared like aliases).
+
+Example:
+  bd devlog link tsstackwysiwygeditor SlashCommandMenu --relationship uses`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rel, _ := cmd.Flags().GetString("relationship")
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer store.Close()
+		if err := queries.AddManualLink(rootCtx, store.UnderlyingDB(), args[0], args[1], rel); err != nil {
+			return err
+		}
+		if rel == "" {
+			rel = "relates-to"
+		}
+		fmt.Printf("✅ Linked: %s --%s--> %s\n", args[0], rel, args[1])
+		flushMetadata(rootCtx)
+		return nil
+	},
+}
+
+var devlogLinksCmd = &cobra.Command{
+	Use:   "links",
+	Short: "Review and manage relationship (edge) suggestions",
+	Long: `Review pending relationship suggestions — entity pairs that co-occur
+strongly in devlogs but have no explicit edge. Promote a pair with
+'bd devlog link <from> <to> --relationship uses', or reject it with
+'bd devlog links dismiss <a> <b>' so it never resurfaces.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return devlogLinksSuggestCmd.RunE(cmd, args)
+	},
+}
+
+var devlogLinksSuggestCmd = &cobra.Command{
+	Use:   "suggest",
+	Short: "List pending relationship suggestions, strongest first",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		limit, _ := cmd.Flags().GetInt("limit")
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer store.Close()
+		db := store.UnderlyingDB()
+
+		suggestions, err := queries.GetLinkSuggestions(rootCtx, db, linkMinCooccur, limit)
+		if err != nil {
+			return fmt.Errorf("fetching suggestions: %w", err)
+		}
+		if jsonOutput {
+			outputJSON(suggestions)
+			return nil
+		}
+		if len(suggestions) == 0 {
+			fmt.Println("✅ No pending relationship suggestions.")
+			return nil
+		}
+		fmt.Printf("Relationship suggestions (%d shown, strongest co-occurrence first):\n\n", len(suggestions))
+		for _, s := range suggestions {
+			fmt.Printf("  %s ↔ %s  (%d shared sessions, overlap %.0f%%)\n", s.EntityA, s.EntityB, s.CoSessions, s.Overlap*100)
+			fmt.Printf("    link:    bd devlog link %s %s --relationship uses\n", s.EntityA, s.EntityB)
+			fmt.Printf("    reject:  bd devlog links dismiss %s %s\n\n", s.EntityA, s.EntityB)
+		}
+		fmt.Println("💡 Use --limit N for more, --json for machine-readable output.")
+		return nil
+	},
+}
+
+var devlogLinksDismissCmd = &cobra.Command{
+	Use:   "dismiss [entityA] [entityB]",
+	Short: "Reject a relationship suggestion so this pair is never suggested again",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := sqlite.New(rootCtx, dbPath)
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer store.Close()
+		if err := queries.DismissLinkPair(rootCtx, store.UnderlyingDB(), args[0], args[1], actor); err != nil {
+			return fmt.Errorf("recording dismissal: %w", err)
+		}
+		fmt.Printf("✅ Dismissed: '%s' ↔ '%s' will not be suggested again.\n", args[0], args[1])
+		return nil
+	},
+}
+
 var devlogPruneCmd = &cobra.Command{
 	Use:   "prune",
 	Short: "Remove ghost sessions that no longer exist on disk",
@@ -3384,6 +3513,14 @@ func init() {
 	devlogAliasesCmd.AddCommand(devlogAliasesSuggestCmd)
 	devlogAliasesCmd.AddCommand(devlogAliasesDismissCmd)
 	devlogCmd.AddCommand(devlogAliasesCmd)
+	// Relationship (edge) suggestions + manual linking.
+	devlogLinkCmd.Flags().StringP("relationship", "r", "", "Relationship label (default: relates-to)")
+	devlogLinksSuggestCmd.Flags().Int("limit", 10, "Maximum suggestions to show (0 = all)")
+	devlogLinksCmd.Flags().Int("limit", 10, "Maximum suggestions to show (0 = all)")
+	devlogLinksCmd.AddCommand(devlogLinksSuggestCmd)
+	devlogLinksCmd.AddCommand(devlogLinksDismissCmd)
+	devlogCmd.AddCommand(devlogLinkCmd)
+	devlogCmd.AddCommand(devlogLinksCmd)
 	devlogCmd.AddCommand(devlogPruneCmd)
 	devlogCmd.AddCommand(devlogStatusCmd)
 	devlogCmd.AddCommand(devlogGraphCmd)
@@ -3486,5 +3623,8 @@ func flushMetadata(ctx context.Context) {
 	aliasesPath := filepath.Join(bDir, "aliases.jsonl")
 	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: auto-flush aliases failed: %v\n", err)
+	}
+	if err := exportLinksToJSONL(ctx, filepath.Join(bDir, "links.jsonl")); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: auto-flush links failed: %v\n", err)
 	}
 }

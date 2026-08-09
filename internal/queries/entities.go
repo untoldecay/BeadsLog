@@ -314,3 +314,171 @@ func DismissAliasPair(ctx context.Context, db *sql.DB, a, b, actor string) error
 		na, nb, actor)
 	return err
 }
+
+// LinkSuggestion is a pair of entities that co-occur strongly in devlog
+// sessions but have NO explicit dependency edge — a candidate for the agent to
+// promote into a real relationship (BeadsLog-58r).
+type LinkSuggestion struct {
+	EntityA    string  `json:"entity_a"`
+	EntityB    string  `json:"entity_b"`
+	CoSessions int     `json:"co_sessions"`
+	Overlap    float64 `json:"session_overlap"`
+}
+
+// GetLinkSuggestions returns entity pairs with high session co-occurrence and
+// no explicit entity_deps edge in either direction. Dismissed pairs and noise
+// endpoints are excluded; ranked by shared-session count. minCo is the minimum
+// shared sessions; limit <= 0 returns all.
+func GetLinkSuggestions(ctx context.Context, db *sql.DB, minCo, limit int) ([]LinkSuggestion, error) {
+	dismissed, err := loadDismissedLinks(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query := `
+		WITH ES AS (SELECT entity_id, session_id FROM session_entities),
+		Overlap AS (
+			SELECT es1.entity_id e1, es2.entity_id e2, COUNT(*) co
+			FROM ES es1 JOIN ES es2 ON es1.session_id = es2.session_id
+			WHERE es1.entity_id < es2.entity_id
+			GROUP BY es1.entity_id, es2.entity_id
+		),
+		Stats AS (SELECT entity_id, COUNT(*) sc FROM ES GROUP BY entity_id)
+		SELECT COALESCE(e1.preferred_name, e1.name),
+		       COALESCE(e2.preferred_name, e2.name),
+		       o.co,
+		       CAST(o.co AS REAL) / (s1.sc + s2.sc - o.co) AS overlap
+		FROM Overlap o
+		JOIN Stats s1 ON o.e1 = s1.entity_id
+		JOIN Stats s2 ON o.e2 = s2.entity_id
+		JOIN entities e1 ON o.e1 = e1.id
+		JOIN entities e2 ON o.e2 = e2.id
+		WHERE o.co >= ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM entity_deps d
+			WHERE (d.from_entity = o.e1 AND d.to_entity = o.e2)
+			   OR (d.from_entity = o.e2 AND d.to_entity = o.e1)
+		  )
+		ORDER BY o.co DESC, overlap DESC
+	`
+	rows, err := db.QueryContext(ctx, query, minCo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []LinkSuggestion
+	for rows.Next() {
+		var s LinkSuggestion
+		if err := rows.Scan(&s.EntityA, &s.EntityB, &s.CoSessions, &s.Overlap); err != nil {
+			return nil, err
+		}
+		if dismissed[dismissalKey(s.EntityA, s.EntityB)] {
+			continue
+		}
+		out = append(out, s)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, rows.Err()
+}
+
+func loadDismissedLinks(ctx context.Context, db *sql.DB) (map[string]bool, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name_a, name_b FROM link_dismissals")
+	if err != nil {
+		return map[string]bool{}, nil //nolint:nilerr // absent table = none dismissed
+	}
+	defer rows.Close()
+	d := make(map[string]bool)
+	for rows.Next() {
+		var a, b string
+		if err := rows.Scan(&a, &b); err != nil {
+			return nil, err
+		}
+		d[dismissalKey(a, b)] = true
+	}
+	return d, rows.Err()
+}
+
+// DismissLinkPair records that a suggested relationship was reviewed and
+// rejected, so it is never suggested again.
+func DismissLinkPair(ctx context.Context, db *sql.DB, a, b, actor string) error {
+	na, nb := normalizeEntityName(a), normalizeEntityName(b)
+	if na > nb {
+		na, nb = nb, na
+	}
+	_, err := db.ExecContext(ctx,
+		"INSERT OR REPLACE INTO link_dismissals (name_a, name_b, dismissed_by) VALUES (?, ?, ?)",
+		na, nb, actor)
+	return err
+}
+
+// AddManualLink creates an explicit dependency edge fromName -> toName with the
+// given relationship, marked source='manual' so it is exported to links.jsonl
+// and survives re-extraction. Entity names are resolved to their canonical IDs.
+// Returns an error if either entity is unknown.
+func AddManualLink(ctx context.Context, db *sql.DB, fromName, toName, rel string) error {
+	fromID, err := resolveEntityID(ctx, db, fromName)
+	if err != nil {
+		return err
+	}
+	toID, err := resolveEntityID(ctx, db, toName)
+	if err != nil {
+		return err
+	}
+	if fromID == toID {
+		return fmt.Errorf("cannot link an entity to itself")
+	}
+	if rel == "" {
+		rel = "relates-to"
+	}
+	_, err = db.ExecContext(ctx,
+		`INSERT OR REPLACE INTO entity_deps (from_entity, to_entity, relationship, discovered_in, source)
+		 VALUES (?, ?, ?, NULL, 'user-link')`, fromID, toID, rel)
+	return err
+}
+
+// resolveEntityID finds an entity id by exact name or via the alias registry.
+func resolveEntityID(ctx context.Context, db *sql.DB, name string) (string, error) {
+	var id string
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM entities WHERE name = ? OR preferred_name = ?
+		 UNION SELECT canonical_id FROM entity_aliases WHERE alias_name = ?
+		 LIMIT 1`, name, name, name).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("entity %q not found in the graph", name)
+	}
+	return id, nil
+}
+
+// ManualLink is one exported manual edge, keyed by entity NAME so it survives
+// DB reconstruction and travels between clones (links.jsonl).
+type ManualLink struct {
+	FromName     string `json:"from"`
+	ToName       string `json:"to"`
+	Relationship string `json:"relationship"`
+}
+
+// GetManualLinks returns all manual edges by name, for export to links.jsonl.
+func GetManualLinks(ctx context.Context, db *sql.DB) ([]ManualLink, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT COALESCE(ef.preferred_name, ef.name), COALESCE(et.preferred_name, et.name), d.relationship
+		FROM entity_deps d
+		JOIN entities ef ON d.from_entity = ef.id
+		JOIN entities et ON d.to_entity = et.id
+		WHERE d.source = 'user-link'
+		ORDER BY 1, 2, 3`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ManualLink
+	for rows.Next() {
+		var l ManualLink
+		if err := rows.Scan(&l.FromName, &l.ToName, &l.Relationship); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/debug"
+	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/types"
 )
@@ -168,7 +169,40 @@ func importFromJSONLInline(ctx context.Context, jsonlPath string, renameOnImport
 		}
 	}
 
+	// Import manual relationship edges (BeadsLog-58r)
+	linksPath := filepath.Join(beadsDir, "links.jsonl")
+	if _, err := os.Stat(linksPath); err == nil {
+		if err := importLinksFromJSONL(ctx, store, linksPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to import links: %v\n", err)
+		}
+	}
+
 	return nil
+}
+
+// importLinksFromJSONL re-applies manual relationship edges from links.jsonl,
+// resolving entity names to ids. Best-effort per line — an edge whose endpoints
+// aren't in the graph (yet) is skipped rather than failing the whole import.
+func importLinksFromJSONL(ctx context.Context, st storage.Storage, linksPath string) error {
+	if st == nil {
+		return fmt.Errorf("no storage available for link import")
+	}
+	f, err := os.Open(linksPath) // #nosec G304 - path is beadsDir + constant
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	db := st.UnderlyingDB()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		var l queries.ManualLink
+		if json.Unmarshal(scanner.Bytes(), &l) != nil {
+			continue
+		}
+		_ = queries.AddManualLink(ctx, db, l.FromName, l.ToName, l.Relationship)
+	}
+	return scanner.Err()
 }
 
 // importAliasesFromJSONL imports alias records into st. The store is passed

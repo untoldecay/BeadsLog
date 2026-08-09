@@ -73,6 +73,7 @@ var migrationsList = []Migration{
 	{"entity_preferred_name", migrations.MigrateEntityPreferredName},
 	{"devlog_cascades", migrations.MigrateDevlogCascades},
 	{"alias_dismissals", migrations.MigrateAliasDismissals},
+	{"link_dismissals", migrations.MigrateLinkDismissals},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -153,6 +154,7 @@ func getMigrationDescription(name string) string {
 		"entity_preferred_name":        "Adds preferred_name column to entities table for better display casing",
 		"devlog_cascades":             "Ensures devlog tables support ON DELETE CASCADE for ghost pruning",
 		"alias_dismissals":            "Adds alias_dismissals table so rejected alias suggestions stop resurfacing",
+		"link_dismissals":             "Adds link_dismissals table so rejected relationship suggestions stop resurfacing",
 	}
 
 	if desc, ok := descriptions[name]; ok {

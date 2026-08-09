@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/types"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -107,6 +108,9 @@ func exportToJSONL(ctx context.Context, jsonlPath string) error {
 	aliasesPath := filepath.Join(beadsDir, "aliases.jsonl")
 	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to export aliases: %v\n", err)
+	}
+	if err := exportLinksToJSONL(ctx, filepath.Join(beadsDir, "links.jsonl")); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to export links: %v\n", err)
 	}
 
 	// Immediately finalize for backward compatibility
@@ -245,6 +249,9 @@ func exportToJSONLDeferred(ctx context.Context, jsonlPath string) (*ExportResult
 	if err := exportAliasesToJSONL(ctx, aliasesPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to export aliases: %v\n", err)
 	}
+	if err := exportLinksToJSONL(ctx, filepath.Join(dir, "links.jsonl")); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to export links: %v\n", err)
+	}
 
 	// Set appropriate file permissions (0600: rw-------)
 	if err := os.Chmod(jsonlPath, 0600); err != nil {
@@ -327,6 +334,36 @@ func exportAliasesToJSONL(ctx context.Context, aliasesPath string) error {
 	}
 
 	return nil
+}
+
+// exportLinksToJSONL writes the manual relationship edges to links.jsonl so
+// they survive DB reconstruction and travel between clones (mirrors aliases,
+// BeadsLog-58r). Idempotent: skips the write when content is unchanged.
+func exportLinksToJSONL(ctx context.Context, linksPath string) error {
+	if err := ensureStoreActive(); err != nil {
+		return fmt.Errorf("failed to initialize store for link export: %w", err)
+	}
+	links, err := queries.GetManualLinks(ctx, store.UnderlyingDB())
+	if err != nil {
+		return fmt.Errorf("failed to get manual links: %w", err)
+	}
+	if len(links) == 0 {
+		_ = os.Remove(linksPath)
+		return nil
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for _, l := range links {
+		if err := enc.Encode(l); err != nil {
+			return fmt.Errorf("failed to encode link: %w", err)
+		}
+	}
+	if existing, err := os.ReadFile(linksPath); err == nil {
+		if sha256.Sum256(existing) == sha256.Sum256(buf.Bytes()) {
+			return nil
+		}
+	}
+	return os.WriteFile(linksPath, buf.Bytes(), 0600)
 }
 
 func validateOpenIssuesForSync(ctx context.Context) error {
