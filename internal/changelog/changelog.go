@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.62.1"
+const CurrentVersion = "0.63.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.63.0",
+		Date:    "2026-08-11",
+		Features: []string{
+			"Solo/team mode transitions are now clean and reversible. Solo mode uses a separate, git-excluded devlog dir (_rules/_devlog-solo/) so the committed team _devlog/ is never touched; team→solo offers Fresh (clean graph) or Continuity (carry team history). Solo settings (sync-mode/no-push/daemon.auto-sync) live in a git-excluded .beads/config.local.yaml so they never leak into the tracked config.yaml. Rejoining via 'bd init --team --force' publishes your solo devlogs into the team dir, restores config, and removes the excludes.",
+		},
+		Protocol: []string{
+			"To go solo on a shared repo: 'bd init --solo --force' (choose Invisible + Fresh/Continuity). To rejoin: 'bd init --team --force' — it publishes solo devlogs and warns that un-excluding .beads/ merges local issue state via per-issue last-write-wins.",
+		},
+	},
 	{
 		Version: "0.62.1",
 		Date:    "2026-08-09",

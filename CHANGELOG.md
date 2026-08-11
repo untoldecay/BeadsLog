@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-08-11
+
+### Added
+- **Reversible solo/team mode transitions.** Solo mode now uses a separate, git-excluded devlog dir (`_rules/_devlog-solo/`) so the committed team `_rules/_devlog/` is never touched. `team→solo` (`bd init --solo --force`) offers **Fresh** (clean solo graph) or **Continuity** (carry the team's devlog history into your private graph). Rejoining (`bd init --team --force`) publishes your new solo devlogs into the team dir, restores `devlog_dir`, removes the excludes, and cleans up the solo dir — a clean round trip.
+
+### Fixed
+- **Solo config no longer leaks to the team.** `sync-mode: local-only`, `no-push`, and `daemon.auto-sync: false` for invisible/stealth solo modes are now written to a git-excluded `.beads/config.local.yaml` (merged over `config.yaml` at load time) instead of the tracked `config.yaml`, so switching to solo can't leak into a teammate's checkout. Local-branch and non-git solo modes still use `config.yaml`.
+
 ## [0.62.1] - 2026-08-09
 
 ## [0.62.1] - 2026-08-09

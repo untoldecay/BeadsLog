@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.63.0",
+		Date:    "2026-08-11",
+		Changes: []string{
+			"NEW: reversible solo/team transitions — solo uses a git-excluded _rules/_devlog-solo/ dir (team _devlog/ untouched); 'bd init --solo --force' offers Fresh vs Continuity, 'bd init --team --force' publishes solo devlogs back and removes excludes",
+			"FIX: solo config (sync-mode/no-push/daemon.auto-sync) now lives in a git-excluded .beads/config.local.yaml (merged over config.yaml) so invisible/stealth solo mode never leaks into the tracked config.yaml",
+		},
+	},
+	{
 		Version: "0.62.1",
 		Date:    "2026-08-09",
 		Changes: []string{
