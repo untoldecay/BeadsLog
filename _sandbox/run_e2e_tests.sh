@@ -271,21 +271,39 @@ git init -q -b main
 git config user.name "E2E Tester"
 git config user.email "e2e@example.com"
 git commit -q --allow-empty -m init
-printf "1\n" | "$BD_BIN" init --solo --prefix solotest --quiet --no-daemon > /dev/null 2>&1
+# Prompts: 1 = Invisible (git-exclude), then 2 = Continuity devlog graph.
+printf "1\n2\n" | "$BD_BIN" init --solo --prefix solotest --quiet --no-daemon > /dev/null 2>&1
 
-if ! grep -q 'sync-mode: "local-only"' .beads/config.yaml || \
-   ! grep -q 'no-push: true' .beads/config.yaml || \
-   ! grep -q 'daemon.auto-sync: false' .beads/config.yaml; then
-    echo "❌ FAIL: solo config keys missing from config.yaml"
-    grep -E "sync-mode|no-push|auto-sync" .beads/config.yaml || true
+# Invisible mode keeps solo settings in the git-excluded config.local.yaml so
+# they never leak into the tracked config.yaml (BeadsLog-9vd).
+if ! grep -q 'sync-mode: "local-only"' .beads/config.local.yaml || \
+   ! grep -q 'no-push: true' .beads/config.local.yaml || \
+   ! grep -q 'daemon.auto-sync: false' .beads/config.local.yaml; then
+    echo "❌ FAIL: solo config keys missing from config.local.yaml"
+    grep -E "sync-mode|no-push|auto-sync" .beads/config.local.yaml 2>/dev/null || true
+    exit 1
+fi
+# The committed config.yaml must NOT carry active (uncommented) solo settings.
+if grep -E '^[[:space:]]*(sync-mode:|no-push:|daemon\.auto-sync:)' .beads/config.yaml | grep -qv '^[[:space:]]*#'; then
+    echo "❌ FAIL: solo settings leaked into committed config.yaml"
+    grep -E '^[[:space:]]*(sync-mode:|no-push:|daemon\.auto-sync:)' .beads/config.yaml
     exit 1
 fi
 if ! grep -q "^\.beads/" .git/info/exclude; then
     echo "❌ FAIL: .beads/ not in .git/info/exclude (invisible mode)"
     exit 1
 fi
+if ! grep -q "^_rules/_devlog-solo/" .git/info/exclude; then
+    echo "❌ FAIL: _rules/_devlog-solo/ not in .git/info/exclude (invisible mode)"
+    exit 1
+fi
 if git status --porcelain | grep -q "\.beads"; then
     echo "❌ FAIL: git still sees .beads files in invisible mode"
+    exit 1
+fi
+# devlog_dir must be repointed to the excluded solo dir.
+if [ "$("$BD_BIN" config get devlog_dir --no-daemon 2>/dev/null)" != "_rules/_devlog-solo" ]; then
+    echo "❌ FAIL: devlog_dir not repointed to _rules/_devlog-solo (got: $("$BD_BIN" config get devlog_dir --no-daemon 2>/dev/null))"
     exit 1
 fi
 
@@ -907,5 +925,62 @@ fi
 
 cd "$TEST_DIR"
 echo "✅ Test 30 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 31: team -> solo -> team round trip (BeadsLog-9vd)"
+# ---------------------------------------------------------
+RT="$TEST_DIR/roundtrip"
+mkdir -p "$RT" && cd "$RT"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --prefix rt --no-daemon > /dev/null 2>&1
+# A committed team devlog to carry via continuity.
+mkdir -p _rules/_devlog
+printf '# Team\n## Problem\nWork on CoreService.\n' > _rules/_devlog/2026-08-10_team.md
+git add -A && git commit -q -m "team devlog"
+
+# team -> solo (Invisible + Continuity).
+printf "1\n2\n" | "$BD_BIN" init --solo --force --prefix rt --no-daemon > /dev/null 2>&1
+if [ "$("$BD_BIN" config get devlog_dir --no-daemon 2>/dev/null)" != "_rules/_devlog-solo" ]; then
+    echo "❌ FAIL: devlog_dir not repointed to solo dir"
+    exit 1
+fi
+if [ ! -f _rules/_devlog-solo/2026-08-10_team.md ]; then
+    echo "❌ FAIL: continuity did not carry the team devlog into the solo dir"
+    exit 1
+fi
+if ! git diff --quiet _rules/_devlog/; then
+    echo "❌ FAIL: team devlog dir was modified during solo transition"
+    exit 1
+fi
+
+# Write a solo-only devlog, then rejoin the team.
+printf '# Solo\n## Problem\nSecretWidget.\n' > _rules/_devlog-solo/2026-08-11_solo.md
+printf "n\nn\n" | "$BD_BIN" init --team --force --prefix rt --no-daemon > /dev/null 2>&1
+
+if [ ! -f _rules/_devlog/2026-08-11_solo.md ]; then
+    echo "❌ FAIL: solo devlog was not published to the team dir"
+    exit 1
+fi
+if [ "$("$BD_BIN" config get devlog_dir --no-daemon 2>/dev/null)" != "_rules/_devlog" ]; then
+    echo "❌ FAIL: devlog_dir not restored to team dir"
+    exit 1
+fi
+if [ -d _rules/_devlog-solo ]; then
+    echo "❌ FAIL: redundant solo dir not cleaned up after rejoining team"
+    exit 1
+fi
+if [ -f .beads/config.local.yaml ]; then
+    echo "❌ FAIL: config.local.yaml override not removed on team rejoin"
+    exit 1
+fi
+if grep -qE "_devlog-solo|^\.beads/" .git/info/exclude 2>/dev/null; then
+    echo "❌ FAIL: solo excludes not removed from .git/info/exclude"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 31 Passed."
 
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
