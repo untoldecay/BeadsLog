@@ -240,11 +240,11 @@ func initializeDevlog(baseDir string, quiet bool, autoSync, enforce, backgroundE
 
 		defer store.Close()
 
-		// Always set or update if empty
-
+		// Set only when unset — never clobber a devlog_dir already chosen this
+		// run (e.g. solo mode repoints it to the excluded _devlog-solo).
 		current, _ := store.GetConfig(rootCtx, "devlog_dir")
 
-		if current == "" || current != baseDir {
+		if current == "" {
 
 			if err := store.SetConfig(rootCtx, "devlog_dir", baseDir); err != nil && !quiet {
 

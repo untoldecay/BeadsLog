@@ -171,6 +171,18 @@ func Initialize() error {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 		debug.Logf("Debug: loaded config from %s\n", v.ConfigFileUsed())
+
+		// Merge a sibling config.local.yaml if present. This is the per-machine
+		// override used by solo mode (BeadsLog-9vd): it is git-excluded, so
+		// local-only settings never leak to the committed config.yaml.
+		localPath := filepath.Join(filepath.Dir(v.ConfigFileUsed()), "config.local.yaml")
+		if _, err := os.Stat(localPath); err == nil {
+			v.SetConfigFile(localPath)
+			if err := v.MergeInConfig(); err != nil {
+				return fmt.Errorf("error reading config.local.yaml: %w", err)
+			}
+			debug.Logf("Debug: merged local overrides from %s\n", localPath)
+		}
 	} else {
 		// No config.yaml found - use defaults and environment variables
 		debug.Logf("Debug: no config.yaml found; using defaults and environment variables\n")

@@ -20,6 +20,19 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Println("This wizard will configure beads for team collaboration.")
 	fmt.Println()
 
+	// Step 0: If this repo is currently in solo mode, reverse it — publish the
+	// solo devlogs into the team dir, drop the excludes, restore config
+	// (BeadsLog-9vd). Detected by the solo devlog dir being active.
+	if cur, _ := store.GetConfig(ctx, "devlog_dir"); cur == soloDevlogDir {
+		fmt.Printf("%s Solo mode detected — rejoining the team.\n", ui.RenderAccent("▶"))
+		published, tErr := transitionToTeam(ctx, store)
+		if tErr != nil {
+			return fmt.Errorf("failed to reverse solo mode: %w", tErr)
+		}
+		fmt.Printf("%s Published %d solo devlog(s) to %s; solo excludes removed.\n", ui.RenderPass("✓"), published, teamDevlogDir)
+		fmt.Printf("%s Note: rejoining un-excludes .beads/ — your local issue state now merges with the team (per-issue last-write-wins) on the next sync.\n\n", ui.RenderWarn("⚠"))
+	}
+
 	// Step 1: Check if we're in a git repository
 	fmt.Printf("%s Detecting git repository setup...\n", ui.RenderAccent("▶"))
 

@@ -162,6 +162,29 @@ func SetYamlConfigAt(configPath, key, value string) error {
 	return nil
 }
 
+// SetLocalYamlConfig sets a value in the git-excluded config.local.yaml sibling
+// of the project's config.yaml. Used by solo mode so per-machine settings
+// (sync-mode, no-push, daemon.auto-sync) never leak into the committed config
+// (BeadsLog-9vd). Merged over config.yaml at load time.
+func SetLocalYamlConfig(key, value string) error {
+	configPath, err := findProjectConfigYaml()
+	if err != nil {
+		return err
+	}
+	localPath := filepath.Join(filepath.Dir(configPath), "config.local.yaml")
+	return SetYamlConfigAt(localPath, key, value)
+}
+
+// LocalYamlConfigPath returns the path to the project's config.local.yaml
+// (whether or not it exists), or an error if no config.yaml is found.
+func LocalYamlConfigPath() (string, error) {
+	configPath, err := findProjectConfigYaml()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(configPath), "config.local.yaml"), nil
+}
+
 // GetYamlConfig gets a configuration value from config.yaml.
 // Returns empty string if key is not found or is commented out.
 // Keys are normalized to their canonical yaml format (e.g., sync.branch -> sync-branch).

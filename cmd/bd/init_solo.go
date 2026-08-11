@@ -17,17 +17,24 @@ import (
 // soloLocalBranch is the default local-only sync branch for solo mode.
 const soloLocalBranch = "beads-local"
 
-// applySoloConfig writes the local-only settings to .beads/config.yaml.
-// sync.mode is the declarative marker (read by doctor); no-push and
-// daemon.auto-sync are the enforcement.
-func applySoloConfig() error {
+// applySoloConfig writes the local-only settings. sync.mode is the declarative
+// marker (read by doctor); no-push and daemon.auto-sync are the enforcement.
+// When local is true they go to the git-excluded config.local.yaml so they
+// never leak into the committed config.yaml (invisible/stealth modes); when
+// false they go to config.yaml (local-branch mode commits them to a
+// never-pushed branch; non-git repos have nothing to leak to). (BeadsLog-9vd)
+func applySoloConfig(local bool) error {
 	settings := [][2]string{
 		{"sync.mode", "local-only"},
 		{"no-push", "true"},
 		{"daemon.auto-sync", "false"},
 	}
+	set := config.SetYamlConfig
+	if local {
+		set = config.SetLocalYamlConfig
+	}
 	for _, kv := range settings {
-		if err := config.SetYamlConfig(kv[0], kv[1]); err != nil {
+		if err := set(kv[0], kv[1]); err != nil {
 			return fmt.Errorf("failed to set %s: %w", kv[0], err)
 		}
 	}
@@ -45,16 +52,21 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 	fmt.Println("Beads data stays on this machine: no push, no daemon auto-sync.")
 	fmt.Println()
 
-	if err := applySoloConfig(); err != nil {
-		return false, err
-	}
-	fmt.Printf("%s sync.mode: local-only (no-push, daemon auto-sync off)\n", ui.RenderPass("✓"))
-
 	if stealthAlreadySet {
+		// Beads files are already git-excluded — keep the solo config local too.
+		if err := applySoloConfig(true); err != nil {
+			return false, err
+		}
+		fmt.Printf("%s sync.mode: local-only (no-push, daemon auto-sync off)\n", ui.RenderPass("✓"))
 		fmt.Printf("%s Stealth already active: beads files excluded from git\n", ui.RenderPass("✓"))
 		return true, nil
 	}
 	if !isGitRepo() {
+		// No git → nothing to leak into; write to config.yaml directly.
+		if err := applySoloConfig(false); err != nil {
+			return false, err
+		}
+		fmt.Printf("%s sync.mode: local-only (no-push, daemon auto-sync off)\n", ui.RenderPass("✓"))
 		return false, nil
 	}
 
@@ -71,6 +83,12 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 	response = strings.TrimSpace(response)
 
 	if response == "2" {
+		// Local-branch mode commits beads (incl. config) to a never-pushed
+		// branch, so the solo config belongs in the committed config.yaml.
+		if err := applySoloConfig(false); err != nil {
+			return false, err
+		}
+		fmt.Printf("%s sync.mode: local-only (no-push, daemon auto-sync off)\n", ui.RenderPass("✓"))
 		branch := soloLocalBranch
 		// Continue from an existing sync branch (config or a well-known branch
 		// like beads-metadata) instead of orphaning its history (BeadsLog-a2l).
@@ -95,10 +113,27 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 		return false, nil
 	}
 
-	if err := setupForkExclude(true); err != nil {
-		return false, fmt.Errorf("failed to configure git exclude: %w", err)
+	// Devlog graph choice: fresh vs carry the team history.
+	fmt.Println("\nDevlog graph when going solo:")
+	fmt.Printf("  1. %s: start clean (your solo notes only)\n", ui.RenderAccent("Fresh"))
+	fmt.Printf("  2. %s: carry the team's devlog history into your private graph\n", ui.RenderAccent("Continuity"))
+	fmt.Print("\nChoice [1/2, default 2]: ")
+	gResp, _ := reader.ReadString('\n')
+	continuity := strings.TrimSpace(gResp) != "1"
+
+	// Invisible mode: solo config goes to the git-excluded config.local.yaml so
+	// nothing leaks into the committed config.yaml (BeadsLog-9vd).
+	if err := applySoloConfig(true); err != nil {
+		return false, err
 	}
-	fmt.Printf("\n%s .beads/ excluded from git — invisible to collaborators\n", ui.RenderPass("✓"))
+	fmt.Printf("%s sync.mode: local-only (no-push, daemon auto-sync off)\n", ui.RenderPass("✓"))
+
+	carried, err := transitionToSolo(ctx, store, continuity)
+	if err != nil {
+		return false, fmt.Errorf("failed to set up solo devlog space: %w", err)
+	}
+	fmt.Printf("\n%s .beads/ + %s/ excluded from git — invisible to collaborators\n", ui.RenderPass("✓"), soloDevlogDir)
+	printSoloDevlogNote(carried, continuity)
 	printSoloSummary("")
 	return true, nil
 }
