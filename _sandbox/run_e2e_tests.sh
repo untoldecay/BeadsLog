@@ -1004,4 +1004,57 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 31 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 32: solo on a team that doesn't use beads — no footprint leaks (BeadsLog-9vd)"
+# ---------------------------------------------------------
+NB="$TEST_DIR/nonbeads"
+mkdir -p "$NB" && cd "$NB"
+git init -q -b main
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+# Team baseline: their OWN agent file (no beads) + code, committed.
+printf '# Team Agent Rules\nUse tabs. Run make test.\n' > AGENTS.md
+echo "code" > app.txt
+git add AGENTS.md app.txt && git commit -q -m "team baseline (no beads)"
+
+# Solo dev adds beads, then goes invisible.
+"$BD_BIN" init --quiet --prefix nb --no-daemon > /dev/null 2>&1
+printf "1\n2\n" | "$BD_BIN" init --solo --force --prefix nb --no-daemon > /dev/null 2>&1
+
+# Do private work and run the agent close-protocol's blanket stage.
+"$BD_BIN" create "private solo issue" -p 2 --no-daemon > /dev/null 2>&1
+"$BD_BIN" sync --no-daemon > /dev/null 2>&1
+git add -A
+LEAK=$(git diff --cached --name-only | grep -E 'beads|_rules|AGENT|CLAUDE|\.cursorrules|\.windsufrules|GEMINI|CODEBASE|gitattributes' || true)
+if [ -n "$LEAK" ]; then
+    echo "❌ FAIL: beads footprint would leak to a non-beads team:"
+    echo "$LEAK" | sed 's/^/    /'
+    exit 1
+fi
+git reset -q
+# The solo agent must still read beads content from AGENTS.md on disk...
+if ! grep -q "bd onboard" AGENTS.md; then
+    echo "❌ FAIL: agent file lost its beads content on disk (solo agent can't onboard)"
+    exit 1
+fi
+# ...while git hides the modification and the team's committed copy is intact.
+if ! git ls-files -v AGENTS.md | grep -q '^S'; then
+    echo "❌ FAIL: team AGENTS.md not skip-worktree'd (beads block would leak)"
+    exit 1
+fi
+if ! git show HEAD:AGENTS.md | grep -q "Use tabs"; then
+    echo "❌ FAIL: team's committed AGENTS.md content was clobbered"
+    exit 1
+fi
+
+# Rejoin the team — footprint hiding must fully reverse.
+printf "n\nn\n" | "$BD_BIN" init --team --force --prefix nb --no-daemon > /dev/null 2>&1
+if git ls-files -v AGENTS.md | grep -q '^S'; then
+    echo "❌ FAIL: AGENTS.md still skip-worktree'd after rejoining team"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 32 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

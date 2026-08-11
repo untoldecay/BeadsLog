@@ -132,8 +132,14 @@ func runSoloWizard(ctx context.Context, store storage.Storage, stealthAlreadySet
 	if err != nil {
 		return false, fmt.Errorf("failed to set up solo devlog space: %w", err)
 	}
-	fmt.Printf("\n%s .beads/ + %s/ excluded from git — invisible to collaborators\n", ui.RenderPass("✓"), soloDevlogDir)
+	fmt.Printf("\n%s .beads/ + %s/ + beads scaffolding excluded from git — invisible to collaborators\n", ui.RenderPass("✓"), soloDevlogDir)
 	printSoloDevlogNote(carried, continuity)
+	// skip-worktree can hide an UNcommitted protocol block, but not one already
+	// in history. If a teammate would pull the block, tell the user to strip it.
+	if committed := protocolCommittedFiles(); len(committed) > 0 {
+		fmt.Printf("%s Heads up: the beads protocol block is already committed in %s — it's in git history, so hiding it now only stops future changes. To fully remove it from the team's view, delete the <beads_protocol>…</beads_protocol> block and commit that.\n",
+			ui.RenderWarn("⚠"), strings.Join(committed, ", "))
+	}
 	printSoloSummary("")
 	return true, nil
 }
