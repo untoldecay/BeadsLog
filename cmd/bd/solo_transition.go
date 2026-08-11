@@ -112,6 +112,11 @@ func transitionToSolo(ctx context.Context, store storage.Storage, continuity boo
 	if _, err := addGitExcludePatterns([]string{".beads/", soloDevlogDir + "/"}); err != nil {
 		return carried, err
 	}
+	// .git/info/exclude only hides UNTRACKED files. In an established team-beads
+	// repo the .beads/ files are already committed, so also skip-worktree them —
+	// otherwise the agent's 'git add -A; commit; push' close protocol leaks the
+	// solo user's private issue state to the team (kf7).
+	_ = setSkipWorktree(gitTrackedBeadsFiles(), true)
 	return carried, nil
 }
 
@@ -128,6 +133,10 @@ func transitionToTeam(ctx context.Context, store storage.Storage) (published int
 	if err := store.SetConfig(ctx, "devlog_dir", teamDevlogDir); err != nil {
 		return published, err
 	}
+	// Clear skip-worktree first so the tracked .beads/ files are visible to git
+	// again — rejoining the team deliberately re-exposes local issue state to
+	// merge (per-issue LWW), which the caller warns about (kf7).
+	_ = setSkipWorktree(gitTrackedBeadsFiles(), false)
 	if err := removeGitExcludePatterns([]string{".beads/", soloDevlogDir + "/"}); err != nil {
 		return published, err
 	}
@@ -206,6 +215,45 @@ func publishSoloDevlogs(solo, team string) (int, error) {
 func runGit(args ...string) (string, error) {
 	out, err := exec.Command("git", args...).Output() // #nosec G204 - fixed args
 	return string(out), err
+}
+
+// gitTrackedBeadsFiles returns the git-tracked files under .beads/ (issues.jsonl,
+// config.yaml, aliases.jsonl, …). In an established team-beads repo these are
+// already committed, so .git/info/exclude — which only affects UNTRACKED files —
+// cannot hide the solo user's local mutations. Empty slice if none are tracked.
+func gitTrackedBeadsFiles() []string {
+	out, err := runGit("ls-files", "-z", ".beads/")
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, f := range strings.Split(strings.TrimRight(out, "\x00"), "\x00") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files
+}
+
+// setSkipWorktree flips the skip-worktree bit on tracked files so git ignores
+// local modifications to them (they won't be staged, committed or pushed) —
+// git's native mechanism for locally diverging a tracked file. Passing skip
+// false clears it, re-exposing the file to git.
+//
+// ponytail: skip-worktree can stall a `git rebase`/`pull` that also touches the
+// file; solo runs with daemon auto-sync OFF so the daemon can't race it (the
+// footgun in memory git-rebase-vs-bd-daemon). Upgrade path if that bites: move
+// solo beads to a separate untracked DB/JSONL path instead of hiding the tracked one.
+func setSkipWorktree(files []string, skip bool) error {
+	if len(files) == 0 {
+		return nil
+	}
+	flag := "--skip-worktree"
+	if !skip {
+		flag = "--no-skip-worktree"
+	}
+	_, err := runGit(append([]string{"update-index", flag}, files...)...)
+	return err
 }
 
 func printSoloDevlogNote(carried int, continuity bool) {

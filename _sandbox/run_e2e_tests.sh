@@ -954,6 +954,22 @@ if ! git diff --quiet _rules/_devlog/; then
     echo "❌ FAIL: team devlog dir was modified during solo transition"
     exit 1
 fi
+# kf7: .beads/ was committed above (tracked), so exclusion alone can't hide it.
+# A private solo issue + the agent close-protocol's 'git add -A' must NOT stage it.
+if ! git ls-files -v .beads/issues.jsonl | grep -q '^S'; then
+    echo "❌ FAIL: .beads/issues.jsonl not skip-worktree'd in solo (would leak)"
+    git ls-files -v .beads/ | head
+    exit 1
+fi
+"$BD_BIN" create "PRIVATE solo issue" -p 2 --no-daemon > /dev/null 2>&1
+"$BD_BIN" sync --no-daemon > /dev/null 2>&1
+git add -A
+if git diff --cached --name-only | grep -q '^\.beads/'; then
+    echo "❌ FAIL: solo beads mutation leaked into the index via 'git add -A'"
+    git diff --cached --name-only | grep '^\.beads/'
+    exit 1
+fi
+git reset -q  # unstage before continuing the round trip
 
 # Write a solo-only devlog, then rejoin the team.
 printf '# Solo\n## Problem\nSecretWidget.\n' > _rules/_devlog-solo/2026-08-11_solo.md
@@ -977,6 +993,11 @@ if [ -f .beads/config.local.yaml ]; then
 fi
 if grep -qE "_devlog-solo|^\.beads/" .git/info/exclude 2>/dev/null; then
     echo "❌ FAIL: solo excludes not removed from .git/info/exclude"
+    exit 1
+fi
+# kf7: rejoining must clear skip-worktree so .beads/ syncs with the team again.
+if git ls-files -v .beads/issues.jsonl | grep -q '^S'; then
+    echo "❌ FAIL: .beads/issues.jsonl still skip-worktree'd after rejoining team"
     exit 1
 fi
 
