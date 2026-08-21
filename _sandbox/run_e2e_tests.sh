@@ -983,4 +983,59 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 31 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 33: dedicated sync branch is the default with a remote — beads never lands on the work branch (BeadsLog)"
+# ---------------------------------------------------------
+BARE="$TEST_DIR/origin33.git"
+rm -rf "$BARE"; git init -q --bare "$BARE"
+SB="$TEST_DIR/syncbranch"
+mkdir -p "$SB" && cd "$SB"
+git init -q -b develop
+git config user.name "E2E Tester"
+git config user.email "e2e@example.com"
+git remote add origin "$BARE"
+echo "code" > app.txt && git add app.txt && git commit -q -m "work on develop" && git push -q -u origin develop
+
+# Plain init on a repo WITH a remote defaults to the dedicated sync branch.
+"$BD_BIN" init --quiet --prefix sb --no-daemon > /dev/null 2>&1
+if [ "$("$BD_BIN" config get sync.branch --no-daemon 2>/dev/null)" != "beads-metadata" ]; then
+    echo "❌ FAIL: plain init with a remote did not default sync.branch to beads-metadata"
+    exit 1
+fi
+"$BD_BIN" create "an issue" -p 2 --no-daemon > /dev/null 2>&1
+"$BD_BIN" sync --no-daemon > /dev/null 2>&1
+
+# Beads must be on beads-metadata (local + remote), never on develop.
+if [ "$(git ls-tree -r beads-metadata --name-only 2>/dev/null | grep -c 'issues.jsonl')" -ne 1 ]; then
+    echo "❌ FAIL: issues.jsonl not committed to local beads-metadata"
+    exit 1
+fi
+if git log develop --name-only --oneline 2>/dev/null | grep -q '\.beads/'; then
+    echo "❌ FAIL: beads leaked onto the develop work branch"
+    exit 1
+fi
+if ! git ls-remote origin 2>/dev/null | grep -q 'refs/heads/beads-metadata'; then
+    echo "❌ FAIL: beads-metadata was not pushed to origin"
+    exit 1
+fi
+if git ls-tree -r origin/develop --name-only 2>/dev/null | grep -q '\.beads/'; then
+    echo "❌ FAIL: beads leaked onto origin/develop (shared work branch)"
+    exit 1
+fi
+
+# --inline opts out (old behavior: no dedicated sync branch).
+IN="$TEST_DIR/inline"
+mkdir -p "$IN" && cd "$IN"
+git init -q -b develop
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+git remote add origin "$BARE"
+"$BD_BIN" init --quiet --inline --prefix il --no-daemon > /dev/null 2>&1
+if [ -n "$("$BD_BIN" config get sync.branch --no-daemon 2>/dev/null | grep -v 'not set')" ]; then
+    echo "❌ FAIL: --inline should not set a sync branch"
+    exit 1
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 33 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

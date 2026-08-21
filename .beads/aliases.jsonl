@@ -30,6 +30,7 @@
 {"alias_name":"pre-commit-hook","canonical_name":"precommithook"}
 {"alias_name":"regex-extractor","canonical_name":"regexextractor"}
 {"alias_name":"renameonimport","canonical_name":"rename-on-import"}
+{"alias_name":"skip-worktree","canonical_name":"skipworktree"}
 {"alias_name":"sync-branch","canonical_name":"syncbranch"}
 {"alias_name":"sync-session","canonical_name":"syncsession"}
 {"alias_name":"workingprotocol.md","canonical_name":"working_protocol.md"}

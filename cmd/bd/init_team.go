@@ -14,6 +14,12 @@ import (
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
+// defaultSyncBranch is the dedicated branch beads commits go to by default, so
+// beads data never lands on the user's work branch (develop/main). Isolated via
+// an internal worktree; override with 'bd config set sync-branch <name>' or
+// disable with 'bd init --inline'.
+const defaultSyncBranch = "beads-metadata"
+
 // runTeamWizard guides the user through team workflow setup
 func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("\n%s %s\n\n", ui.RenderBold("bd"), ui.RenderBold("Team Workflow Setup Wizard"))
@@ -44,66 +50,25 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 		return fmt.Errorf("not in a git repository")
 	}
 
-	// Get current branch
-	currentBranch, err := getGitBranch()
-	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
-	}
-
-	fmt.Printf("%s Current branch: %s\n", ui.RenderPass("✓"), currentBranch)
-
-	// Step 2: Check for protected main branch
-	fmt.Printf("\n%s Checking branch configuration...\n", ui.RenderAccent("▶"))
-
-	fmt.Println("\nIs your main branch protected (prevents direct commits)?")
-	fmt.Println("  GitHub: Settings → Branches → Branch protection rules")
-	fmt.Println("  GitLab: Settings → Repository → Protected branches")
-	fmt.Print("\nProtected main branch? [y/N]: ")
-
 	reader := bufio.NewReader(os.Stdin)
-	response, _ := reader.ReadString('\n')
-	response = strings.TrimSpace(strings.ToLower(response))
 
-	protectedMain := (response == "y" || response == "yes")
-
-	var syncBranch string
-
-	if protectedMain {
-		fmt.Printf("\n%s Protected main detected\n", ui.RenderPass("✓"))
-		fmt.Println("\n  Beads will commit issue updates to a separate branch.")
-		fmt.Printf("  Default sync branch: %s\n", ui.RenderAccent("beads-metadata"))
-		fmt.Print("\n  Sync branch name [press Enter for default]: ")
-
-		branchName, _ := reader.ReadString('\n')
-		branchName = strings.TrimSpace(branchName)
-
-		if branchName == "" {
-			syncBranch = "beads-metadata"
-		} else {
-			syncBranch = branchName
-		}
-
-		fmt.Printf("\n%s Sync branch set to: %s\n", ui.RenderPass("✓"), syncBranch)
-
-		// Set sync.branch config (GH#923: use syncbranch.Set for validation)
-		if err := syncbranch.Set(ctx, store, syncBranch); err != nil {
-			return fmt.Errorf("failed to set sync branch: %w", err)
-		}
-
-		// Create the sync branch if it doesn't exist
-		fmt.Printf("\n%s Creating sync branch...\n", ui.RenderAccent("▶"))
-
-		if err := createSyncBranch(syncBranch); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create sync branch: %v\n", err)
-			fmt.Println("  You can create it manually: git checkout -b", syncBranch)
-		} else {
-			fmt.Printf("%s Sync branch created\n", ui.RenderPass("✓"))
-		}
-
-	} else {
-		fmt.Printf("%s Direct commits to %s\n", ui.RenderPass("✓"), currentBranch)
-		syncBranch = currentBranch
+	// Step 2: Sync branch. Beads always commits to a dedicated branch, never your
+	// work branch — a dedicated branch is safe whether or not main is protected
+	// (that's all the old "protected main?" question decided), so we don't ask,
+	// we just isolate. Honor a name already configured (e.g. from 'bd init').
+	fmt.Printf("\n%s Sync branch\n", ui.RenderAccent("▶"))
+	syncBranch := defaultSyncBranch
+	if existing := syncbranch.GetFromYAML(); existing != "" {
+		syncBranch = existing
 	}
+	// Set sync.branch config (GH#923: use syncbranch.Set for validation)
+	if err := syncbranch.Set(ctx, store, syncBranch); err != nil {
+		return fmt.Errorf("failed to set sync branch: %w", err)
+	}
+	fmt.Printf("%s Beads commits go to a dedicated %s branch via an internal worktree —\n", ui.RenderPass("✓"), ui.RenderAccent(syncBranch))
+	fmt.Println("  never your work branches. Teammates pull/push it like normal git.")
+	fmt.Printf("  Share to main when you want: %s (or 'bd sync --merge').\n", ui.RenderAccent("merge "+syncBranch+" → main via PR"))
+	fmt.Printf("  Rename: %s   Disable: %s\n", ui.RenderAccent("bd config set sync-branch <name>"), ui.RenderAccent("bd init --inline"))
 
 	// Step 3: Configure team settings
 	fmt.Printf("\n%s Configuring team settings...\n", ui.RenderAccent("▶"))
@@ -126,7 +91,7 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Println("  • Auto-push: Pushes commits to remote")
 	fmt.Print("\nEnable auto-sync? [Y/n]: ")
 
-	response, _ = reader.ReadString('\n')
+	response, _ := reader.ReadString('\n')
 	response = strings.TrimSpace(strings.ToLower(response))
 
 	autoSync := !(response == "n" || response == "no")
@@ -150,16 +115,9 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("\n%s %s\n\n", ui.RenderPass("✓"), ui.RenderBold("Team setup complete!"))
 
 	fmt.Println("Configuration:")
-	if protectedMain {
-		fmt.Printf("  Protected main: %s\n", ui.RenderAccent("yes"))
-		fmt.Printf("  Sync branch: %s\n", ui.RenderAccent(syncBranch))
-		fmt.Printf("  Commits will go to: %s\n", ui.RenderAccent(syncBranch))
-		fmt.Printf("  Merge to main via: %s\n", ui.RenderAccent("Pull Request"))
-	} else {
-		fmt.Printf("  Protected main: %s\n", ui.RenderAccent("no"))
-		fmt.Printf("  Commits will go to: %s\n", ui.RenderAccent(currentBranch))
-	}
-
+	fmt.Printf("  Sync branch: %s\n", ui.RenderAccent(syncBranch))
+	fmt.Printf("  Commits go to: %s (dedicated, never your work branches)\n", ui.RenderAccent(syncBranch))
+	fmt.Printf("  Merge to main via: %s\n", ui.RenderAccent("Pull Request"))
 	if autoSync {
 		fmt.Printf("  Auto-sync: %s\n", ui.RenderAccent("enabled"))
 	} else {
@@ -169,13 +127,9 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Println()
 	fmt.Println("How it works:")
 	fmt.Println("  • All team members work on the same repository")
-	fmt.Println("  • Issues are shared via git commits")
+	fmt.Println("  • Issues + devlogs are shared via the", syncBranch, "branch")
 	fmt.Println("  • Use 'bd list' to see all team's issues")
-
-	if protectedMain {
-		fmt.Println("  • Issue updates commit to", syncBranch)
-		fmt.Println("  • Periodically merge", syncBranch, "to main via PR")
-	}
+	fmt.Println("  • Periodically merge", syncBranch, "to main via PR (optional)")
 
 	if autoSync {
 		fmt.Println("  • Daemon automatically commits and pushes changes")
@@ -187,13 +141,10 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	fmt.Printf("Try it: %s\n", ui.RenderAccent("bd create \"Team planning issue\" -p 2"))
 	fmt.Println()
 
-	if protectedMain {
-		fmt.Println("Next steps:")
-		fmt.Printf("  1. %s\n", "Share the "+syncBranch+" branch with your team")
-		fmt.Printf("  2. %s\n", "Team members: git pull origin "+syncBranch)
-		fmt.Printf("  3. %s\n", "Periodically: merge "+syncBranch+" to main via PR")
-		fmt.Println()
-	}
+	fmt.Println("Next steps:")
+	fmt.Printf("  1. %s\n", "Teammates: git pull origin "+syncBranch+" (or just run 'bd sync')")
+	fmt.Printf("  2. %s\n", "Periodically: merge "+syncBranch+" to main via PR")
+	fmt.Println()
 
 	return nil
 }

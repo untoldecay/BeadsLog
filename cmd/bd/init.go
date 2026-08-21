@@ -56,6 +56,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 		team, _ := cmd.Flags().GetBool("team")
 		solo, _ := cmd.Flags().GetBool("solo")
 		stealth, _ := cmd.Flags().GetBool("stealth")
+		inline, _ := cmd.Flags().GetBool("inline")
 
 		if solo && team {
 			fmt.Fprintln(os.Stderr, "Error: --solo and --team are mutually exclusive")
@@ -392,16 +393,22 @@ With --stealth: configures per-repository git settings for invisible beads usage
 			}
 		}
 
-		// Set sync.branch only if explicitly specified via --branch flag
-		// GH#807: Do NOT auto-detect current branch - if sync.branch is set to main/master,
-		// the worktree created by bd sync will check out main, preventing the user from
-		// checking out main in their working directory (git error: "'main' is already checked out")
-		//
-		// When --branch is not specified, bd sync will commit directly to the current branch
-		// (the original behavior before sync branch feature)
+		// Default beads commits to a dedicated sync branch (beads-metadata) so they
+		// never land on the user's work branch (develop/main). A dedicated branch
+		// is safe re: GH#807 — it is never checked out in the working tree, so the
+		// sync worktree can always check it out (unlike auto-picking the current
+		// branch). --inline restores the old commit-to-current-branch behavior.
+		// Solo/stealth manage their own posture (invisible = no branch at all,
+		// local-branch = beads-local, never pushed), so leave them alone.
 		//
 		// GH#927: This must run AFTER createConfigYaml() so that config.yaml exists
 		// and syncbranch.Set() can update it via config.SetYamlConfig() (PR#910 mechanism)
+		// Only auto-engage when a remote exists — that's the only case where beads
+		// can leak onto a shared work branch via push. Purely local repos keep the
+		// simple inline behavior (nothing is pushed anywhere anyway).
+		if branch == "" && !inline && !solo && !stealth && hasGitRemote(ctx) {
+			branch = defaultSyncBranch
+		}
 		if branch != "" {
 			if err := syncbranch.Set(ctx, store, branch); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: failed to set sync branch: %v\n", err)
@@ -409,7 +416,7 @@ With --stealth: configures per-repository git settings for invisible beads usage
 				os.Exit(1)
 			}
 			if !quiet {
-				fmt.Printf("  Sync branch: %s\n", branch)
+				fmt.Printf("  Sync branch: %s (beads commits stay off your work branches; --inline to disable)\n", branch)
 			}
 		}
 
@@ -858,7 +865,8 @@ With --stealth: configures per-repository git settings for invisible beads usage
 func init() {
 	initCmd.Flags().StringP("prefix", "p", "", "Issue prefix (default: current directory name)")
 	initCmd.Flags().BoolP("quiet", "q", false, "Suppress output (quiet mode)")
-	initCmd.Flags().StringP("branch", "b", "", "Git branch for beads commits (default: current branch)")
+	initCmd.Flags().StringP("branch", "b", "", "Git branch for beads commits (default: dedicated "+defaultSyncBranch+" branch)")
+	initCmd.Flags().Bool("inline", false, "Commit beads to the current branch instead of a dedicated sync branch")
 	initCmd.Flags().Bool("contributor", false, "Run OSS contributor setup wizard")
 	initCmd.Flags().Bool("team", false, "Run team workflow setup wizard")
 	initCmd.Flags().Bool("solo", false, "Run solo mode setup: beads data stays local, never pushed to remote")

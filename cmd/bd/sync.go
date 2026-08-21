@@ -316,7 +316,7 @@ func doPullFirstSync(ctx context.Context, jsonlPath string, renameOnImport, noGi
 	// Step 3: Pull from remote
 	// When sync.branch is configured, pull from the sync branch via worktree
 	// Otherwise, use normal git pull on the current branch
-	if hasSyncBranchConfig {
+	if hasSyncBranchConfig && hasGitRemote(ctx) {
 		fmt.Printf("→ Pulling from sync branch '%s'...\n", syncBranch)
 		pullResult, err := syncbranch.PullFromSyncBranch(ctx, syncBranchRepoRoot, syncBranch, jsonlPath, false)
 		if err != nil {
@@ -331,6 +331,11 @@ func doPullFirstSync(ctx context.Context, jsonlPath string, renameOnImport, noGi
 		} else if pullResult.FastForwarded {
 			fmt.Println("  Fast-forwarded to remote")
 		}
+	} else if hasSyncBranchConfig {
+		// Sync branch configured but no remote (local-only): nothing to fetch.
+		// The local sync branch is the only state; skip the pull and commit
+		// to it locally below. (Mirrors syncBranchPull's local-only guard.)
+		fmt.Println("→ Local-only (no remote); skipping sync-branch pull")
 	} else {
 		fmt.Println("→ Pulling from remote...")
 		if err := gitPull(ctx, ""); err != nil {
@@ -389,7 +394,10 @@ func doPullFirstSync(ctx context.Context, jsonlPath string, renameOnImport, noGi
 	// Otherwise, use normal git commit/push on the current branch
 	if hasSyncBranchConfig {
 		fmt.Printf("→ Committing to sync branch '%s'...\n", syncBranch)
-		commitResult, err := syncbranch.CommitToSyncBranch(ctx, syncBranchRepoRoot, syncBranch, jsonlPath, !noPush)
+		// Only push if a remote exists — a local-only repo (or one before its
+		// remote is added) commits to the sync branch without pushing.
+		pushSyncBranch := !noPush && hasGitRemote(ctx)
+		commitResult, err := syncbranch.CommitToSyncBranch(ctx, syncBranchRepoRoot, syncBranch, jsonlPath, pushSyncBranch)
 		if err != nil {
 			return fmt.Errorf("committing to sync branch: %w", err)
 		}
