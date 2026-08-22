@@ -109,9 +109,20 @@ func transitionToSolo(ctx context.Context, store storage.Storage, continuity boo
 	if err := store.SetConfig(ctx, "devlog_dir", soloDevlogDir); err != nil {
 		return carried, err
 	}
-	if _, err := addGitExcludePatterns([]string{".beads/", soloDevlogDir + "/"}); err != nil {
+	// Hide the whole beads footprint from git in one exclude write: .beads/, the
+	// solo devlog dir, the _rules scaffolding, and any untracked agent file
+	// carrying the protocol block. Agents read these from disk, so solo stays
+	// fully functional; the team just never sees beads (BeadsLog-9vd).
+	footprintPatterns, trackedAgents := beadsFootprintExcludes()
+	patterns := append([]string{".beads/", soloDevlogDir + "/"}, footprintPatterns...)
+	if _, err := addGitExcludePatterns(patterns); err != nil {
 		return carried, err
 	}
+	// .git/info/exclude only hides UNTRACKED files. Already-tracked files (an
+	// established repo) need skip-worktree so local mutations don't leak: the
+	// .beads/ state (kf7) and the protocol block in the team's own agent files.
+	_ = setSkipWorktree(gitTrackedBeadsFiles(), true)
+	_ = setSkipWorktree(trackedAgents, true)
 	return carried, nil
 }
 
@@ -128,7 +139,18 @@ func transitionToTeam(ctx context.Context, store storage.Storage) (published int
 	if err := store.SetConfig(ctx, "devlog_dir", teamDevlogDir); err != nil {
 		return published, err
 	}
-	if err := removeGitExcludePatterns([]string{".beads/", soloDevlogDir + "/"}); err != nil {
+	// Clear skip-worktree first so the tracked .beads/ files + agent protocol
+	// blocks are visible to git again — rejoining the team deliberately
+	// re-exposes local issue state to merge (per-issue LWW), which the caller
+	// warns about (kf7).
+	_ = setSkipWorktree(gitTrackedBeadsFiles(), false)
+	_, trackedAgents := beadsFootprintExcludes()
+	_ = setSkipWorktree(trackedAgents, false)
+	// Remove every possible footprint pattern (fixed dirs + all candidate agent
+	// files); patterns not present are ignored.
+	unExclude := append([]string{".beads/", soloDevlogDir + "/"}, soloFootprintDirs...)
+	unExclude = append(unExclude, footprintFiles...)
+	if err := removeGitExcludePatterns(unExclude); err != nil {
 		return published, err
 	}
 	// Drop the per-machine override entirely so the committed config.yaml
@@ -206,6 +228,120 @@ func publishSoloDevlogs(solo, team string) (int, error) {
 func runGit(args ...string) (string, error) {
 	out, err := exec.Command("git", args...).Output() // #nosec G204 - fixed args
 	return string(out), err
+}
+
+// gitTrackedBeadsFiles returns the git-tracked files under .beads/ (issues.jsonl,
+// config.yaml, aliases.jsonl, …). In an established team-beads repo these are
+// already committed, so .git/info/exclude — which only affects UNTRACKED files —
+// cannot hide the solo user's local mutations. Empty slice if none are tracked.
+func gitTrackedBeadsFiles() []string {
+	out, err := runGit("ls-files", "-z", ".beads/")
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, f := range strings.Split(strings.TrimRight(out, "\x00"), "\x00") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files
+}
+
+// setSkipWorktree flips the skip-worktree bit on tracked files so git ignores
+// local modifications to them (they won't be staged, committed or pushed) —
+// git's native mechanism for locally diverging a tracked file. Passing skip
+// false clears it, re-exposing the file to git.
+//
+// ponytail: skip-worktree can stall a `git rebase`/`pull` that also touches the
+// file; solo runs with daemon auto-sync OFF so the daemon can't race it (the
+// footgun in memory git-rebase-vs-bd-daemon). Upgrade path if that bites: move
+// solo beads to a separate untracked DB/JSONL path instead of hiding the tracked one.
+func setSkipWorktree(files []string, skip bool) error {
+	if len(files) == 0 {
+		return nil
+	}
+	flag := "--skip-worktree"
+	if !skip {
+		flag = "--no-skip-worktree"
+	}
+	_, err := runGit(append([]string{"update-index", flag}, files...)...)
+	return err
+}
+
+// soloFootprintDirs are the bd scaffolding dirs (beyond .beads/) that pollute a
+// team which doesn't use beads. Only untracked instances are actually hidden —
+// .git/info/exclude leaves tracked files alone, so a team that committed these
+// (i.e. does use beads) keeps them.
+var soloFootprintDirs = []string{"_rules/_orchestration/", "_rules/_devlog/"}
+
+// gitIsTracked reports whether path is tracked by git.
+func gitIsTracked(path string) bool {
+	out, err := runGit("ls-files", "--", path)
+	return err == nil && strings.TrimSpace(out) != ""
+}
+
+// footprintFiles are the shared config/agent files bd injects beads content
+// into: the agent instruction files plus .gitattributes (the JSONL merge
+// driver). Each is hidden only if it actually carries a bd marker.
+var footprintFiles = append(append([]string{}, Candidates...), ".gitattributes")
+
+// agentFileHasProtocol reports whether a footprint file carries content bd
+// injected: the <beads_protocol> block or pre-onboard trap in agent files, or
+// the merge driver in .gitattributes.
+func agentFileHasProtocol(path string) bool {
+	b, err := os.ReadFile(path) // #nosec G304 - fixed candidate names
+	if err != nil {
+		return false
+	}
+	s := string(b)
+	if path == ".gitattributes" {
+		return strings.Contains(s, "merge=beads")
+	}
+	return strings.Contains(s, ProtocolStartTag) ||
+		strings.Contains(s, LegacyProtocolStartTag) ||
+		strings.Contains(s, BootstrapTrap)
+}
+
+// beadsFootprintExcludes returns the exclude patterns for the non-.beads/ beads
+// footprint (scaffolding dirs + untracked agent files carrying the protocol
+// block) and the tracked agent files that must instead be skip-worktree'd. This
+// is what keeps beads from polluting a team that doesn't use it (BeadsLog-9vd):
+// agents read these files from disk regardless of git, so hiding them from git
+// leaves the solo setup fully functional while the team never sees it.
+func beadsFootprintExcludes() (patterns, trackedAgents []string) {
+	patterns = append(patterns, soloFootprintDirs...)
+	for _, f := range footprintFiles {
+		if !agentFileHasProtocol(f) {
+			continue
+		}
+		if gitIsTracked(f) {
+			trackedAgents = append(trackedAgents, f)
+		} else {
+			patterns = append(patterns, f)
+		}
+	}
+	return patterns, trackedAgents
+}
+
+// protocolCommittedFiles returns agent files whose committed (HEAD) version
+// already contains the protocol block — skip-worktree can't hide what's already
+// in history, so the caller warns the user to strip it.
+func protocolCommittedFiles() []string {
+	var committed []string
+	for _, f := range footprintFiles {
+		if !agentFileHasProtocol(f) || !gitIsTracked(f) {
+			continue
+		}
+		if out, err := runGit("show", "HEAD:"+f); err == nil &&
+			(strings.Contains(out, ProtocolStartTag) ||
+				strings.Contains(out, LegacyProtocolStartTag) ||
+				strings.Contains(out, BootstrapTrap) ||
+				strings.Contains(out, "merge=beads")) {
+			committed = append(committed, f)
+		}
+	}
+	return committed
 }
 
 func printSoloDevlogNote(carried int, continuity bool) {
