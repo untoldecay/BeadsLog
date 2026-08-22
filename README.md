@@ -1,19 +1,20 @@
 # BeadsLog
 
-**Git-backed project memory for AI coding agents.**
+**Codebase memory for AI coding agents.**
 
 BeadsLog records what your agents do as they work — decisions, dead ends, and which components depend on which — and turns it into a searchable graph stored in git. Agents query it before they code, so they don't rebuild deleted code or repeat past mistakes.
 
 Built on [Beads](https://github.com/steveyegge/beads).
 
-**Built for vibecoders. Agent-first.** You steer in plain language; your AI agent (Claude Code, Cursor, Codex, …) writes the code. BeadsLog is the memory that agent is missing.
-
 **For you if:**
 - You **vibecode on a team at high pace.** Everyone's agents share one memory, so they build on each other's work instead of colliding or redoing it — no waiting, no stepping on toes.
 - You're a **solo vibecoder juggling many projects.** Pick any project back up after days or weeks; your agent reloads the full context in seconds. Time away between sessions stops costing you.
+- You **don't have the dev reflexes yet** — git hygiene, keeping work coordinated across people. BeadsLog handles that layer so you don't have to.
 - You're **tired of re-explaining your project** to your agent every single session.
 
-**Not for you if:** you don't use AI agents, or you want a human-facing issue tracker or kanban board. BeadsLog is agent-first, not a Jira replacement.
+**Not for you if:** you're a seasoned dev who doesn't use AI agents — or who doesn't need an extra layer to keep things in check.
+
+**Built for vibecoders, agent agnostic** — works with Claude Code, Cursor, Codex, ….
 
 ## Quick Start
 
