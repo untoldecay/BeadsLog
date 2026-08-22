@@ -1,6 +1,6 @@
 # BeadsLog
 
-**Codebase memory for AI coding agents.**
+**Agent-first codebase memory.**
 
 BeadsLog records what your agents do as they work — decisions, dead ends, and which components depend on which — and turns it into a searchable graph stored in git. Agents query it before they code, so they don't rebuild deleted code or repeat past mistakes.
 
