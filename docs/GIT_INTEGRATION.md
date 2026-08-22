@@ -228,26 +228,33 @@ Then resolve with:
 jj resolve --tool=beads-merge
 ```
 
-## Protected Branch Workflows
+## Dedicated Sync Branch (default)
 
-**If your repository uses protected branches** (GitHub, GitLab, etc.), bd can commit to a separate branch instead of `main`:
+By **default**, when your repo has a git remote, `bd init` commits beads data to a
+dedicated **`beads-metadata`** branch instead of your work branch (`main`/`develop`).
+This keeps beads off the branches you ship code on, and works with protected
+branches out of the box — no extra setup. See [Protected Branches](PROTECTED_BRANCHES.md).
 
 ### Configuration
 
 ```bash
-# Initialize with separate sync branch
-bd init --branch beads-sync
+# Default: bd init auto-configures the dedicated sync branch when a remote exists
+bd init
 
-# Or configure existing setup
-bd config set sync.branch beads-sync
+# Use a different branch name
+bd init --branch beads-sync          # or: bd config set sync-branch beads-sync
+
+# Opt out — commit beads to the CURRENT branch instead (pre-sync-branch behavior)
+bd init --inline
 ```
 
 ### How It Works
 
-- Beads commits issue updates to `beads-sync` instead of `main`
+- Beads commits issue updates to `beads-metadata` instead of your work branch
 - Uses git worktrees (lightweight checkouts) in `.git/beads-worktrees/`
+- `.beads/` is kept out of the work branch's staging, so a stray `git add -A` can't land it there
 - Your main working directory is never affected
-- Periodically merge `beads-sync` back to `main` via pull request
+- Optionally merge `beads-metadata` back to `main` via pull request (`bd sync --merge`)
 
 ### Daily Workflow (Unchanged for Agents)
 
@@ -258,7 +265,7 @@ bd update bd-a1b2 --status in_progress
 bd close bd-a1b2 "Fixed"
 ```
 
-All changes automatically commit to `beads-sync` branch (if daemon is running with `--auto-commit`).
+All changes automatically commit to the `beads-metadata` branch (in team mode, with `daemon.auto-sync: true`).
 
 ### Merging to Main (Humans)
 
@@ -279,7 +286,7 @@ bd sync --merge
 - ✅ Works with protected `main` branches
 - ✅ No disruption to agent workflows
 - ✅ Platform-agnostic (works on any git platform)
-- ✅ Backward compatible (opt-in via config)
+- ✅ On by default with a remote (use `bd init --inline` to opt out)
 
 See [PROTECTED_BRANCHES.md](PROTECTED_BRANCHES.md) for complete setup guide, troubleshooting, and examples.
 

@@ -245,8 +245,16 @@ Configuration keys use dot-notation namespaces to organize settings:
 - `export.skip_encoding_errors` - Skip issues that fail JSON encoding (default: false)
 - `export.write_manifest` - Write .manifest.json with export metadata (default: false)
 - `auto_export.error_policy` - Override error policy for auto-exports (default: `best-effort`)
-- `sync.branch` - Name of the dedicated sync branch for beads data (see docs/PROTECTED_BRANCHES.md)
+- `sync.branch` (a.k.a. `sync-branch`) - Dedicated branch beads commits to. Defaults to `beads-metadata` when a remote exists; set automatically by `bd init`. Use `bd init --inline` to opt out and commit on the current branch. See docs/PROTECTED_BRANCHES.md and docs/RUNNING_MODES.md
+- `sync-mode` - `auto` (default) or `local-only`. `local-only` (set by `bd init --solo`) means beads is never pushed and `bd doctor` skips remote checks
 - `sync.require_confirmation_on_mass_delete` - Require interactive confirmation before pushing when >50% of issues vanish during a merge AND more than 5 issues existed before (default: `false`)
+
+> [!NOTE]
+> **Per-machine overrides (`config.local.yaml`):** solo mode writes local-only
+> settings (`sync-mode`, `no-push`, `daemon.auto-sync`) to a git-excluded
+> `.beads/config.local.yaml`, which is merged over `config.yaml` at load time.
+> This keeps machine-specific solo state out of the committed `config.yaml`. You
+> generally don't edit it by hand — `bd init --solo` / `bd init --team` manage it.
 
 ### Integration Namespaces
 
@@ -391,8 +399,8 @@ bd sync  # Respects import.orphan_handling setting
 Controls for the sync branch workflow (see docs/PROTECTED_BRANCHES.md):
 
 ```bash
-# Configure sync branch (required for protected branch workflow)
-bd config set sync.branch beads-sync
+# Change the sync branch name (defaults to beads-metadata, set automatically by bd init)
+bd config set sync-branch beads-sync
 
 # Enable mass deletion protection (optional, default: false)
 # When enabled, if >50% of issues vanish during a merge AND more than 5

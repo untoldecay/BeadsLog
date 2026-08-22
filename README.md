@@ -13,11 +13,14 @@ Requires [Go](https://go.dev/doc/install) (1.24+).
 go install github.com/untoldecay/BeadsLog/cmd/bd@latest
 
 # 2. Initialize in repo
-bd init
+bd init          # solo? private? see Running Modes below
 
 # 3. Connect AI agent
 bd onboard
 ```
+
+> [!TIP]
+> `bd init` keeps beads off your work branch by default (dedicated `beads-metadata` branch when a remote exists). Working privately, or on a team that doesn't use beads? See [Running Modes](docs/RUNNING_MODES.md) — team, solo, and switching.
 
 > [!NOTE]
 > **Folder naming:** entity extraction filters common words and trunk branch names (`master`, `main`, `test`, `core`, ...) to keep the knowledge graph clean. If your project folder is named one of these (e.g. a worktree checked out as `master/`), BeadsLog automatically tracks it as `<name>-repository`. Manually written relationship arrows targeting a filtered word are dropped **with a warning** — rename the entity in your arrow (e.g. `master-repository`) to keep the edge.

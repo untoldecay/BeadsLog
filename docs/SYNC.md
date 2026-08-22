@@ -186,11 +186,11 @@ Beads supports several sync modes for different use cases:
 
 | Mode | Trigger | Flow | Use Case |
 |------|---------|------|----------|
-| **Normal** | Default `bd sync` | Pull → Merge → Export → Push | Standard multi-machine sync |
-| **Sync-branch** | `sync.branch` config | Separate git branch for beads files | Isolated beads history |
+| **Sync-branch** | `sync.branch` config (**default** with a remote) | Commit beads to a dedicated `beads-metadata` branch via worktree | Keep beads off your work branch |
+| **Normal (inline)** | `bd init --inline` | Pull → Merge → Export → Push on the current branch | Commit beads alongside code |
 | **External** | `BEADS_DIR` env | Separate repo for beads | Shared team database |
 | **From-main** | `sync.from_main` config | Clone beads from main branch | Feature branch workflow |
-| **Local-only** | No git remote | Export only (no push) | Single-machine usage |
+| **Local-only** | No remote, **or** solo mode (`sync-mode: local-only` / `no-push`) | Export/commit only, never push | Single-machine or private (solo) usage |
 | **Export-only** | `--no-pull` flag | Export → Push (skip pull/merge) | Force local state to remote |
 
 ### Mode Selection Logic

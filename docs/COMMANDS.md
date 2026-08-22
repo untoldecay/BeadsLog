@@ -2,6 +2,17 @@
 
 BeadsLog combines issue tracking with architectural mapping. Commands are categorized by their primary role in the workflow.
 
+## 🚦 Setup & Modes
+Choose how beads relates to git. See [Running Modes](RUNNING_MODES.md) for why/how.
+
+| Command | Usage | Description |
+| :--- | :--- | :--- |
+| `bd init` | `bd init` | Initialize. With a remote, beads commits to a dedicated `beads-metadata` branch (off your work branch). |
+| `bd init --inline` | `bd init --inline` | Commit beads on the **current** branch instead of a dedicated one. |
+| `bd init --solo` | `bd init --solo` | Private, local-only: never pushed, invisible to the team (Invisible or local `beads-local` branch). |
+| `bd init --team` | `bd init --team --force` | (Re)join a team; publishes local devlogs, restores shared config. |
+| `bd config set sync-branch` | `bd config set sync-branch <name>` | Rename the dedicated sync branch. |
+
 ## 📋 Issue Tracking (The "Beads")
 Use these to manage the "Forward" flow of tasks.
 

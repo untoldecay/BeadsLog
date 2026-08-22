@@ -15,18 +15,27 @@ go build -o bd ./cmd/bd
 First time in a repository:
 
 ```bash
-# Basic setup
+# Basic setup — with a remote, beads commits to a dedicated beads-metadata
+# branch (off your work branch); works with protected main out of the box
 bd init
+
+# Commit beads on your CURRENT branch instead of a dedicated one
+bd init --inline
+
+# Private / local-only: never pushed, invisible to the team
+bd init --solo
+
+# Team collaboration wizard (auto-sync, dedicated sync branch)
+bd init --team
 
 # OSS contributor (fork workflow with separate planning repo)
 bd init --contributor
 
-# Team member (branch workflow for collaboration)
-bd init --team
-
-# Protected main branch (GitHub/GitLab)
+# Use a custom sync-branch name
 bd init --branch beads-sync
 ```
+
+See [Running Modes](RUNNING_MODES.md) for when to use each.
 
 The wizard will:
 - Create `.beads/` directory and database

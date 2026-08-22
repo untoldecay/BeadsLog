@@ -2,6 +2,14 @@
 
 This guide explains how to use beads with protected branches on platforms like GitHub, GitLab, and Bitbucket.
 
+> [!NOTE]
+> **This is now the default.** As of the dedicated-sync-branch release, `bd init`
+> automatically commits beads to a dedicated **`beads-metadata`** branch whenever
+> your repo has a remote — you no longer need `--branch`, and it works with
+> protected branches with zero extra setup. This guide's mechanics still apply;
+> substitute your branch name if you renamed it. To opt out and commit beads on
+> your current branch, use `bd init --inline`.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -17,64 +25,56 @@ This guide explains how to use beads with protected branches on platforms like G
 
 **Problem:** GitHub and other platforms let you protect branches (like `main`) to require pull requests for all changes. This prevents beads from auto-committing issue updates directly to `main`.
 
-**Solution:** Beads can commit to a separate branch (like `beads-sync`) using git worktrees, while keeping your main working directory untouched. Periodically merge the metadata branch back to `main` via a pull request.
+**Solution:** By default (when a remote exists), beads commits to a dedicated `beads-metadata` branch using git worktrees, while keeping your main working directory untouched. Optionally merge the metadata branch back to `main` via a pull request.
 
 **Benefits:**
 - ✅ Works with any git platform's branch protection
 - ✅ Main branch stays protected
 - ✅ No disruption to your primary working directory
-- ✅ Backward compatible (opt-in via config)
+- ✅ On by default (use `bd init --inline` to opt out)
 - ✅ Minimal disk overhead (uses sparse checkout)
 - ✅ Platform-agnostic solution
 
 ## Quick Start
 
-**1. Initialize beads with a separate sync branch:**
+**1. Initialize beads (the sync branch is configured automatically):**
 
 ```bash
 cd your-project
-bd init --branch beads-sync
+bd init                       # auto-uses beads-metadata when a remote exists
+# bd init --branch beads-sync # only if you want a different branch name
 ```
 
-This creates a `.beads/` directory and configures beads to commit to `beads-sync` instead of `main`.
+This creates a `.beads/` directory and configures beads to commit to `beads-metadata` instead of `main`.
 
-**Important:** After initialization, you'll see some untracked files that should be committed to your protected branch:
+> [!IMPORTANT]
+> In the default sync-branch mode, `.beads/` is added to `.git/info/exclude`, so
+> it stays off your work branch and you do **not** hand-commit it — the daemon /
+> `bd sync` publishes `.beads/` to the sync branch for you via an internal
+> worktree. (If you inited with `--inline`, beads lives on your current branch
+> and you commit `.beads/issues.jsonl` normally.)
+
+**2. Start syncing:**
 
 ```bash
-# Check what files were created
-git status
-
-# Commit the beads configuration to your protected branch
-git add .beads/.gitignore .gitattributes
-git commit -m "Initialize beads issue tracker"
-git push origin main  # Or create a PR if required
+bd sync   # or let the daemon auto-sync in team mode
 ```
 
-**Files created by `bd init --branch`:**
+`bd sync` commits your beads changes to `beads-metadata` and pushes them; it also pulls and merges teammates' changes (per-issue last-write-wins).
 
-Files that should be committed to your protected branch (main):
-- `.beads/.gitignore` - Tells git what to ignore in .beads/ directory
-- `.gitattributes` - Configures merge driver for intelligent JSONL conflict resolution
+**What lives where:**
+
+On the **`beads-metadata`** sync branch (published automatically):
+- `.beads/issues.jsonl` - Issue data in JSONL format
+- `.beads/metadata.json` - Metadata about the beads installation
+- `.beads/config.yaml` - Configuration
 
 Files that are automatically gitignored (do NOT commit):
 - `.beads/beads.db` - SQLite database (local only, regenerated from JSONL)
 - `.beads/daemon.lock`, `daemon.log`, `daemon.pid` - Runtime files
 - `.beads/beads.left.jsonl`, `beads.right.jsonl` - Temporary merge artifacts
 
-The sync branch (beads-sync) will contain:
-- `.beads/issues.jsonl` - Issue data in JSONL format (committed automatically by daemon)
-- `.beads/metadata.json` - Metadata about the beads installation
-- `.beads/config.yaml` - Configuration template (optional)
-
-**2. Start the daemon with auto-commit:**
-
-```bash
-bd daemon --start --auto-commit
-```
-
-The daemon will automatically commit issue changes to the `beads-sync` branch.
-
-**3. When ready, merge to main:**
+**3. When ready, merge to main (optional):**
 
 ```bash
 # Check what's changed
