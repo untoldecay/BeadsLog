@@ -54,6 +54,7 @@ Acquire context → Implement → Iterate → Record.
 
 ## 📚 Docs
 
+- [Running Modes](docs/RUNNING_MODES.md) — Team, solo, and switching: which mode to run and why.
 - [Use Cases](docs/USE_CASES.md) — Real-world scenarios for agents and teams.
 - [Project Catchup](docs/CATCHUP.md) — Staying aligned with team progress.
 - [Lifecycle States](docs/LIFECYCLE.md) — Managing active, paused, and abandoned work.
