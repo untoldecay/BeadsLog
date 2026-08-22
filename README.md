@@ -6,18 +6,21 @@ BeadsLog records what your agents do as they work — decisions, dead ends, and 
 
 Built on [Beads](https://github.com/steveyegge/beads).
 
+**For you if:** you build with AI coding agents (Claude Code, Cursor, Codex, …) and you're tired of re-explaining your project every session — solo or on a team.
+**Not for you if:** you don't use AI agents, or you want a human-facing issue tracker or kanban board. BeadsLog is agent-first, not a Jira replacement.
+
 ## Quick Start
 
 Requires [Go](https://go.dev/doc/install) 1.24+.
 
 ```bash
 go install github.com/untoldecay/BeadsLog/cmd/bd@latest
-bd init        # solo? private? see Running Modes
-bd onboard     # connect your AI agent
+bd init        # set BeadsLog up in this project — private by default, nothing is shared with your team unless you choose to
+bd onboard     # ask your AI agent to run this; it reads the setup and connects itself, no work for you
 ```
 
 > [!TIP]
-> `bd init` keeps beads off your work branch by default (a dedicated `beads-metadata` branch when a remote exists). Working privately, or on a team that doesn't use beads? See [Running Modes](docs/RUNNING_MODES.md).
+> BeadsLog keeps its notes on their own separate git branch — not mixed into the code you and your team work on. It won't clutter your project or get in your teammates' way. Working solo, or on a team that doesn't use BeadsLog? [Running Modes](docs/RUNNING_MODES.md) shows the fully private setup.
 
 ## What agents do with it
 
