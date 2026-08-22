@@ -4,7 +4,7 @@
 
 BeadsLog records what your agents do as they work — decisions, dead ends, and which components depend on which — and turns it into a searchable graph stored in git. Agents query it before they code, so they don't rebuild deleted code or repeat past mistakes.
 
-Built on [Beads](https://github.com/steveyegge/beads).
+Built on [Beads](https://github.com/steveyegge/beads), a git-native issue tracker for AI agents. BeadsLog adds the memory layer on top: agents' session notes become a searchable graph of decisions and dependencies.
 
 **For you if:**
 - You **vibecode on a team at high pace.** Everyone's agents share one memory, so they build on each other's work instead of colliding or redoing it — no waiting, no stepping on toes.
@@ -31,7 +31,11 @@ bd onboard     # ask your AI agent to run this; it reads the setup and connects 
 
 ## What agents do with it
 
-Agents query the graph instead of guessing from `grep` and `ls`. One command per job:
+As your agent works, it writes a short devlog — plain markdown, a few sentences. You don't write these; the agent does:
+
+> **Switched auth to webhook-first validation** — the sync response timed out under load. Touches `AuthService`, `StripeClient`.
+
+Weeks later, any agent queries that back before touching the code — no re-explaining, no `grep`-and-guess. One command per job:
 
 | Job | Command |
 |---|---|
@@ -44,7 +48,7 @@ Agents query the graph instead of guessing from `grep` and `ls`. One command per
 
 Trust badges keep history honest: `[🟢 VALIDATED]` code landed in main; `[⏸ PAUSED]`/`[🚫 ABANDONED]` warn agents off dead branches. See [Lifecycle](docs/LIFECYCLE.md).
 
-The loop: **acquire context → implement → record.** You only ever run one command yourself: `bd catchup`.
+The loop — **acquire context → implement → record** — runs as your agent works. The one command you run yourself: `bd catchup`.
 
 <details>
 <summary>Folder-naming note</summary>
