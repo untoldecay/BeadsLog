@@ -35,9 +35,9 @@ As your agent works, it writes a short devlog — plain markdown, a few sentence
 
 > **Switched auth to webhook-first validation** — the sync response timed out under load. Touches `AuthService`, `StripeClient`.
 
-Weeks later, any agent queries that back before touching the code — no re-explaining, no `grep`-and-guess. One command per job:
+Weeks later, any agent queries that back before touching the code — no re-explaining, no `grep`-and-guess. **Your agent runs these, not you** (they're local and instant — no network, no waiting):
 
-| Job | Command |
+| Your agent's job | Command it runs |
 |---|---|
 | Load where I left off | `bd devlog resume --last 1` |
 | Find a past decision | `bd devlog search "stripe timeout"` |
