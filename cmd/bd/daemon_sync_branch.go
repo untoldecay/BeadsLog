@@ -143,7 +143,10 @@ func gitHasChangesInWorktree(ctx context.Context, worktreePath, filePath string)
 		return false, fmt.Errorf("failed to make path relative: %w", err)
 	}
 	
-	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", relPath) // #nosec G204 - worktreePath and relPath are derived from trusted git operations
+	// --ignored=matching so a first-commit issues.jsonl still registers as a
+	// change even when .beads/ is in .git/info/exclude (kept off the work branch;
+	// the exclude is shared with this worktree). The force-add below stages it.
+	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", "--ignored=matching", relPath) // #nosec G204 - worktreePath and relPath are derived from trusted git operations
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("git status failed in worktree: %w", err)
@@ -159,8 +162,9 @@ func gitCommitInWorktree(ctx context.Context, worktreePath, filePath, message st
 		return fmt.Errorf("failed to make path relative: %w", err)
 	}
 	
-	// Stage the file
-	addCmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "add", relPath) // #nosec G204 - worktreePath and relPath are derived from trusted git operations
+	// Stage the file with -f so it's added even when .beads/ is in
+	// .git/info/exclude (which is shared with this internal worktree).
+	addCmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "add", "-f", relPath) // #nosec G204 - worktreePath and relPath are derived from trusted git operations
 	if err := addCmd.Run(); err != nil {
 		return fmt.Errorf("git add failed in worktree: %w", err)
 	}

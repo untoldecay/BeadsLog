@@ -415,6 +415,9 @@ With --stealth: configures per-repository git settings for invisible beads usage
 				_ = store.Close()
 				os.Exit(1)
 			}
+			// Also keep beads data out of the work tree's staging, so a manual
+			// 'git add -A' can't land it on the work branch.
+			excludeBeadsFromWorkBranch()
 			if !quiet {
 				fmt.Printf("  Sync branch: %s (beads commits stay off your work branches; --inline to disable)\n", branch)
 			}

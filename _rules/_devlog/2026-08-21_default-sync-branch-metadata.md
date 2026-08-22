@@ -35,9 +35,24 @@ e2e Test 33: repo with a bare remote → plain `bd init` on `develop` defaults t
 `--inline` sets no sync branch. Local-only repos keep the inline path (whole
 existing e2e suite unchanged, all green).
 
+## Follow-up: keep .beads/ off the work branch's staging
+`sync.branch` routes `bd sync`, but `.beads/` still sat untracked in the work
+tree, so a manual `git add -A` (or an agent close-protocol) could still stage it
+onto `develop`. Added `excludeBeadsFromWorkBranch` (new `sync_branch_exclude.go`)
+to add `.beads/` to `.git/info/exclude` whenever a sync branch is configured
+(init + team wizard). Because that exclude is shared with the internal sync
+worktree, the worktree commit broke two ways: `hasChangesInWorktree`'s
+`git status --porcelain` went blind to the excluded (untracked) first-commit
+`issues.jsonl`, and the daemon's `git add` wasn't forced — fixed with
+`--ignored=matching` on the status check and `git add -f` in both the CLI
+(`internal/syncbranch/worktree.go`) and daemon (`cmd/bd/daemon_sync_branch.go`)
+paths. e2e Test 33 now also asserts `git add -A` stages nothing under `.beads/`.
+
 ## Entities
 - init.go
 - init_team.go
 - sync.go
 - defaultSyncBranch
 - beads-metadata
+- excludeBeadsFromWorkBranch
+- hasChangesInWorktree

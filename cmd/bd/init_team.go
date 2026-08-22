@@ -65,6 +65,9 @@ func runTeamWizard(ctx context.Context, store storage.Storage) error {
 	if err := syncbranch.Set(ctx, store, syncBranch); err != nil {
 		return fmt.Errorf("failed to set sync branch: %w", err)
 	}
+	// Keep beads data out of the work tree's staging so a manual 'git add -A'
+	// can't land it on the work branch (beads lives on the dedicated branch).
+	excludeBeadsFromWorkBranch()
 	fmt.Printf("%s Beads commits go to a dedicated %s branch via an internal worktree —\n", ui.RenderPass("✓"), ui.RenderAccent(syncBranch))
 	fmt.Println("  never your work branches. Teammates pull/push it like normal git.")
 	fmt.Printf("  Share to main when you want: %s (or 'bd sync --merge').\n", ui.RenderAccent("merge "+syncBranch+" → main via PR"))

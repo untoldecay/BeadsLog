@@ -705,7 +705,11 @@ func hasChangesInWorktree(ctx context.Context, worktreePath, filePath string) (b
 		if err != nil {
 			return false, fmt.Errorf("failed to make path relative: %w", err)
 		}
-		cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", relPath)
+		// --ignored=matching so a first-commit issues.jsonl still registers as a
+		// change even when .beads/ is in .git/info/exclude (bd keeps beads off the
+		// work branch; the exclude is shared with this worktree). Force-add below
+		// still stages it.
+		cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", "--ignored=matching", relPath)
 		output, err := cmd.Output()
 		if err != nil {
 			return false, fmt.Errorf("git status failed in worktree: %w", err)
@@ -713,7 +717,7 @@ func hasChangesInWorktree(ctx context.Context, worktreePath, filePath string) (b
 		return len(strings.TrimSpace(string(output))) > 0, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", relBeadsDir)
+	cmd := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain", "--ignored=matching", relBeadsDir)
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("git status failed in worktree: %w", err)

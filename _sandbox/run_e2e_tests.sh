@@ -975,8 +975,11 @@ if [ -f .beads/config.local.yaml ]; then
     echo "❌ FAIL: config.local.yaml override not removed on team rejoin"
     exit 1
 fi
-if grep -qE "_devlog-solo|^\.beads/" .git/info/exclude 2>/dev/null; then
-    echo "❌ FAIL: solo excludes not removed from .git/info/exclude"
+# The solo-specific devlog exclude must be gone. (.beads/ may remain excluded:
+# rejoining team now uses a dedicated sync branch, which legitimately keeps
+# .beads/ off the work branch — see Test 33.)
+if grep -qE "_devlog-solo" .git/info/exclude 2>/dev/null; then
+    echo "❌ FAIL: solo devlog exclude not removed from .git/info/exclude"
     exit 1
 fi
 
@@ -1002,14 +1005,29 @@ if [ "$("$BD_BIN" config get sync.branch --no-daemon 2>/dev/null)" != "beads-met
     echo "❌ FAIL: plain init with a remote did not default sync.branch to beads-metadata"
     exit 1
 fi
+# Follow-up: .beads/ is excluded from the work tree so a manual 'git add -A'
+# (or an agent's blanket stage) can't land it on develop.
+if ! grep -q '^\.beads/' .git/info/exclude; then
+    echo "❌ FAIL: .beads/ not excluded from the work branch"
+    exit 1
+fi
 "$BD_BIN" create "an issue" -p 2 --no-daemon > /dev/null 2>&1
 "$BD_BIN" sync --no-daemon > /dev/null 2>&1
+"$BD_BIN" create "a second issue" -p 2 --no-daemon > /dev/null 2>&1
+"$BD_BIN" sync --no-daemon > /dev/null 2>&1  # incremental sync must also work
 
 # Beads must be on beads-metadata (local + remote), never on develop.
 if [ "$(git ls-tree -r beads-metadata --name-only 2>/dev/null | grep -c 'issues.jsonl')" -ne 1 ]; then
     echo "❌ FAIL: issues.jsonl not committed to local beads-metadata"
     exit 1
 fi
+git add -A  # the exact operation an agent close-protocol would run on develop
+if git diff --cached --name-only | grep -q '^\.beads/'; then
+    echo "❌ FAIL: 'git add -A' staged beads onto the develop work branch"
+    git diff --cached --name-only | grep '^\.beads/'
+    exit 1
+fi
+git reset -q
 if git log develop --name-only --oneline 2>/dev/null | grep -q '\.beads/'; then
     echo "❌ FAIL: beads leaked onto the develop work branch"
     exit 1
