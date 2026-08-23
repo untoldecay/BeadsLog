@@ -3566,7 +3566,10 @@ func init() {
 	devlogCmd.AddCommand(devlogOngoingCmd)
 	devlogCmd.AddCommand(devlogMigrateCmd)
 	devlogCmd.AddCommand(devlogAuthorsCmd)
-	
+	devlogExportCmd.Flags().StringP("output", "o", "", "Write JSON to a file instead of stdout")
+	devlogCmd.AddCommand(devlogExportCmd)
+	devlogCmd.AddCommand(devlogWatchCmd)
+
 	rootCmd.AddCommand(devlogCmd)
 }
 
