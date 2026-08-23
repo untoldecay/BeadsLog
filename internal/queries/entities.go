@@ -119,7 +119,10 @@ func normalizeEntityName(name string) string {
 // names stay in the entity_aliases registry so future extractions resolve
 // to the canonical. Returns the number of entities merged away.
 func AutoAliasDuplicates(ctx context.Context, db *sql.DB) (int, error) {
-	rows, err := db.QueryContext(ctx, "SELECT id, name, mention_count FROM entities")
+	// ORDER BY name so group insertion order (and thus canonical election on
+	// ties) is stable across machines — otherwise different rows win the tie
+	// depending on SQLite/insertion order (BeadsLog-5xf drift fix).
+	rows, err := db.QueryContext(ctx, "SELECT id, name, mention_count FROM entities ORDER BY name")
 	if err != nil {
 		return 0, err
 	}
@@ -144,7 +147,10 @@ func AutoAliasDuplicates(ctx context.Context, db *sql.DB) (int, error) {
 		}
 		canonical := group[0]
 		for _, e := range group[1:] {
-			if counts[e.ID] > counts[canonical.ID] {
+			// Higher mention_count wins; break ties alphabetically by name so
+			// the canonical is deterministic across machines.
+			if counts[e.ID] > counts[canonical.ID] ||
+				(counts[e.ID] == counts[canonical.ID] && e.Name < canonical.Name) {
 				canonical = e
 			}
 		}

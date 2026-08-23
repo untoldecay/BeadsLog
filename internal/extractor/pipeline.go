@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -105,6 +106,18 @@ func (p *Pipeline) Run(ctx context.Context, text string) (*ExtractionResult, err
 	for _, r := range allRelationships {
 		resultRelationships = append(resultRelationships, r)
 	}
+
+	// Go map iteration order is randomized, so tie-breaks (equal-confidence
+	// merges, ON CONFLICT preferred_name) resolved differently per run/machine.
+	// Sort for a stable, reproducible graph (BeadsLog-5xf drift fix).
+	sort.Slice(resultEntities, func(i, j int) bool {
+		return resultEntities[i].Name < resultEntities[j].Name
+	})
+	sort.Slice(resultRelationships, func(i, j int) bool {
+		ki := resultRelationships[i].FromEntity + "|" + resultRelationships[i].ToEntity + "|" + resultRelationships[i].Type
+		kj := resultRelationships[j].FromEntity + "|" + resultRelationships[j].ToEntity + "|" + resultRelationships[j].Type
+		return ki < kj
+	})
 	
 	// Note: We don't call ExtractRelationships separately anymore, it's part of RegexExtractor
 	// which is always in the pipeline.

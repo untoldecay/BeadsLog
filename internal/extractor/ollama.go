@@ -121,12 +121,18 @@ Required Output Format:
 }
 `, text)
 
-	// Set options for deterministic output if possible
+	// Pin temperature=0 and a fixed seed so the same model+prompt yields the
+	// same extraction on every machine — a major source of cross-machine graph
+	// drift (BeadsLog-5xf). Model-version skew still requires the graph.jsonl fix.
 	req := &api.GenerateRequest{
 		Model:  o.model,
 		Prompt: prompt,
 		Format: json.RawMessage(`"json"`), // Force JSON mode
 		Stream: new(bool), // false
+		Options: map[string]any{
+			"temperature": 0.0,
+			"seed":        42,
+		},
 	}
 	*req.Stream = false
 
