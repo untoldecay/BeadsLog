@@ -7,7 +7,7 @@ isolated contexts) and, from Run 03 on, a **blind judge** (given both answer set
 anonymized + shuffled) scoring correctness / significance / impact-awareness /
 actionability. Metrics: tokens + tool-calls (from sub-agent usage) + judge score.
 
-Method is codified in the `bd eval bench` command and the `audience-test`-style loop.
+Method is codified in the `bd bench` command and the `audience-test`-style loop.
 
 ## Runs
 

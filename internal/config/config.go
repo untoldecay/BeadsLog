@@ -160,11 +160,6 @@ func Initialize() error {
 	// Maps project names to paths for resolving external: blocked_by references
 	v.SetDefault("external_projects", map[string]string{})
 
-	// Evaluation Mode Defaults (bd-2zb)
-	v.SetDefault("eval.mode", false)
-	v.SetDefault("eval.session_id", "")
-	v.SetDefault("eval.scenario_id", "")
-
 	// Read config file if it was found
 	if configFileSet {
 		if err := v.ReadInConfig(); err != nil {

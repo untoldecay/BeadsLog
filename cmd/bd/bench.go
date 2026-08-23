@@ -7,19 +7,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// evalBenchCmd emits a harness-agnostic benchmark protocol (like `bd onboard` /
+func init() {
+	rootCmd.AddCommand(benchCmd)
+}
+
+// benchCmd emits a harness-agnostic benchmark protocol (like `bd onboard` /
 // `bd prime` emit protocol text). The driving agent reads it and runs an A/B
 // comparison — BeadsLog retrieval vs brute-force grep — on THIS repo's devlog
 // history, scored by a blind judge. Works in any harness that has bd + an agent.
-var evalBenchCmd = &cobra.Command{
+var benchCmd = &cobra.Command{
 	Use:   "bench [prompt]",
 	Short: "Emit an A/B benchmark protocol (BeadsLog retrieval vs brute-force grep)",
 	Long: `Print a protocol the current agent runs to benchmark how it answers
 project-history questions WITH BeadsLog retrieval vs WITHOUT (brute-force grep),
 on this repository's own devlog history.
 
-  bd eval bench "why did we switch storage?"   # benchmark a specific question
-  bd eval bench                                  # agent generates its own questions
+  bd bench "why did we switch storage?"   # benchmark a specific question
+  bd bench                                  # agent generates its own questions
 
 The agent spawns two arms (bd vs grep) plus a blind judge, measures tokens and
 tool-calls, and reports honestly — a tie or a loss on a small/greppable corpus is
