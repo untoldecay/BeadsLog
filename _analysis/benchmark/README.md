@@ -16,21 +16,28 @@ Method is codified in the `bd eval bench` command and the `audience-test`-style 
 | 01 | Tasklet fixture (8 devlogs, since dropped) | keyword recall | `run-01_fixture-keyword.md` |
 | 02 | This repo (104 devlogs) | keyword recall | `run-02_real-keyword.md` |
 | 03 | This repo (104 devlogs) | fuzzy/human recall, 4 rounds + judges | `run-03_real-fuzzy-4rounds.md` |
-| 04 | This repo (full codebase) | feasibility/impact/dependency assessment | `run-04_feasibility-integration-picker.md` |
+| 04 | This repo (full codebase) | feasibility: init integration-picker | `run-04_feasibility-integration-picker.md` |
+| 05 | This repo (full codebase) | feasibility: reproducible graph / drift | `run-05_feasibility-drift.md` |
+| 06 | This repo (full codebase) | feasibility: `bd devlog export` | `run-06_feasibility-export.md` |
+| 07 | This repo (full codebase) | feasibility: `bd devlog watch` | `run-07_feasibility-watch.md` |
 
 ## Headline finding — bd's value scales with task complexity
 
-| Task type | Tokens | Tool-calls | Answer quality (blind judge) |
-|---|---|---|---|
-| **Simple recall** ("what fixed bug X?") | tie | bd ~half | **tie** |
-| **Architectural reasoning** ("assess feasibility/impact/deps of Y") | **bd −17%** | **bd −33%** | **bd 17/20 vs 11/20** |
+| Task type | Sample | Tokens | Tool-calls | Answer quality (blind judge) |
+|---|---|---|---|---|
+| **Recall** ("what fixed bug X?") | n=4 rounds | tie | **bd ~half** (7 vs 13.5) | **tie** (18 vs 18) |
+| **Engineering reasoning** ("assess feasibility/impact/deps of Y") | n=4 tasks | **bd usually cheaper** (median 76k vs 89k) | **bd usually fewer** (median 53 vs 64.5) | **bd +2** (median 16.5 vs 14.5) |
 
-- On flat recall a capable agent can grep, **bd ties or its output-verbosity loses** — brute-force grep is a strong baseline when keywords are guessable and the corpus is greppable.
-- The one durable recall-level edge is **tool-calls / round-trips (~half)**.
-- bd **wins decisively once the task requires understanding the system** — it recalls the *right* prior decisions and maps dependencies instead of brute-forcing exploration, and that grounding yields a *more correct* assessment (see Run 04's storage-design call).
+- On flat recall a capable agent can grep, **bd ties on quality and tokens**; its one durable edge is **fewer tool-calls / round-trips (~half)**.
+- bd **wins as the task requires understanding the system** — it recalls prior decisions and maps dependencies instead of brute-forcing exploration. It won quality in **3 of 4** feasibility tasks (Run 04 +6, Run 06 +4, Run 07 +1) and was cheaper in 3 of 4.
+- **Not absolute:** grep can reconstruct committed history (issues.jsonl, devlogs) with more effort — it won Run 05 by 1, and crushed Run 06 on tokens. bd sometimes over-explores.
+
+## Product findings surfaced by the benchmark
+1. **Cite committed filenames, not `sess-xxxxx`.** In Run 05 the judge flagged bd's *correct* answer as a "grounding risk" because it cited opaque devlog session IDs it couldn't verify; grep cited `issues.jsonl:40` line numbers. `bd devlog search/graph` should return the committed filename for verifiability.
+2. **Deterministic graph** (Run 05) — a one-line `ollama.go` gap (`temperature=0, seed=42`) closes ~90% of cross-machine drift; `graph.jsonl` (BeadsLog-5xf) is the 100% design.
+3. **`bd devlog export`** (Run 06) and **`bd devlog watch`** (Run 07) are both real ~80-line features reusing existing machinery.
 
 ## Honest caveats
-- Recall result (Run 03) is n=4 with per-round judges — solid.
-- Feasibility result (Run 04) is n=1 — directional; needs 2–3 more runs to harden before publishing a number.
-- The bd arm = "agent WITH bd added to its normal tools" vs grep-only. That is the intended comparison (bd augments the agent).
-- Judges are blind + shuffled to avoid pro-bd bias; in Run 03 the judge picked grep in 2 of 4 rounds.
+- Recall (Run 03) n=4 with per-round judges; feasibility now n=4 — both directional but consistent.
+- The bd arm = "agent WITH bd added to its normal tools" vs grep-only — the intended comparison (bd augments the agent).
+- Judges blind + shuffled to avoid pro-bd bias; grep still won 3 of 8 judged rounds overall (Run03 R2/R4, Run05).
