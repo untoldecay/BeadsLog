@@ -14,7 +14,7 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.63.0"
+const CurrentVersion = "0.64.0"
 
 
 var entries = []Entry{
