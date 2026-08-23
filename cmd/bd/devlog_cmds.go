@@ -3577,6 +3577,7 @@ func convertSearchResultsToUI(results []queries.SearchResult) []ui.SearchResultI
 	for i, r := range results {
 		items[i] = ui.SearchResultItem{
 			ID:              r.ID,
+			Filename:        r.Filename,
 			Title:           r.Title,
 			Date:            r.Date,
 			Narrative:       r.Narrative,

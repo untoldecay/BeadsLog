@@ -14,6 +14,7 @@ import (
 
 type SearchResult struct {
 	ID        string  `json:"id"`
+	Filename  string  `json:"filename"` // committed devlog file — verifiable, unlike the sess- id
 	Title     string  `json:"title"`
 	Date      string  `json:"date"`
 	Narrative string  `json:"narrative"` // Snippet or Preview
@@ -230,7 +231,8 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 			bs.state,
 			bs.short_reason,
 			COALESCE(bc.is_merged, 0),
-			COALESCE(bc.is_deleted, 0)
+			COALESCE(bc.is_deleted, 0),
+			COALESCE(s.filename, '')
 		FROM hits h
 		JOIN sessions s ON s.rowid = h.rowid
 		LEFT JOIN branch_states bs ON (bs.scope_type = 'branch' AND (bs.scope_ref = s.branch OR bs.scope_ref = REPLACE(s.branch, ' (local)', ''))) 
@@ -270,7 +272,7 @@ func executeRankedSearch(ctx context.Context, db *sql.DB, phrase, near, mainQuer
 		var reason sql.NullString
 		var isMerged, isDeleted int
 		
-		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &r.Author, &r.AuthorEmail, &r.Agent, &state, &reason, &isMerged, &isDeleted); err != nil {
+		if err := rows.Scan(&r.ID, &r.Title, &timestamp, &snippet, &fullNarrative, &r.BM25, &ageDays, &r.Branch, &r.Author, &r.AuthorEmail, &r.Agent, &state, &reason, &isMerged, &isDeleted, &r.Filename); err != nil {
 			continue
 		}
 

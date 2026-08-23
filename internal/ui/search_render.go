@@ -11,6 +11,7 @@ import (
 // SearchResultItem represents a search result for rendering
 type SearchResultItem struct {
 	ID        string
+	Filename  string // committed devlog file (verifiable), shown alongside the sess- id
 	Title     string
 	Date      string
 	Narrative string
@@ -125,6 +126,12 @@ func RenderResultsWithContext(query string, results []SearchResultItem, related 
 				metaParts = append(metaParts, fmt.Sprintf(" %s", lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Branch)))
 			}
 			contentLines = append(contentLines, strings.Join(metaParts, "  "))
+
+			// Cite the committed devlog file, not just the sess- id — the
+			// filename is what an agent/human can actually open and verify.
+			if r.Filename != "" {
+				contentLines = append(contentLines, fmt.Sprintf("   📄 %s", lipgloss.NewStyle().Foreground(ColorMuted).Render(r.Filename)))
+			}
 
 			if r.StatusReason != "" {
 				reasonStyle := lipgloss.NewStyle().Foreground(ColorWarn).Italic(true)
