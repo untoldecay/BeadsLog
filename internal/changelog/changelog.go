@@ -19,6 +19,18 @@ const CurrentVersion = "0.63.0"
 
 var entries = []Entry{
 	{
+		Version: "0.64.0",
+		Date:    "2026-08-23",
+		Features: []string{
+			"'bd devlog export' dumps the full knowledge graph (entities, edges, sessions) as stable sorted JSON for external tools; 'bd devlog watch' live-tails the devlog and re-indexes new sessions incrementally (standalone, no daemon).",
+			"Deterministic graph construction: Ollama pinned to temperature=0/seed=42, sorted pipeline output, alphabetical alias tie-break — two machines build the same graph from the same devlogs (regex path byte-for-byte reproducible). Model-version skew still needs graph.jsonl (BeadsLog-5xf).",
+			"'bd devlog search' now cites the committed devlog filename, not just the opaque sess- id, so an agent's sources are verifiable.",
+		},
+		Protocol: []string{
+			"Cite the devlog filename shown next to 📄 in search results (not the sess- id) so your claims can be checked. Use 'bd devlog export' when a tool needs the raw graph.",
+		},
+	},
+	{
 		Version: "0.63.0",
 		Date:    "2026-08-11",
 		Features: []string{

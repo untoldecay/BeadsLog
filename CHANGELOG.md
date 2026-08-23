@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-08-23
+
+### Added
+- **`bd devlog export`** — dump the full knowledge graph (entities, edges, sessions) as stable, sorted JSON (`bd devlog export -o graph.json`) for external tools. Output is diffable across runs.
+- **`bd devlog watch`** — live-tail the devlog and re-index new sessions incrementally, reusing the daemon's file-watcher/debounce; runs standalone (no daemon needed), like `tail -f`.
+
+### Fixed
+- **Deterministic graph construction.** Entity extraction was non-deterministic across machines (a source of graph drift): Ollama ran at `temperature=0.8`/random seed, Go map iteration randomized merge tie-breaks, and `AutoAliasDuplicates` elected canonicals by insertion order. Now Ollama is pinned to `temperature=0`/`seed=42`, pipeline output is sorted, and canonical election breaks ties alphabetically — two machines build the same graph from the same devlogs (regex path is byte-for-byte reproducible). Model-version skew still needs the shared `graph.jsonl` (BeadsLog-5xf).
+- **Verifiable search citations.** `bd devlog search` now shows the committed devlog **filename** (📄) next to each result, not just the opaque `sess-xxxxx` id — so an agent's cited sources can actually be opened and checked.
+
 ## [0.63.0] - 2026-08-11
 
 ### Added

@@ -297,6 +297,15 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.64.0",
+		Date:    "2026-08-23",
+		Changes: []string{
+			"NEW: 'bd devlog export' dumps the graph (entities/edges/sessions) as stable JSON; 'bd devlog watch' live re-indexes new sessions (standalone)",
+			"FIX: deterministic entity extraction (Ollama temperature=0/seed=42, sorted pipeline, alphabetical alias tie-break) — same devlogs → same graph across machines",
+			"FIX: 'bd devlog search' cites the committed devlog filename (📄), not just the opaque sess- id — sources are now verifiable",
+		},
+	},
+	{
 		Version: "0.63.0",
 		Date:    "2026-08-11",
 		Changes: []string{
