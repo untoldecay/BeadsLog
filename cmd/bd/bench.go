@@ -75,6 +75,40 @@ Can you spawn parallel sub-agents (a Task/Agent tool in this harness)?
 - No  -> tell the user you cannot run a clean parallel A/B here, and offer to run
         the arms sequentially in fresh contexts, or stop. State which mode you use.
 
+## 0.5 Daemon hygiene — READ THIS or you will spawn a daemon swarm
+
+Every ` + "`bd`" + ` command auto-starts a background daemon if one isn't running. This
+benchmark spawns multiple sub-agents that each run ` + "`bd`" + `, often in different
+working dirs — so **each one can start its own daemon**. Left unchecked they
+accumulate into a swarm that re-exports ` + "`.beads/issues.jsonl`" + ` every few seconds,
+can silently drop fields (e.g. ` + "`owner`" + `) on rebuild, and — if any daemon runs
+with ` + "`--auto-commit --auto-push`" + ` — can push corrupted data to your remote.
+
+Do ALL of this:
+
+- **Baseline first.** Before running anything, snapshot the daemons that already
+  exist: ` + "`pgrep -fl 'bd daemon'`" + `. Note their PIDs — these are the ones to KEEP.
+- **--no-daemon on every bd call** in this benchmark (both arms and the judge, in
+  every sub-agent). Never let a benchmark ` + "`bd`" + ` command start a daemon.
+- **Never benchmark against a repo with an ` + "`--auto-push`" + ` daemon live.** Stop it
+  first (` + "`bd daemon stop`" + `) so a mid-run re-export can't be committed/pushed.
+- **Clean up after.** When done, diff against the baseline and stop only the
+  daemons that appeared *during* the run. Stop each one by naming its target:
+  ` + "`bd daemon stop <workspace-path>`" + ` (find a daemon's dir with
+  ` + "`lsof -a -p <pid> -d cwd -Fn`" + `) or ` + "`bd daemon stop <pid>`" + `. NOTE: a bare
+  ` + "`bd daemon stop`" + ` with no argument ERRORS (` + "`accepts 1 arg(s), received 0`" + `) —
+  that's a feature: it forces you to name the specific stray so you can never
+  mass-kill. Identify daemons whose cwd is a temp/scratch/sandbox path and stop
+  those; leave other projects' daemons alone.
+- **Never mass-kill: no ` + "`pkill -9 'bd daemon'`" + `, no ` + "`bd daemon killall`" + `.** Both
+  hit unrelated projects' daemons (you often have several repos' daemons running
+  at once), and SIGKILL mid-write corrupts the SQLite DB
+  (` + "`database disk image is malformed`" + `). Always stop strays one PID/path at a time.
+  If ` + "`bd daemon stop <target>`" + ` cannot reach a specific stray, a targeted
+  ` + "`kill <pid>`" + ` (SIGTERM, not -9) on that one PID is the only escalation.
+- **End where you started.** Verify the final ` + "`pgrep -fl 'bd daemon'`" + ` matches the
+  baseline set before you report results.
+
 ## 1. The questions
 
 %s
