@@ -191,7 +191,7 @@ else
         brew upgrade bd || brew reinstall bd
     else
         echo -e "${YELLOW}⚠ bd not installed via Homebrew, skipping upgrade${NC}"
-        echo "To install: brew install steveyegge/beads/bd"
+        echo "To install: brew install untoldecay/BeadsLog/bd"
     fi
 fi
 echo -e "${GREEN}✓ Local installation upgraded${NC}\n"
@@ -206,7 +206,7 @@ if [ "$DRY_RUN" = false ]; then
     echo ""
     echo "Next steps:"
     echo "  • GitHub Actions is building release binaries"
-    echo "  • Monitor: https://github.com/steveyegge/beads/actions"
+    echo "  • Monitor: https://github.com/untoldecay/BeadsLog/actions"
     echo "  • PyPI publish happens automatically"
     echo "  • Update CHANGELOG.md if not done yet"
     echo ""
