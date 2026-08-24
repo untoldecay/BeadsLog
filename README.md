@@ -2,19 +2,29 @@
 
 **Agent-first codebase memory.**
 
-BeadsLog records what your agents do as they work — decisions, dead ends, and which components depend on which — and turns it into a searchable graph stored in git. Agents query it before they code, so they don't rebuild deleted code or repeat past mistakes.
+BeadsLog remembers what your project actually became — the decisions, the dead
+ends, which components depend on which — recorded as you and your agent work and
+stored as a searchable graph in git.
 
-Built on [Beads](https://github.com/steveyegge/beads), a git-native issue tracker for AI agents. BeadsLog adds the memory layer on top: agents' session notes become a searchable graph of decisions and dependencies.
+That memory pays off twice. Agents reload full context in seconds — the
+architecture, the past decisions, why the last change was made — so you stop
+re-explaining your project every session. And it catches drift: BeadsLog records
+what you and your agent actually decided, so when an agent writes thousands of
+lines a session, the places the code wandered from the plan stay visible instead
+of compounding.
+
+Built on [Beads](https://github.com/steveyegge/beads), a git-native issue
+tracker for AI agents.
 
 **For you if:**
-- You **vibecode on a team at high pace.** Everyone's agents share one memory, so they build on each other's work instead of colliding or redoing it — no waiting, no stepping on toes.
-- You're a **solo vibecoder juggling many projects.** Pick any project back up after days or weeks; your agent reloads the full context in seconds. Time away between sessions stops costing you.
-- You **don't have the dev reflexes yet** — git hygiene, keeping work coordinated across people. BeadsLog handles that layer so you don't have to.
-- You're **tired of re-explaining your project** to your agent every single session.
+- You vibecode on a team at high pace. Everyone's agents share one memory and build on each other's work instead of colliding or redoing it.
+- You're a solo vibecoder juggling many projects. Pick one back up after weeks; your agent reloads the context in seconds.
+- You don't have the dev reflexes yet — git hygiene, writing down scope and architecture, coordinating work across people. BeadsLog handles that.
+- You re-explain your project to your agent every session.
 
-**Not for you if:** you're a seasoned dev who doesn't use AI agents — or who doesn't need an extra layer to keep things in check.
+**Not for you if:** you're a seasoned dev who codes without AI agents.
 
-**Built for vibecoders, agent agnostic** — works with Claude Code, Cursor, Codex, ….
+**Built for vibecoders, agent-agnostic** — works with Claude Code, Cursor, Codex, ….
 
 ## Quick Start
 
@@ -22,20 +32,25 @@ Requires [Go](https://go.dev/doc/install) 1.24+.
 
 ```bash
 go install github.com/untoldecay/BeadsLog/cmd/bd@latest
-bd init        # set BeadsLog up in this project — private by default, nothing is shared with your team unless you choose to
-bd onboard     # ask your AI agent to run this; it reads the setup and connects itself, no work for you
+bd init        # set up in this project — private by default, nothing is shared unless you choose to
+bd onboard     # ask your agent to run this; it reads the setup and connects itself
 ```
 
 > [!TIP]
-> BeadsLog keeps its notes on their own separate git branch — not mixed into the code you and your team work on. It won't clutter your project or get in your teammates' way. Working solo, or on a team that doesn't use BeadsLog? [Running Modes](docs/RUNNING_MODES.md) shows the fully private setup.
+> BeadsLog keeps its notes on a separate git branch, not mixed into the code you
+> and your team work on. Working solo, or on a team that doesn't use BeadsLog?
+> [Running Modes](docs/RUNNING_MODES.md) shows the fully private setup.
 
 ## What agents do with it
 
-As your agent works, it writes a short devlog — plain markdown, a few sentences. You don't write these; the agent does:
+As your agent works, it writes a short devlog — plain markdown, a few sentences.
+You don't write these; the agent does:
 
 > **Switched auth to webhook-first validation** — the sync response timed out under load. Touches `AuthService`, `StripeClient`.
 
-Weeks later, any agent queries that back before touching the code — no re-explaining, no `grep`-and-guess. **Your agent runs these, not you** (they're local and instant — no network, no waiting):
+Weeks later, any agent reads that back before touching the code — no
+re-explaining, no `grep`-and-guess. Your agent runs these, not you (local and
+instant — no network, no waiting):
 
 | Your agent's job | Command it runs |
 |---|---|
@@ -46,15 +61,29 @@ Weeks later, any agent queries that back before touching the code — no re-expl
 | Trace how A connects to B | `bd devlog path "A" "B"` |
 | See what the team shipped | `bd catchup` |
 
-Trust badges keep history honest: `[🟢 VALIDATED]` code landed in main; `[⏸ PAUSED]`/`[🚫 ABANDONED]` warn agents off dead branches. See [Lifecycle](docs/LIFECYCLE.md).
+Trust badges keep the history honest: `[🟢 VALIDATED]` code landed in main;
+`[⏸ PAUSED]` and `[🚫 ABANDONED]` warn agents off dead branches. See
+[Lifecycle](docs/LIFECYCLE.md).
 
-The loop — **acquire context → implement → record** — runs as your agent works. The one command you run yourself: `bd catchup`.
+The loop — acquire context, implement, record — runs as your agent works. The
+one command you run yourself: `bd catchup`.
 
 <details>
 <summary>Folder-naming note</summary>
 
-Entity extraction filters common words and branch names (`master`, `main`, `test`, `core`, …). If your project folder is named one of these, BeadsLog tracks it as `<name>-repository`. A hand-written relationship arrow targeting a filtered word is dropped with a warning — rename the entity (e.g. `master-repository`) to keep the edge.
+Entity extraction filters common words and branch names (`master`, `main`,
+`test`, `core`, …). If your project folder is named one of these, BeadsLog tracks
+it as `<name>-repository`. A hand-written relationship arrow targeting a filtered
+word is dropped with a warning — rename the entity (e.g. `master-repository`) to
+keep the edge.
 </details>
+
+## Does it hold up?
+
+Blind-judged against brute-force `grep`, BeadsLog wins even on flat lookups —
+**~50% fewer tool-calls** at equal answer quality — and the gap widens with
+complexity: on system-reasoning questions, **~14% higher quality for ~15% fewer
+tokens**. See the [benchmarks](docs/BENCHMARK.md) for the method and every run.
 
 ## Docs
 
@@ -67,6 +96,7 @@ Entity extraction filters common words and branch names (`master`, `main`, `test
 - [Devlog](docs/DEVLOG.md) — the "Bead" and the narrative format.
 - [Lifecycle States](docs/LIFECYCLE.md) — active, paused, abandoned, validated.
 - [Devlog Architecture](docs/DEVLOG_ARCHITECTURE.md) — how the graph is built.
+- [Benchmarks](docs/BENCHMARK.md) — BeadsLog vs `grep`, blind-judged; run your own with `bd bench`.
 
 **Operate**
 - [Catchup](docs/CATCHUP.md) · [Hooks](docs/HOOKS.md) · [Ollama Enrichment](docs/OLLAMA_ENRICHMENT.md)
