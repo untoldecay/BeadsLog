@@ -297,6 +297,14 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.65.0",
+		Date:    "2026-08-24",
+		Changes: []string{
+			"NEW: 'bd bench [question]' — harness-agnostic A/B benchmark (BeadsLog retrieval vs grep) with a blind judge; run it in any repo to measure retrieval value. Includes a daemon-hygiene protocol to prevent daemon swarms in multi-subagent runs",
+			"REMOVED: legacy opencode-based 'bd eval' harness (~1420 lines dead code) — benchmarking now lives at the top-level 'bd bench'",
+		},
+	},
+	{
 		Version: "0.64.0",
 		Date:    "2026-08-23",
 		Changes: []string{

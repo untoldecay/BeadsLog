@@ -14,10 +14,20 @@ type Entry struct {
 }
 
 // CurrentVersion is the latest version of the tool embedded in this binary
-const CurrentVersion = "0.64.0"
+const CurrentVersion = "0.65.0"
 
 
 var entries = []Entry{
+	{
+		Version: "0.65.0",
+		Date:    "2026-08-24",
+		Features: []string{
+			"'bd bench [question]' emits a harness-agnostic A/B benchmark protocol — the agent runs BeadsLog retrieval vs brute-force grep on this repo's own devlog history, scored by a blind judge, reporting tokens and tool-calls. Run it in any repo to measure whether retrieval helps. Removed the legacy opencode-based 'bd eval' harness (~1420 lines of dead code).",
+		},
+		Protocol: []string{
+			"Run 'bd bench \"your question\"' to benchmark retrieval on this repo. Follow the daemon-hygiene section it prints: pass --no-daemon to every bd call, and stop strays with 'bd daemon stop <path|pid>' — never 'pkill -9' or 'bd daemon killall' (both hit other projects' daemons and can corrupt the DB).",
+		},
+	},
 	{
 		Version: "0.64.0",
 		Date:    "2026-08-23",
