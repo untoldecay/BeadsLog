@@ -275,8 +275,8 @@ func CheckBdInPath() DoctorCheck {
 			Message: "'bd' command not found in PATH",
 			Detail:  "Claude hooks execute 'bd prime' and won't work without bd in PATH",
 			Fix: "Install bd globally:\n" +
-				"  • Homebrew: brew install steveyegge/tap/bd\n" +
-				"  • Script: curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash\n" +
+				"  • Go: go install github.com/untoldecay/BeadsLog/cmd/bd@latest\n" +
+				"  • Script: curl -fsSL https://raw.githubusercontent.com/untoldecay/BeadsLog/main/scripts/install.sh | bash\n" +
 				"  • Or add bd to your PATH",
 		}
 	}
@@ -333,7 +333,7 @@ func CheckDocumentationBdPrimeReference(repoPath string) DoctorCheck {
 			Detail:  "Files: " + strings.Join(filesWithBdPrime, ", "),
 			Fix: "Upgrade bd to get the 'bd prime' command:\n" +
 				"  • Homebrew: brew upgrade bd\n" +
-				"  • Script: curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash\n" +
+				"  • Script: curl -fsSL https://raw.githubusercontent.com/untoldecay/BeadsLog/main/scripts/install.sh | bash\n" +
 				"  Or remove 'bd prime' references from documentation if using older version",
 		}
 	}

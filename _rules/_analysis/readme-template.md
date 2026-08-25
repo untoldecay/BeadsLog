@@ -6,7 +6,7 @@ Perfect! Vibecoders need **concrete scenarios** to "see themselves". Here's the 
 
 **Git-backed devlog sessions that capture why you built things, for AI agents and teams.**
 
-BeadsLog extends [Beads](https://github.com/steveyegge/beads) with automatic session capture and hybrid search (BM25 + entity graphs). [watercrawl](https://watercrawl.dev/blog/Building-on-RAG)
+BeadsLog extends [Beads](https://github.com/untoldecay/BeadsLog) with automatic session capture and hybrid search (BM25 + entity graphs). [watercrawl](https://watercrawl.dev/blog/Building-on-RAG)
 
 ```
 # Install

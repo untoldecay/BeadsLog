@@ -30,7 +30,7 @@ brew upgrade bd
 ### go install
 
 ```bash
-go install github.com/steveyegge/beads/cmd/bd@latest
+go install github.com/untoldecay/BeadsLog/cmd/bd@latest
 ```
 
 ### From Source

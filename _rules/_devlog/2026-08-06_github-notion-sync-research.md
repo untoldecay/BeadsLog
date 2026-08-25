@@ -15,7 +15,7 @@ assessment and a v1 plan before committing to build.
   needed. The Linear integration (cmd/bd/linear.go + internal/linear/) is a
   complete template for the brick (pull/push/dry-run/prefer-local, incremental
   timestamp sync, config via bd config). Partial Jira scaffolding also exists.
-- External research: upstream steveyegge/beads has no GitHub/Notion integration
+- External research: upstream untoldecay/BeadsLog has no GitHub/Notion integration
   and has diverged to Dolt storage — greenfield for us. GitHub side is
   low-risk (go-github v89, `gh auth token` reuse, `since=` polling, throttle
   ~1 create/sec for bulk export). Notion side is a YAGNI candidate for v1: no

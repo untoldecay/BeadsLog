@@ -28,7 +28,7 @@ Below is a PRD plus a merged AGENTS.md that reflects this architecture.
 - **Single SQLite DB**: `.beads/beads.db`  
   Contains:
   - Core Beads tables:
-    - `issues`, `dependencies`, `config`, etc. [github](https://github.com/steveyegge/beads)
+    - `issues`, `dependencies`, `config`, etc. [github](https://github.com/untoldecay/BeadsLog)
   - Devlog tables (created/used when enabled):
     - `sessions` – per-session devlog header/meta.
     - `entities` – components, services, endpoints, etc.
@@ -36,7 +36,7 @@ Below is a PRD plus a merged AGENTS.md that reflects this architecture.
     - `session_issues` – link sessions ↔ issues (e.g. “session X debugged issue Y”).
 - **Sync mechanism**:
   - Still driven by Beads’ JSONL + git model:
-    - `.beads/issues.jsonl` + `sessions.jsonl` (or equivalent) committed and merged via git. [github](https://github.com/steveyegge/beads)
+    - `.beads/issues.jsonl` + `sessions.jsonl` (or equivalent) committed and merged via git. [github](https://github.com/untoldecay/BeadsLog)
 
 ### 2.3 Feature Flag / Modes
 
@@ -54,7 +54,7 @@ Below is a PRD plus a merged AGENTS.md that reflects this architecture.
 ### 2.4 Command Model
 
 - **Core Beads (unchanged)**:
-  - `bd ready`, `bd create`, `bd update`, `bd close`, `bd dep ...`, `bd sync`, `bd show`, etc. [github](https://github.com/steveyegge/beads)
+  - `bd ready`, `bd create`, `bd update`, `bd close`, `bd dep ...`, `bd sync`, `bd show`, etc. [github](https://github.com/untoldecay/BeadsLog)
 - **Devlog subcommands (session memory layer)**:
   - `bd devlog resume --last N`
   - `bd devlog resume <issue-id>`

@@ -602,7 +602,7 @@ To fix this, either:
      export BD_JIRA_SCRIPT=/path/to/jira2jsonl.py
 
   2. Or download it from GitHub:
-     curl -o jira2jsonl.py https://raw.githubusercontent.com/steveyegge/beads/main/examples/jira-import/jira2jsonl.py
+     curl -o jira2jsonl.py https://raw.githubusercontent.com/untoldecay/BeadsLog/main/examples/jira-import/jira2jsonl.py
      export BD_JIRA_SCRIPT=$PWD/jira2jsonl.py
 
 Looked in: %v`, name, locations)

@@ -47,7 +47,7 @@ This master script automates the **entire release process**:
 - All changes committed
 - golangci-lint installed
 - Homebrew installed (for local upgrade)
-- Push access to steveyegge/beads and steveyegge/homebrew-beads
+- Push access to untoldecay/BeadsLog and untoldecay/homebrew-beads
 
 ### Output
 

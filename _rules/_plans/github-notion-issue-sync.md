@@ -23,7 +23,7 @@ for free via its native GitHub synced databases.
 - Per-repo config: `.beads/config.yaml` via Viper, env-var overrides.
 
 ### External research
-- **Upstream beads (steveyegge/beads)**: no GitHub/Notion integration, none
+- **Upstream beads (untoldecay/BeadsLog)**: no GitHub/Notion integration, none
   planned; upstream migrated to Dolt storage so our SQLite+JSONL fork has
   diverged — nothing to wait for, no conflict. No community fork does this.
 - **GitHub**: `google/go-github` v89, actively maintained. Auth chain:

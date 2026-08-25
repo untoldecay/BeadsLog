@@ -81,7 +81,7 @@ The Devlog Beads project forks the Beads issue tracker into a graph-powered deve
 
 #### Phase 1: Fork & Schema (30min)
 
-1.  **Fork Beads:** Clone `steveyegge/beads` to `devlog`.
+1.  **Fork Beads:** Clone `untoldecay/BeadsLog` to `devlog`.
 2.  **Complete Schema (`internal/db/schema.go`):**
     *   Add `sessions` table (id, title, timestamp, status, type, filename, narrative).
     *   Add `entities` table (id, name, type, first_seen, mention_count).

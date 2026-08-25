@@ -4,11 +4,11 @@
   "version": "0.65.0",
   "author": {
     "name": "Steve Yegge",
-    "url": "https://github.com/steveyegge"
+    "url": "https://github.com/untoldecay"
   },
-  "repository": "https://github.com/steveyegge/beads",
+  "repository": "https://github.com/untoldecay/BeadsLog",
   "license": "MIT",
-  "homepage": "https://github.com/steveyegge/beads",
+  "homepage": "https://github.com/untoldecay/BeadsLog",
   "keywords": [
     "issue-tracker",
     "task-management",

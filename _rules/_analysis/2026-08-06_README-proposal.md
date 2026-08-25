@@ -17,7 +17,7 @@ AI agents forget everything between sessions. They re-make decisions, re-try aba
 
 Two halves, one system:
 
-- **`bd` — a dependency-aware issue tracker** (extends [Beads](https://github.com/steveyegge/beads)): tasks, bugs, and their dependency chains, all in the terminal, JSON-output for agents.
+- **`bd` — a dependency-aware issue tracker** (extends [Beads](https://github.com/untoldecay/BeadsLog)): tasks, bugs, and their dependency chains, all in the terminal, JSON-output for agents.
 - **The devlog — a session memory graph**: markdown session logs turned into a searchable, verifiable knowledge graph. `bd devlog resume` loads yesterday's context; `bd devlog search` finds the fix from three weeks ago; `bd devlog graph`/`impact` shows what depends on what *before* you touch it. Sessions carry lifecycle states (`VALIDATED` / `PAUSED` / `ABANDONED` + reason) so abandoned experiments are never mistaken for baseline truth.
 
 ## How it stores things (and why Git doesn't fight it)

@@ -7,9 +7,9 @@ The Devlog Beads project forks the Beads issue tracker into a graph-powered deve
 
 ### 1. Fork Beads
 ```bash
-git clone https://github.com/steveyegge/beads devlog
+git clone https://github.com/untoldecay/BeadsLog devlog
 cd devlog
-git remote add upstream https://github.com/steveyegge/beads
+git remote add upstream https://github.com/untoldecay/BeadsLog
 go mod tidy
 ```
 
@@ -76,7 +76,7 @@ import (
     "time"
 
     "github.com/spf13/cobra"
-    "github.com/steveyegge/beads/internal/db"
+    "github.com/untoldecay/BeadsLog/internal/db"
 )
 
 type IndexRow struct {

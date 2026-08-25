@@ -123,7 +123,7 @@ jobs:
 
       - name: Download checksums
         run: |
-          curl -sL "https://github.com/steveyegge/beads/releases/download/${{ steps.release.outputs.tag }}/checksums.txt" -o checksums.txt
+          curl -sL "https://github.com/untoldecay/BeadsLog/releases/download/${{ steps.release.outputs.tag }}/checksums.txt" -o checksums.txt
 
       - name: Extract checksums
         id: checksums
@@ -139,26 +139,26 @@ jobs:
           cat > Formula/bd.rb <<'EOF'
           class Bd < Formula
             desc "AI-supervised issue tracker for coding workflows"
-            homepage "https://github.com/steveyegge/beads"
+            homepage "https://github.com/untoldecay/BeadsLog"
             version "${{ steps.release.outputs.version }}"
             license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "https://github.com/steveyegge/beads/releases/download/v#{version}/beads_#{version}_darwin_arm64.tar.gz"
+                url "https://github.com/untoldecay/BeadsLog/releases/download/v#{version}/beads_#{version}_darwin_arm64.tar.gz"
                 sha256 "${{ steps.checksums.outputs.darwin_arm64 }}"
               else
-                url "https://github.com/steveyegge/beads/releases/download/v#{version}/beads_#{version}_darwin_amd64.tar.gz"
+                url "https://github.com/untoldecay/BeadsLog/releases/download/v#{version}/beads_#{version}_darwin_amd64.tar.gz"
                 sha256 "${{ steps.checksums.outputs.darwin_amd64 }}"
               end
             end
 
             on_linux do
               if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-                url "https://github.com/steveyegge/beads/releases/download/v#{version}/beads_#{version}_linux_arm64.tar.gz"
+                url "https://github.com/untoldecay/BeadsLog/releases/download/v#{version}/beads_#{version}_linux_arm64.tar.gz"
                 sha256 "${{ steps.checksums.outputs.linux_arm64 }}"
               else
-                url "https://github.com/steveyegge/beads/releases/download/v#{version}/beads_#{version}_linux_amd64.tar.gz"
+                url "https://github.com/untoldecay/BeadsLog/releases/download/v#{version}/beads_#{version}_linux_amd64.tar.gz"
                 sha256 "${{ steps.checksums.outputs.linux_amd64 }}"
               end
             end
@@ -185,7 +185,7 @@ jobs:
             exit 0
           fi
 
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/steveyegge/homebrew-beads.git" tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/untoldecay/homebrew-beads.git" tap
           cp Formula/bd.rb tap/Formula/bd.rb
           cd tap
           git config user.name "github-actions[bot]"

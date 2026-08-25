@@ -293,14 +293,14 @@ npm install --save-dev @beads/bd
 
 ## 📚 Next Steps
 
-1. **Read the full docs**: https://github.com/steveyegge/beads
+1. **Read the full docs**: https://github.com/untoldecay/BeadsLog
 2. **Try the quickstart**: `bd quickstart` (interactive tutorial)
 3. **Set up MCP**: For local Claude Desktop integration
-4. **Explore examples**: https://github.com/steveyegge/beads/tree/main/examples
+4. **Explore examples**: https://github.com/untoldecay/BeadsLog/tree/main/examples
 
 ## 🔗 Resources
 
-- [beads GitHub](https://github.com/steveyegge/beads)
+- [beads GitHub](https://github.com/untoldecay/BeadsLog)
 - [npm package](https://www.npmjs.com/package/@beads/bd)
 - [Claude Code docs](https://docs.claude.com/claude-code)
 - [SessionStart hooks](https://docs.claude.com/claude-code/hooks)
@@ -348,6 +348,6 @@ After setup, you should see:
 
 ## 🆘 Support
 
-- [File an issue](https://github.com/steveyegge/beads/issues)
-- [Read the FAQ](https://github.com/steveyegge/beads/blob/main/FAQ.md)
-- [Check troubleshooting](https://github.com/steveyegge/beads/blob/main/TROUBLESHOOTING.md)
+- [File an issue](https://github.com/untoldecay/BeadsLog/issues)
+- [Read the FAQ](https://github.com/untoldecay/BeadsLog/blob/main/FAQ.md)
+- [Check troubleshooting](https://github.com/untoldecay/BeadsLog/blob/main/TROUBLESHOOTING.md)

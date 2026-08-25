@@ -319,7 +319,7 @@ bd deploy production --confirm
 
 **Matches:**
 - ✅ Anthropic progressive disclosure [mcpjam](https://www.mcpjam.com/blog/claude-agent-skills)
-- ✅ Beads minimalism [github](https://github.com/steveyegge/beads/blob/main/AGENT_INSTRUCTIONS.md)
+- ✅ Beads minimalism [github](https://github.com/untoldecay/BeadsLog/blob/main/AGENT_INSTRUCTIONS.md)
 - ✅ Manus one-action-per-turn [gist.github](https://gist.github.com/renschni/4fbc70b31bad8dd57f3370239dccd58f)
 
 Perfect balance of guidance + discovery! 🎯

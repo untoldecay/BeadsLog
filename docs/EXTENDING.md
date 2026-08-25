@@ -99,7 +99,7 @@ func InitializeMyAppSchema(dbPath string) error {
 
 ```go
 import (
-    "github.com/steveyegge/beads"
+    "github.com/untoldecay/BeadsLog"
 )
 
 // Open bd's storage
@@ -169,7 +169,7 @@ package vc
 
 import (
     "database/sql"
-    "github.com/steveyegge/beads"
+    "github.com/untoldecay/BeadsLog"
     _ "modernc.org/sqlite"
 )
 
@@ -472,7 +472,7 @@ The recommended way to extend bd is using the `UnderlyingDB()` method on the sto
 ```go
 import (
     "database/sql"
-    "github.com/steveyegge/beads"
+    "github.com/untoldecay/BeadsLog"
     _ "modernc.org/sqlite"
 )
 
@@ -562,7 +562,7 @@ If you need independent connection management, you can still open the database d
 import (
     "database/sql"
     _ "modernc.org/sqlite"
-    "github.com/steveyegge/beads"
+    "github.com/untoldecay/BeadsLog"
 )
 
 // Auto-discover bd's database path
@@ -601,8 +601,8 @@ When creating many issues at once (e.g., bulk imports, batch processing), use `C
 ```go
 import (
     "context"
-    "github.com/steveyegge/beads/internal/storage/sqlite"
-    "github.com/steveyegge/beads/internal/types"
+    "github.com/untoldecay/BeadsLog/internal/storage/sqlite"
+    "github.com/untoldecay/BeadsLog/internal/types"
 )
 
 // Open bd's storage
