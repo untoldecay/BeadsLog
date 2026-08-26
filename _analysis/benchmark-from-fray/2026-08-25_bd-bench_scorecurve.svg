@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" font-family="Helvetica,Arial,sans-serif" font-size="13">
+<rect width="760" height="460" fill="#141515"/>
+<text x="380.0" y="30" fill="#fff" font-size="17" font-weight="600" text-anchor="middle">bd bench — judge score vs how much curated prose grep may read</text>
+<text x="380.0" y="50" fill="#8aa" font-size="12" text-anchor="middle">answer quality (blind judge, /20) — 4-question runs, corpus stripped left→right</text>
+<line x1="90" y1="350" x2="720" y2="350" stroke="#2a2c2c"/>
+<text x="80" y="354" fill="#889" text-anchor="end">0</text>
+<line x1="90" y1="280" x2="720" y2="280" stroke="#2a2c2c"/>
+<text x="80" y="284" fill="#889" text-anchor="end">5</text>
+<line x1="90" y1="210" x2="720" y2="210" stroke="#2a2c2c"/>
+<text x="80" y="214" fill="#889" text-anchor="end">10</text>
+<line x1="90" y1="140" x2="720" y2="140" stroke="#2a2c2c"/>
+<text x="80" y="144" fill="#889" text-anchor="end">15</text>
+<line x1="90" y1="70" x2="720" y2="70" stroke="#2a2c2c"/>
+<text x="80" y="74" fill="#889" text-anchor="end">20</text>
+<rect x="90" y="70" width="630" height="70" fill="#ffd24d" opacity="0.10"/>
+<text x="714" y="134" fill="#d4b24a" text-anchor="end" font-size="11">judge-noise band: bd's IDENTICAL answer scored 15–20</text>
+<text x="90" y="372" fill="#cfe" text-anchor="middle" font-size="12">Run 2</text>
+<text x="90" y="385" fill="#788" text-anchor="middle" font-size="10">devlogs+</text>
+<text x="90" y="398" fill="#788" text-anchor="middle" font-size="10">commits+</text>
+<text x="90" y="411" fill="#788" text-anchor="middle" font-size="10">contracts</text>
+<text x="300" y="372" fill="#cfe" text-anchor="middle" font-size="12">Run 3</text>
+<text x="300" y="385" fill="#788" text-anchor="middle" font-size="10">commits+</text>
+<text x="300" y="398" fill="#788" text-anchor="middle" font-size="10">contracts</text>
+<text x="510" y="372" fill="#cfe" text-anchor="middle" font-size="12">Run 4</text>
+<text x="510" y="385" fill="#788" text-anchor="middle" font-size="10">contracts</text>
+<text x="510" y="398" fill="#788" text-anchor="middle" font-size="10">only</text>
+<text x="720" y="372" fill="#cfe" text-anchor="middle" font-size="12">Run 5</text>
+<text x="720" y="385" fill="#788" text-anchor="middle" font-size="10">code</text>
+<text x="720" y="398" fill="#788" text-anchor="middle" font-size="10">only</text>
+<polyline points="90,70 300,70 510,112 720,70" fill="none" stroke="#6cc0ff" stroke-width="2.5"/>
+<polyline points="90,98 300,84 510,70 720,140" fill="none" stroke="#ff9d5c" stroke-width="2.5"/>
+<circle cx="90" cy="70" r="4.5" fill="#6cc0ff"/><text x="90" y="61" fill="#6cc0ff" text-anchor="middle" font-size="11">20</text>
+<circle cx="90" cy="98" r="4.5" fill="#ff9d5c"/><text x="90" y="114" fill="#ff9d5c" text-anchor="middle" font-size="11">18</text>
+<circle cx="300" cy="70" r="4.5" fill="#6cc0ff"/><text x="300" y="61" fill="#6cc0ff" text-anchor="middle" font-size="11">20</text>
+<circle cx="300" cy="84" r="4.5" fill="#ff9d5c"/><text x="300" y="100" fill="#ff9d5c" text-anchor="middle" font-size="11">19</text>
+<circle cx="510" cy="112" r="4.5" fill="#6cc0ff"/><text x="510" y="103" fill="#6cc0ff" text-anchor="middle" font-size="11">17</text>
+<circle cx="510" cy="70" r="4.5" fill="#ff9d5c"/><text x="510" y="86" fill="#ff9d5c" text-anchor="middle" font-size="11">20</text>
+<circle cx="720" cy="70" r="4.5" fill="#6cc0ff"/><text x="720" y="61" fill="#6cc0ff" text-anchor="middle" font-size="11">20</text>
+<circle cx="720" cy="140" r="4.5" fill="#ff9d5c"/><text x="720" y="156" fill="#ff9d5c" text-anchor="middle" font-size="11">15</text>
+<circle cx="98" cy="68" r="5" fill="#ff9d5c"/><text x="108" y="72" fill="#ff9d5c">bd (devlog) — same reused answer</text>
+<circle cx="350" cy="68" r="5" fill="#6cc0ff"/><text x="360" y="72" fill="#6cc0ff">grep (no bd)</text>
+<text x="380.0" y="452" fill="#667" text-anchor="middle" font-size="11">Takeaway: both lines sit inside the noise band — on this redundantly-documented repo, quality is a wash; bd's robust edge was efficiency, not recall.</text>
+</svg>

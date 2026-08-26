@@ -1,17 +1,17 @@
-# Benchmarks: BeadsLog vs `grep`
+# Benchmarks: where durable memory actually helps
 
-**Question:** does querying a BeadsLog graph actually beat an agent brute-forcing `grep` over the same history?
+**The question isn't "does BeadsLog beat `grep`."** That framing is a trap: in real use `bd` *aims* grep — it points to where an answer lives, then you read that spot — so they're partners, not rivals. The real question is **when a durable memory layer changes the outcome, and when the code already carries it.**
 
-**Finding:** it depends on the *kind* of question — and we measured both, honestly. Grep ties on flat lookups; BeadsLog pulls ahead as the question needs understanding the system.
+We ran two benchmarks — a first pass on this repo, then a harder, more self-critical one on a second, unusually well-documented codebase ([Fray traces](../_analysis/benchmark-from-fray/)). The honest synthesis:
 
-## The headline
+## What we found
 
-| Question type | Sample | Answer quality (blind judge) | Retrieval cost |
-|---|---|---|---|
-| **Recall** — "what fixed X?" | n=4 rounds | tie (18 vs 18) | BeadsLog **~half the tool-calls** (7 vs 13.5) |
-| **Engineering reasoning** — "assess impact/deps of Y" | n=4 tasks | **BeadsLog +2** (median 16.5 vs 14.5) | cheaper in **3 of 4** (median 76k vs 89k tokens) |
+- **Re-deriving "why shipped code works" is a wash.** On a well-documented repo the reasoning is redundant across code comments, commits, and design notes — strip any three and the fourth still answers. No retrieval method had a decisive coverage edge, and a blind judge scored *identical* text with a ±25% swing, larger than any BeadsLog-vs-grep gap. Don't read per-round "winners" as signal.
+- **Deciding what to build next is where memory pays.** On a feasibility task, the arm with only live code mis-framed a feature as greenfield and missed an abandoned-corruption history the team had already fought — advice that would re-open a solved problem. Durable memory prevented it. This is the clearest, non-noisy win — but it's the *memory* (devlogs + design notes), not `bd`'s tooling specifically; thorough grep over the same notes tied it.
+- **BeadsLog's own repeatable edges are narrow and real:** the **"why with no code home"** — abandoned experiments, numbers you tried and reverted, designs you decided against, which live nowhere in the code — and **semantic recall** when your words don't match the code's identifiers (grep confidently pinned the wrong mechanism; the concept index found the right one).
+- **The efficiency case is unproven, not disproven.** On a small, familiar repo, plain grep was as fast or faster — `bd`'s index step is overhead when grep already finds things easily. "Aim grep so you brute-force less" needs a large or unfamiliar corpus we haven't tested. No efficiency claim until then.
 
-The value scales with task complexity: on a small, greppable corpus a capable agent with good keywords ties; BeadsLog's durable edge is **fewer round-trips**, and its decisive wins come when the task requires recalling prior decisions and mapping dependencies instead of brute-forcing exploration.
+> **Learned the hard way:** curated memory can go *stale vs the code* (a design note said ~100ms; the code said 50ms). Memory helps when checked against the code and misleads when trusted as authority — which is why it's most valuable for *deciding*, and least necessary for *re-reading* shipped behavior.
 
 ---
 
@@ -56,7 +56,7 @@ Phrased the way a teammate actually asks — fuzzy, no exact keywords from the s
 
 > "Assess the feasibility, impact, and dependencies of adding an interactive integration-picker to `bd init`. Comprehensive report."
 
-This is where a graph of prior decisions beats re-deriving context from raw files.
+This is where durable memory pays — it surfaces prior designs and abandoned experiments the raw code no longer shows. (The win is *having* the memory; thorough grep over the same notes matches it. The retrieval tooling isn't what wins here.)
 
 ---
 
@@ -74,7 +74,7 @@ Full traces live in [`_analysis/benchmark/`](../_analysis/benchmark/).
 | 06 | This repo (full codebase) | feasibility: `bd devlog export` |
 | 07 | This repo (full codebase) | feasibility: `bd devlog watch` |
 
-BeadsLog won answer quality in 3 of 4 feasibility tasks (Run 04 +6, Run 06 +4, Run 07 +1) and was cheaper in 3 of 4. Grep won Run 05 by 1 and crushed Run 06 on tokens — it can reconstruct committed history with more effort.
+These early per-run "winners" looked encouraging, but a follow-up showed the judge swings ±25% on identical text — so the individual results are within noise, not signal. The rigorous re-test lives in [`_analysis/benchmark-from-fray/`](../_analysis/benchmark-from-fray/): pre-registered coverage checklists, fact-verified ground truth, unprimed judges, on a second codebase. Its verdict is the honest one and it's what "What we found" above reports — recall is a wash, memory changes *decisions*, and on a small familiar repo plain grep was as efficient or better.
 
 ---
 
@@ -93,11 +93,12 @@ bd bench                                  # agent generates its own question set
 
 ## 5. Honest caveats
 
-- `grep` is a strong baseline. A capable agent with good keywords reconstructs committed history (issues.jsonl, devlogs) with more effort — it won 3 of 8 judged rounds overall.
-- The BeadsLog arm is "agent **with** bd added to its normal tools" vs grep-only — the intended comparison (bd *augments* the agent).
-- Judges were blind and answer sets shuffled, to keep pro-BeadsLog bias out.
-- Samples are directional (n=4 per regime), but consistent across runs.
-- BeadsLog's edge grows with corpus size, with questions worded differently from the source (semantic recall), and on things grep can't do at all: cross-session memory, lifecycle badges, shared team graph, impact analysis.
+- **`grep` is a strong baseline — often the winner.** On a well-documented, familiar repo it reconstructs "why" from code + comments + commits, and finds files as fast as `bd` or faster. A grep tier took #1 on every multi-tier run.
+- **Judge noise is large.** Identical text scored across a ±25% range. Treat single-run results as directional at best; the signal only survives across many runs and pre-registered checklists.
+- **Curated memory can go stale vs the code.** A design note said ~100ms where the code said 50ms. "Authoritative" is only as good as its upkeep — verify against code before trusting it.
+- **The efficiency / "aim grep" win is untested at scale.** On a small familiar repo `bd`'s index step is overhead. Its plausible payoff — a large or unfamiliar codebase where blind grep drowns in false hits — is the single most valuable experiment we haven't run. Don't claim it yet.
+- **`bd` is meant as an index for grep, not its rival.** These runs pit them apart to isolate each; real use is `bd` locates → you read that spot. Partners, not opponents.
+- **What's plausible but unproven** (would favor `bd`, honestly): cross-session recall over months, impact/graph analysis, shared team memory, lifecycle badges. This bench probed small, greppable "why" questions — a fair *floor* for `bd`, not its ceiling.
 
 ---
 

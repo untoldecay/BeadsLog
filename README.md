@@ -80,10 +80,15 @@ keep the edge.
 
 ## Does it hold up?
 
-Blind-judged against brute-force `grep`, BeadsLog wins even on flat lookups —
-**~50% fewer tool-calls** at equal answer quality — and the gap widens with
-complexity: on system-reasoning questions, **~14% higher quality for ~15% fewer
-tokens**. See the [benchmarks](docs/BENCHMARK.md) for the method and every run.
+We benchmarked it honestly — losing runs included. On a small, well-documented
+repo, re-deriving *why shipped code works* is a wash: the code, comments, and
+commits already carry the reasoning, and a capable `grep` keeps pace. BeadsLog
+earns its keep in two narrower, sturdier places — **deciding what to build next**
+(it surfaces prior designs and abandoned experiments, so you don't re-open a
+problem the team already closed) and **remembering what the code can't**: the path
+you abandoned, the number you tried and reverted, the design you decided against.
+See the [benchmarks](docs/BENCHMARK.md) — the method, every run, and the losses
+left in.
 
 ## Docs
 

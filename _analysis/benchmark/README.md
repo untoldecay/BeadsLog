@@ -1,5 +1,15 @@
 # BeadsLog retrieval benchmark — trace log
 
+> **⚠️ Superseded — read this as a dev trail, not a conclusion.** A harder,
+> pre-registered re-test on a second codebase
+> ([`_analysis/benchmark-from-fray/`](../benchmark-from-fray/)) showed the blind
+> judge swings ±25% on identical text, so the per-run "winners" below are within
+> noise. The honest synthesis lives in [`docs/BENCHMARK.md`](../../docs/BENCHMARK.md):
+> recall quality is a wash, plain grep was as efficient or better on a small
+> familiar repo, and BeadsLog's durable wins are narrower — changing forward
+> *decisions* and recalling the *why with no code home* (abandoned paths, reverted
+> numbers, decisions-against). Keep these files for method history only.
+
 Traces of live A/B benchmarks comparing an agent answering questions about this
 repo **with BeadsLog retrieval** (`bd devlog search/graph/impact` + normal tools)
 vs **brute-force grep only**. Each run spawns two arms (same task, same model,
@@ -21,7 +31,7 @@ Method is codified in the `bd bench` command and the `audience-test`-style loop.
 | 06 | This repo (full codebase) | feasibility: `bd devlog export` | `run-06_feasibility-export.md` |
 | 07 | This repo (full codebase) | feasibility: `bd devlog watch` | `run-07_feasibility-watch.md` |
 
-## Headline finding — bd's value scales with task complexity
+## Headline finding — SUPERSEDED (within judge noise; see banner above)
 
 | Task type | Sample | Tokens | Tool-calls | Answer quality (blind judge) |
 |---|---|---|---|---|
