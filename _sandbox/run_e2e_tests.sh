@@ -1323,4 +1323,85 @@ git config user.name "E2E Tester"; git config user.email "e2e@example.com"
 cd "$TEST_DIR"
 echo "✅ Test 35 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 36: release channels — cut-release --dev and bd upgrade --channel (BeadsLog-70m)"
+# ---------------------------------------------------------
+C36="$TEST_DIR/ch36"
+mkdir -p "$C36/home" "$C36/fakebin" "$C36/plain"
+fail36() { echo "❌ FAIL: $1"; exit 1; }
+CUT36="$ROOT_DIR/scripts/cut-release.sh"
+# Throwaway remote; a synthetic stable tag keeps this independent of real tags
+git clone -q --bare "$ROOT_DIR" "$C36/origin.git"
+git -C "$C36/origin.git" tag -l | xargs git -C "$C36/origin.git" tag -d > /dev/null
+git clone -q "$C36/origin.git" "$C36/src" 2> /dev/null && cd "$C36/src"
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+git switch -q -C main && git push -q -f origin main
+git tag v99.0.0 && git push -q origin v99.0.0
+git switch -q -c feature/x && git commit -q --allow-empty -m "feature work" && git push -q origin feature/x
+heads36() { git -C "$C36/origin.git" for-each-ref --format='%(refname) %(objectname)' refs/heads; git rev-parse HEAD; git status --porcelain; }
+tags36() { git -C "$C36/origin.git" tag -l | sort; }
+BEFORE36=$(heads36)
+
+# 1. dry run publishes nothing
+"$CUT36" --dev --dry-run > "$C36/out" 2>&1 || fail36 "dry run: $(cat "$C36/out")"
+grep -q "99.1.0-dev.1" "$C36/out" || fail36 "dry run chose the wrong version: $(cat "$C36/out")"
+[ "$(tags36)" = "v99.0.0" ] || fail36 "dry run pushed a tag"
+# 2. two cuts: versions increment, branches and checkout are untouched
+echo "dirty" >> README.md   # uncommitted work must neither block nor leak
+BEFORE36=$(heads36)
+"$CUT36" --dev --yes --no-github > "$C36/out" 2>&1 || fail36 "cut: $(cat "$C36/out")"
+"$CUT36" --dev --yes --no-github > "$C36/out" 2>&1 || fail36 "second cut: $(cat "$C36/out")"
+[ "$(tags36 | tr '\n' ' ')" = "v99.0.0 v99.1.0-dev.1 v99.1.0-dev.2 " ] || fail36 "tags: $(tags36)"
+[ "$(heads36)" = "$BEFORE36" ] || fail36 "a branch or the checkout changed"
+[ "$(git worktree list | wc -l | tr -d ' ')" = "1" ] || fail36 "temporary worktree left behind"
+[ "$(git rev-parse 'v99.1.0-dev.2^{commit}~1')" = "$(git rev-parse HEAD)" ] || fail36 "tag is not on top of HEAD"
+[ "$(git diff --name-only HEAD v99.1.0-dev.2)" = "cmd/bd/version.go" ] || fail36 "tag contains more than the version bump"
+OUT36=$(git show v99.1.0-dev.2:cmd/bd/version.go)
+[[ "$OUT36" == *'Version = "99.1.0-dev.2"'* ]] || fail36 "version not bumped in the tag"
+[ -z "$(git -C "$C36/origin.git" branch --contains v99.1.0-dev.2)" ] || fail36 "dev commit is on a branch"
+# 3. guard rails
+if "$CUT36" --dev --base 98.0.0 --yes --no-github > /dev/null 2>&1; then fail36 "accepted a base older than stable"; fi
+if "$CUT36" --dev --base 99.0.0 --yes --no-github > /dev/null 2>&1; then fail36 "accepted the stable version as base"; fi
+if "$CUT36" --bogus < /dev/null > /dev/null 2>&1; then fail36 "unknown option started a release"; fi
+printf 'n\n' | "$CUT36" --dev --no-github > /dev/null 2>&1 || fail36 "declining should exit cleanly"
+printf '#!/bin/sh\nexit 1\n' > "$C36/origin.git/hooks/pre-receive" && chmod +x "$C36/origin.git/hooks/pre-receive"
+if "$CUT36" --dev --yes --no-github > /dev/null 2>&1; then fail36 "rejected push reported success"; fi
+rm "$C36/origin.git/hooks/pre-receive"
+[ -z "$(git tag -l 'v99.1.0-dev.3')" ] || fail36 "failed push left a local tag"
+[ "$(tags36 | wc -l | tr -d ' ')" = "3" ] || fail36 "guard rails pushed something"
+
+# 4. bd upgrade, outside any repository, with a recording 'go'
+printf '#!/bin/sh\necho "$@" >> "%s/go.log"\n' "$C36" > "$C36/fakebin/go" && chmod +x "$C36/fakebin/go"
+up36() { # binary, args...
+    local bin="$1"; shift
+    (cd "$C36/plain" && HOME="$C36/home" XDG_CONFIG_HOME="$C36/home/cfg" BD_RELEASE_SOURCE="$C36/origin.git" PATH="$C36/fakebin:$PATH" "$bin" upgrade "$@" < /dev/null 2>&1)
+}
+OUT36=$(up36 "$BD_BIN" --json)
+[[ "$OUT36" == *'"channel": "stable"'* && "$OUT36" == *'"latest_version": "99.0.0"'* ]] || fail36 "default channel: $OUT36"
+OUT36=$(up36 "$BD_BIN" --channel dev --json)
+[[ "$OUT36" == *'"latest_version": "99.1.0-dev.2"'* && "$OUT36" == *'"upgrade_available": true'* ]] || fail36 "dev channel: $OUT36"
+OUT36=$(up36 "$BD_BIN" --json)
+[[ "$OUT36" == *'"channel": "dev"'* ]] || fail36 "channel not remembered: $OUT36"
+OUT36=$(up36 "$BD_BIN" --install)
+grep -qx "install github.com/untoldecay/BeadsLog/cmd/bd@v99.1.0-dev.2" "$C36/go.log" || fail36 "did not install the exact tag: $(cat "$C36/go.log" 2>/dev/null) $OUT36"
+if up36 "$BD_BIN" --channel beta > /dev/null; then fail36 "unknown channel accepted"; fi
+# going back to stable from a dev build is offered, and installs the stable tag
+(cd "$ROOT_DIR" && "$(command -v go)" build -ldflags "-X main.Version=99.1.0-dev.2" -o "$C36/bd-dev" ./cmd/bd)
+OUT36=$(up36 "$C36/bd-dev")
+[[ "$OUT36" == *"up to date"* ]] || fail36 "dev build on dev channel: $OUT36"
+OUT36=$(up36 "$C36/bd-dev" --channel stable --install)
+[[ "$OUT36" == *"Back to stable: v99.0.0"* ]] || fail36 "going back: $OUT36"
+[ "$(tail -1 "$C36/go.log")" = "install github.com/untoldecay/BeadsLog/cmd/bd@v99.0.0" ] || fail36 "going back installed: $(tail -1 "$C36/go.log")"
+# without a saved choice a dev build follows dev, and gets the release once it exists
+rm -rf "$C36/home"; mkdir "$C36/home"
+git -C "$C36/origin.git" tag v99.1.0 refs/heads/main
+OUT36=$(up36 "$C36/bd-dev" --json)
+[[ "$OUT36" == *'"channel": "dev"'* && "$OUT36" == *'"latest_version": "99.1.0"'* && "$OUT36" == *'"upgrade_available": true'* ]] || fail36 "dev to release: $OUT36"
+# the next series opens after the release
+cd "$C36/src" && "$CUT36" --dev --dry-run > "$C36/out" 2>&1 || fail36 "$(cat "$C36/out")"
+grep -q "99.2.0-dev.1" "$C36/out" || fail36 "next series: $(cat "$C36/out")"
+
+cd "$TEST_DIR"
+echo "✅ Test 36 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

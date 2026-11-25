@@ -7,13 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Release channels: `stable` and `dev`.** `bd upgrade --channel dev|stable` switches this machine (remembered per machine, not in the committed config); `stable` also takes you back from a dev build. `scripts/cut-release.sh --dev` cuts `X.Y.Z-dev.N` from any branch as a tag-only commit, so no branch ever carries a dev version.
+
 ### Fixed
+- **Version comparison understands pre-releases**: `0.66.0` is newer than `0.66.0-dev.1`, and `dev.10` is newer than `dev.9`.
 - **Worktrees no longer ghost devlogs that live on another branch.** `bd devlog sync` marks a session as a ghost only when its file is on no local or remote branch tip and in no worktree (uncommitted files count). Sessions wrongly marked by older versions are restored, and narratives are no longer replaced by the one-line problem when the file is on another branch. In a linked worktree, or a checkout redirected to another repository's database, sync never marks ghosts. If git cannot be queried, nothing is marked or deleted.
 - **`bd devlog prune` and `bd doctor --fix` share the same safety rules** and refuse to run in a linked worktree. `doctor --fix` also no longer drops index rows by title, which could remove a live session's row.
 - `bd devlog show` reads a session's file from its branch or worktree when it is not in this checkout.
 - **Beads redirects have one interpretation and one lookup order.** Relative paths resolve from the project root, as documented; redirects written by `bd worktree create` up to 0.65.0 (relative to `.beads`) still work, and new ones are absolute. In a worktree its own redirect wins, then the main repository, for both the beads directory and the database (they could disagree). `bd worktree info` reports the worktree's redirect, and `bd doctor` no longer rejects valid absolute redirects.
 
 ### Changed
+- **`bd upgrade` installs the exact released tag** instead of whatever is on `main`, takes the latest version from tags, and runs outside a bd repository.
 - **A redirect that cannot be followed is now an error** instead of a warning plus a silent fallback to another database. `bd where`, `bd worktree` and `bd doctor` still run, `--db`/`BEADS_DB` bypass it, and git hooks skip bd rather than block the commit.
 
 ## [0.65.0] - 2026-08-24

@@ -48,7 +48,7 @@ Useful when managing the environment.
 
 | Command | Usage | Description |
 | :--- | :--- | :--- |
-| `bd upgrade check`| `bd upgrade check [--install]` | **NEW**: Interactive update check from main repo. |
+| `bd upgrade` | `bd upgrade [--install] [--channel stable\|dev]` | Check for a newer version on this machine's channel and install it. |
 | `bd daemon start` | `bd daemon start` | Start the background sync and AI worker. |
 | `bd onboard` | `bd onboard` | Refresh agent rules and instructions. |
 | `bd doctor` | `bd doctor --fix` | Repair common installation issues. |

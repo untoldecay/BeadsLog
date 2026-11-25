@@ -2,8 +2,9 @@ package changelog
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/untoldecay/BeadsLog/internal/channel"
 )
 
 type Entry struct {
@@ -440,21 +441,7 @@ func IsNewer(v1, v2 string) bool {
 		return true
 	}
 
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	for i := 0; i < len(parts1) && i < len(parts2); i++ {
-		n1, _ := strconv.Atoi(parts1[i])
-		n2, _ := strconv.Atoi(parts2[i])
-
-		if n1 > n2 {
-			return true
-		}
-		if n1 < n2 {
-			return false
-		}
-	}
-	return len(parts1) > len(parts2)
+	return channel.Compare(v1, v2) > 0
 }
 
 // RenderLatest returns a formatted string of the latest changes for terminal output

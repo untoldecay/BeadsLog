@@ -11,6 +11,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Pre-releases are a separate, non-interactive path: they never touch main or
+# the current branch.
+if [[ "${1:-}" == "--dev" ]]; then
+    shift
+    exec "$SCRIPT_DIR/cut-dev.sh" "$@"
+elif [[ -n "${1:-}" ]]; then
+    echo "Usage: $0          # interactive stable release"
+    echo "       $0 --dev    # pre-release of the current commit (see $0 --dev --help)"
+    exit 1
+fi
+
 echo -e "${BLUE}🚀 BeadsLog Release Orchestrator${NC}"
 echo -e "${BLUE}=================================${NC}"
 
