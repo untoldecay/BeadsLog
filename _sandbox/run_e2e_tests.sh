@@ -1130,4 +1130,121 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 33 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 34: worktrees — a devlog on another branch is never a ghost (BeadsLog-svg.1)"
+# ---------------------------------------------------------
+W34="$TEST_DIR/wt34"
+mkdir -p "$W34/main" && cd "$W34/main"
+git init -q -b develop
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --inline --prefix wt --no-daemon > /dev/null 2>&1
+DB34="$W34/main/.beads/beads.db"
+fail34() { echo "❌ FAIL: $1"; "$BD_BIN" devlog status --no-daemon 2>&1 | head -20; exit 1; }
+# JSON status is the CLI's own view of the shared database
+ghosts34() { (cd "$W34/main" && "$BD_BIN" devlog status --json --no-daemon 2>/dev/null | sed -n 's/.*"ghosts": *\([0-9]*\).*/\1/p' | head -1); }
+listed34() { local l; l=$(cd "$W34/main" && "$BD_BIN" devlog list --no-daemon 2>/dev/null); [[ "$l" == *"$1"* ]]; }
+log34() { # name
+    printf '# %s\n\n## Problem\n%s\n\nFULLTEXT-%s\n\n### Architectural Relationships\n- mod%s -> core34 (uses)\n' "$1" "$1" "$1" "$1" > "_rules/_devlog/2026-11-25_$1.md"
+    "$BD_BIN" devlog record --file "_rules/_devlog/2026-11-25_$1.md" --subject "[feature] $1" --problem "$1 problem" --no-daemon > /dev/null 2>&1
+}
+quiet_commit() { git add -A && git -c core.hooksPath=/dev/null commit -q --allow-empty -m "$1"; }
+
+quiet_commit "bd init"
+git branch old/feat
+log34 AlphaLog
+quiet_commit "devlog Alpha"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "fixture should start with 0 ghosts, got '$(ghosts34)'"
+
+# 1. sync from a worktree on an older branch
+git worktree add -q "$W34/wt" old/feat
+mkdir -p "$W34/wt/.beads" && echo "$W34/main/.beads" > "$W34/wt/.beads/redirect"
+cd "$W34/wt"
+OUT34=$("$BD_BIN" devlog sync --no-daemon 2>&1)
+echo "$OUT34" | grep -q "worktree: 1 session(s) have no file on this branch" || fail34 "worktree sync did not explain itself: $OUT34"
+[ "$(ghosts34)" = "0" ] || fail34 "worktree sync created ghosts"
+listed34 AlphaLog || fail34 "AlphaLog disappeared from list after a worktree sync"
+# show still works from the branch that lacks the file
+OUT34=$("$BD_BIN" devlog show 2026-11-25_AlphaLog --no-daemon 2>/dev/null || true)
+[[ "$OUT34" == *"FULLTEXT-AlphaLog"* ]] || fail34 "show could not read AlphaLog from its branch"
+
+# 1b. the shared post-commit hook must be just as safe
+git -c core.hooksPath=/dev/null commit -q --allow-empty -m noop
+( export PATH="$(dirname "$BD_BIN"):$PATH"; git commit -q --allow-empty -m "plain commit, hooks on" > /dev/null 2>&1 || true )
+sleep 3
+[ "$(ghosts34)" = "0" ] || fail34 "post-commit hook in a worktree created ghosts"
+
+# 2. prune and doctor --fix refuse in a worktree, even with a real ghost present
+cd "$W34/main"
+log34 PhantomLog                       # never committed
+rm "_rules/_devlog/2026-11-25_PhantomLog.md"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "1" ] || fail34 "a file that exists nowhere must still become a ghost"
+cd "$W34/wt"
+if "$BD_BIN" devlog prune --no-daemon > "$W34/prune.txt" 2>&1; then fail34 "prune must exit non-zero in a linked worktree"; fi
+grep -q "main checkout" "$W34/prune.txt" || fail34 "prune refusal has no hint: $(cat "$W34/prune.txt")"
+"$BD_BIN" doctor --fix --yes < /dev/null > /dev/null 2>&1 || true
+[ "$(ghosts34)" = "1" ] || fail34 "doctor --fix pruned from a linked worktree"
+
+# 3. unmerged devlog recorded in the worktree survives sync + prune in main
+log34 BetaLog
+quiet_commit "devlog Beta"
+cd "$W34/main"
+OUT34=$("$BD_BIN" devlog sync --no-daemon 2>&1)
+echo "$OUT34" | grep -q "live on other branches" || fail34 "main sync did not report sessions elsewhere: $OUT34"
+"$BD_BIN" devlog prune --no-daemon > "$W34/prune.txt" 2>&1 || fail34 "prune failed in main: $(cat "$W34/prune.txt")"
+listed34 BetaLog || fail34 "prune deleted a session that lives on an unmerged branch"
+listed34 AlphaLog || fail34 "prune deleted a live session"
+
+# 4. the real ghost is gone, for good
+grep -q "Pruned 1 ghost" "$W34/prune.txt" || fail34 "real ghost not pruned: $(cat "$W34/prune.txt")"
+grep -q PhantomLog _rules/_devlog/_index.md && fail34 "pruned ghost still in _index.md"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "ghost resurrected after prune"
+
+# 5. uncommitted devlog in another worktree is not a ghost either
+cd "$W34/wt" && log34 DraftLog
+cd "$W34/main" && "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "uncommitted devlog in another worktree was marked as a ghost"
+
+# 6. committed, then deleted on every branch: really gone
+log34 GammaLog
+quiet_commit "devlog Gamma"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+rm "_rules/_devlog/2026-11-25_GammaLog.md"
+quiet_commit "delete Gamma"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "1" ] || fail34 "a devlog deleted from all branch tips must become a ghost"
+"$BD_BIN" doctor --fix --yes < /dev/null > /dev/null 2>&1 || true
+[ "$(ghosts34)" = "0" ] || fail34 "doctor --fix must prune real ghosts in the main checkout"
+listed34 BetaLog || fail34 "doctor --fix deleted a session that lives on an unmerged branch"
+
+# 7. ghosts wrongly marked by an older bd are restored, and prune keeps them
+if command -v sqlite3 > /dev/null 2>&1; then
+    sqlite3 "$DB34" "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE filename LIKE '%BetaLog%' OR filename LIKE '%AlphaLog%'"
+    OUT34=$("$BD_BIN" devlog prune --no-daemon 2>&1)
+    echo "$OUT34" | grep -q "Kept 2 session(s)" || fail34 "prune did not restore false ghosts: $OUT34"
+    listed34 BetaLog || fail34 "false ghost was deleted by prune"
+    sqlite3 "$DB34" "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE filename LIKE '%BetaLog%'"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    [ "$(ghosts34)" = "0" ] || fail34 "sync did not restore a false ghost"
+
+    # 8. indexed here but the file is only on another branch: text is kept,
+    #    and text destroyed by an older bd is fetched back.
+    len34() { sqlite3 "$DB34" "SELECT length(narrative) FROM sessions WHERE filename LIKE '%AlphaLog%'"; }
+    L0=$(len34)
+    git branch keep/alpha
+    git rm -q "_rules/_devlog/2026-11-25_AlphaLog.md"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    [ "$(len34)" = "$L0" ] || fail34 "sync truncated a narrative whose file is on another branch ($L0 -> $(len34))"
+    SUM=$(printf '%s' 'AlphaLog problem' | shasum -a 256 | cut -d' ' -f1)
+    sqlite3 "$DB34" "UPDATE sessions SET narrative = 'AlphaLog problem', file_hash = '$SUM', is_ghost = 1 WHERE filename LIKE '%AlphaLog%'"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    OUT34=$(sqlite3 "$DB34" "SELECT narrative FROM sessions WHERE filename LIKE '%AlphaLog%'")
+    [[ "$OUT34" == *"FULLTEXT-AlphaLog"* ]] || fail34 "destroyed narrative was not restored"
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 34 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

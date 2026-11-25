@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Worktrees no longer ghost devlogs that live on another branch.** `bd devlog sync` marks a session as a ghost only when its file is on no local or remote branch tip and in no worktree (uncommitted files count). Sessions wrongly marked by older versions are restored, and narratives are no longer replaced by the one-line problem when the file is on another branch. In a linked worktree, or a checkout redirected to another repository's database, sync never marks ghosts. If git cannot be queried, nothing is marked or deleted.
+- **`bd devlog prune` and `bd doctor --fix` share the same safety rules** and refuse to run in a linked worktree. `doctor --fix` also no longer drops index rows by title, which could remove a live session's row.
+- `bd devlog show` reads a session's file from its branch or worktree when it is not in this checkout.
+
 ## [0.65.0] - 2026-08-24
 
 ## [0.65.0] - 2026-08-24

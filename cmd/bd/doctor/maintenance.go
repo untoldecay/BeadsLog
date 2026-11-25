@@ -11,6 +11,7 @@ import (
 
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/configfile"
+	"github.com/untoldecay/BeadsLog/internal/devlog"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 	"github.com/untoldecay/BeadsLog/internal/types"
 )
@@ -443,6 +444,23 @@ func CheckDevlogGhosts(path string) DoctorCheck {
 			Name:     "Devlog Ghost Sessions",
 			Status:   StatusOK,
 			Message:  "No ghost devlog sessions",
+			Category: CategoryMaintenance,
+		}
+	}
+
+	// Pruning is refused in a linked worktree, so don't offer it as a fix there.
+	devlogDir, _ := store.GetConfig(ctx, "devlog_dir")
+	if devlogDir == "" {
+		devlogDir = "_rules/_devlog"
+	}
+	if !filepath.IsAbs(devlogDir) {
+		devlogDir = filepath.Join(path, devlogDir)
+	}
+	if reason := devlog.NewPresence(devlogDir).Restriction(); reason != "" {
+		return DoctorCheck{
+			Name:     "Devlog Ghost Sessions",
+			Status:   StatusOK,
+			Message:  fmt.Sprintf("%d ghost session(s); not checked here (%s)", ghostCount, reason),
 			Category: CategoryMaintenance,
 		}
 	}

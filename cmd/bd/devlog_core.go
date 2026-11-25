@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/devlog"
 	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
@@ -34,7 +35,10 @@ type IndexRow struct {
 
 // SyncSession synchronizes a session from an index row into the database
 // It handles creation, updates, and content hash verification
-func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
+//
+// presence decides whether a file missing from this checkout is really gone
+// (ghost) or just lives on another branch or worktree.
+func SyncSession(store *sqlite.SQLiteStorage, row IndexRow, presence *devlog.Presence) (bool, error) {
 	db := store.UnderlyingDB()
 
 	// 1. Session ID Resolution Strategy
@@ -80,7 +84,37 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 	var narrative string
 	isMissing := false
 	isGhost := currentGhost
-	
+
+	fromElsewhere := false
+	if err != nil {
+		switch presence.Lookup(filePath) {
+		case devlog.Elsewhere:
+			// The file lives on another branch or worktree. Keep what we know;
+			// only fetch the text if we never had it (new session, or an
+			// earlier sync replaced it with the one-line problem).
+			problemSum := sha256.Sum256([]byte(row.Problem))
+			if exists && currentHash != fmt.Sprintf("%x", problemSum) {
+				if !currentGhost {
+					return false, nil
+				}
+				_, err := db.Exec("UPDATE sessions SET is_ghost = 0, is_missing = 0 WHERE id = ?", sessionID)
+				return err == nil, err
+			}
+			if elsewhere, _, readErr := presence.Read(filePath); readErr == nil {
+				content, err = elsewhere, nil
+				fromElsewhere = true
+			} else {
+				return false, readErr
+			}
+		case devlog.Unknown:
+			return false, nil // cannot prove the file is gone
+		case devlog.Absent:
+			if presence.Restriction() != "" {
+				return false, nil // not this checkout's call to make
+			}
+		}
+	}
+
 	if err != nil {
 		isMissing = true
 		// Only warn if NOT already marked as ghost
@@ -137,7 +171,7 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow) (bool, error) {
 
 	// Extract and link entities (SYNC: Always ForceRegex for speed)
 	result, err := extractAndLinkEntities(store, sessionID, narrative, ExtractionOptions{ForceRegex: true})
-	if err == nil && result != nil && !isMissing {
+	if err == nil && result != nil && !isMissing && !fromElsewhere {
 		// Crystallize (Write-Back) discovered relationships to the file (from Regex)
 		if err := crystallizeRelationships(filePath, result.Relationships); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to crystallize relationships to %s: %v\n", filePath, err)
