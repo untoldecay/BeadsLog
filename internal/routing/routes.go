@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/storage"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
@@ -319,48 +320,13 @@ func findTownRoutes(currentBeadsDir string) ([]Route, string) {
 	return routes, townRoot
 }
 
-// resolveRedirect checks for a redirect file in the beads directory
-// and resolves the redirect path if present.
+// resolveRedirect follows the redirect in a beads directory, if any.
 func resolveRedirect(beadsDir string) string {
-	redirectFile := filepath.Join(beadsDir, "redirect")
-	data, err := os.ReadFile(redirectFile) //nolint:gosec // redirectFile is constructed from known beadsDir
-	if err != nil {
-		if os.Getenv("BD_DEBUG_ROUTING") != "" {
-			fmt.Fprintf(os.Stderr, "[routing] No redirect file at %s: %v\n", redirectFile, err)
-		}
-		return beadsDir // No redirect
+	target := beads.FollowRedirect(beadsDir)
+	if os.Getenv("BD_DEBUG_ROUTING") != "" && target != beadsDir {
+		fmt.Fprintf(os.Stderr, "[routing] Followed redirect from %s -> %s\n", beadsDir, target)
 	}
-
-	redirectPath := strings.TrimSpace(string(data))
-	if os.Getenv("BD_DEBUG_ROUTING") != "" {
-		fmt.Fprintf(os.Stderr, "[routing] Read redirect: %q from %s\n", redirectPath, redirectFile)
-	}
-	if redirectPath == "" {
-		return beadsDir
-	}
-
-	// Handle relative paths
-	if !filepath.IsAbs(redirectPath) {
-		redirectPath = filepath.Join(beadsDir, redirectPath)
-	}
-
-	// Clean and resolve the path
-	redirectPath = filepath.Clean(redirectPath)
-	if os.Getenv("BD_DEBUG_ROUTING") != "" {
-		fmt.Fprintf(os.Stderr, "[routing] Resolved redirect path: %s\n", redirectPath)
-	}
-
-	// Verify the redirect target exists
-	if info, err := os.Stat(redirectPath); err == nil && info.IsDir() {
-		if os.Getenv("BD_DEBUG_ROUTING") != "" {
-			fmt.Fprintf(os.Stderr, "[routing] Followed redirect from %s -> %s\n", beadsDir, redirectPath)
-		}
-		return redirectPath
-	} else if os.Getenv("BD_DEBUG_ROUTING") != "" {
-		fmt.Fprintf(os.Stderr, "[routing] Redirect target check failed: %v\n", err)
-	}
-
-	return beadsDir
+	return target
 }
 
 // RoutedStorage represents a storage connection that may have been routed

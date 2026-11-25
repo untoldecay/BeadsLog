@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/routing"
 	"github.com/untoldecay/BeadsLog/internal/rpc"
 	"github.com/untoldecay/BeadsLog/internal/ui"
@@ -479,7 +480,7 @@ func discoverRigDaemons() []rigDaemon {
 		}
 
 		// Follow redirect if present
-		beadsDir = resolveBeadsRedirect(beadsDir)
+		beadsDir = beads.FollowRedirect(beadsDir)
 
 		// Check if daemon is running
 		socketPath := filepath.Join(beadsDir, "bd.sock")
@@ -498,35 +499,6 @@ func discoverRigDaemons() []rigDaemon {
 	}
 
 	return daemons
-}
-
-// resolveBeadsRedirect follows a redirect file if present.
-// Similar to routing.resolveRedirect but simplified for activity use.
-func resolveBeadsRedirect(beadsDir string) string {
-	redirectFile := filepath.Join(beadsDir, "redirect")
-	data, err := os.ReadFile(redirectFile) // #nosec G304 - redirects are trusted within beads rig paths
-	if err != nil {
-		return beadsDir
-	}
-
-	redirectPath := strings.TrimSpace(string(data))
-	if redirectPath == "" {
-		return beadsDir
-	}
-
-	// Handle relative paths
-	if !filepath.IsAbs(redirectPath) {
-		redirectPath = filepath.Join(beadsDir, redirectPath)
-	}
-
-	redirectPath = filepath.Clean(redirectPath)
-
-	// Verify target exists before returning
-	if info, err := os.Stat(redirectPath); err == nil && info.IsDir() {
-		return redirectPath
-	}
-
-	return beadsDir // Fallback to original if redirect target invalid
 }
 
 // fetchTownMutations retrieves mutations from all rig daemons

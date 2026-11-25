@@ -402,6 +402,26 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
+		// A redirect that can't be followed must not fall back to another
+		// database. Commands that diagnose or repair it still run, and an
+		// explicit --db / BEADS_DB doesn't depend on it.
+		if dbPath == "" && os.Getenv("BEADS_DB") == "" && cmdName != "where" && cmdName != "worktree" &&
+			(cmd.Parent() == nil || cmd.Parent().Name() != "worktree") {
+			if err := beads.CheckRedirect(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: broken beads redirect: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Fix the path in that file, or delete it. 'bd where' and 'bd worktree info' show what is in use.\n")
+				// Installed pre-commit hooks run these two and abort the commit
+				// on failure. Skip them (nothing is read or written) instead of
+				// blocking the user's code commit.
+				flushOnly, _ := cmd.Flags().GetBool("flush-only")
+				if os.Getenv("GIT_INDEX_FILE") != "" && (cmdName == "check" || (cmdName == "sync" && flushOnly)) {
+					fmt.Fprintf(os.Stderr, "Skipped in git hook: 'bd %s'.\n", cmdName)
+					os.Exit(0)
+				}
+				os.Exit(1)
+			}
+		}
+
 		// Auto-detect sandboxed environment (Phase 2 for GH #353)
 		// Only auto-enable if user hasn't explicitly set --sandbox or --no-daemon
 		if !cmd.Flags().Changed("sandbox") && !cmd.Flags().Changed("no-daemon") {

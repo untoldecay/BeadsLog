@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/untoldecay/BeadsLog/cmd/bd/doctor/fix"
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/syncbranch"
 )
 
@@ -271,6 +272,15 @@ func FixRedirectTracking() error {
 	return nil
 }
 
+// resolveLocalRedirect resolves ./.beads/redirect the way every command does.
+func resolveLocalRedirect() (target string, has bool, err error) {
+	beadsDir, err := filepath.Abs(".beads")
+	if err != nil {
+		return "", false, err
+	}
+	return beads.ResolveRedirect(beadsDir)
+}
+
 // CheckRedirectTargetValid verifies that the redirect target exists and has a valid beads database.
 // This catches cases where the redirect points to a non-existent directory or one without a database.
 func CheckRedirectTargetValid() DoctorCheck {
@@ -294,9 +304,7 @@ func CheckRedirectTargetValid() DoctorCheck {
 		}
 	}
 
-	// Parse redirect target
-	target := strings.TrimSpace(string(data))
-	if target == "" {
+	if strings.TrimSpace(string(data)) == "" {
 		return DoctorCheck{
 			Name:    "Redirect Target Valid",
 			Status:  StatusWarning,
@@ -305,43 +313,21 @@ func CheckRedirectTargetValid() DoctorCheck {
 		}
 	}
 
-	// Resolve the redirect path relative to the parent of .beads
-	cwd, err := os.Getwd()
+	resolvedTarget, has, err := resolveLocalRedirect()
 	if err != nil {
-		return DoctorCheck{
-			Name:    "Redirect Target Valid",
-			Status:  StatusWarning,
-			Message: "Cannot determine current directory",
-		}
-	}
-
-	resolvedTarget := filepath.Clean(filepath.Join(cwd, target))
-
-	// Check if target directory exists
-	info, err := os.Stat(resolvedTarget)
-	if os.IsNotExist(err) {
 		return DoctorCheck{
 			Name:    "Redirect Target Valid",
 			Status:  StatusError,
 			Message: "Redirect target does not exist",
-			Detail:  fmt.Sprintf("Target: %s", resolvedTarget),
+			Detail:  err.Error(),
 			Fix:     "Fix the redirect path or create the target directory",
 		}
 	}
-	if err != nil {
+	if !has {
 		return DoctorCheck{
 			Name:    "Redirect Target Valid",
-			Status:  StatusWarning,
-			Message: "Cannot access redirect target",
-			Detail:  err.Error(),
-		}
-	}
-	if !info.IsDir() {
-		return DoctorCheck{
-			Name:    "Redirect Target Valid",
-			Status:  StatusError,
-			Message: "Redirect target is not a directory",
-			Detail:  fmt.Sprintf("Target: %s", resolvedTarget),
+			Status:  StatusOK,
+			Message: "No redirect configured",
 		}
 	}
 
@@ -390,8 +376,7 @@ func CheckRedirectTargetSyncWorktree() DoctorCheck {
 		}
 	}
 
-	target := strings.TrimSpace(string(data))
-	if target == "" {
+	if strings.TrimSpace(string(data)) == "" {
 		return DoctorCheck{
 			Name:    "Redirect Target Sync",
 			Status:  StatusOK,
@@ -399,17 +384,14 @@ func CheckRedirectTargetSyncWorktree() DoctorCheck {
 		}
 	}
 
-	// Resolve the target path
-	cwd, err := os.Getwd()
-	if err != nil {
+	resolvedTarget, has, err := resolveLocalRedirect()
+	if err != nil || !has {
 		return DoctorCheck{
 			Name:    "Redirect Target Sync",
-			Status:  StatusOK,
-			Message: "N/A (cannot determine cwd)",
+			Status:  StatusOK, // the target check reports this
+			Message: "N/A (no valid redirect target)",
 		}
 	}
-
-	resolvedTarget := filepath.Clean(filepath.Join(cwd, target))
 
 	// Check if the target has a sync-branch configured in config.yaml
 	configPath := filepath.Join(resolvedTarget, "config.yaml")

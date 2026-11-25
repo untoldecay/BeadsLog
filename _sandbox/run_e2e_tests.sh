@@ -1247,4 +1247,80 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 34 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 35: redirects — one resolver, one lookup order, broken is an error (BeadsLog-svg.2)"
+# ---------------------------------------------------------
+R35="$TEST_DIR/rd35"
+mkdir -p "$R35/Repos/a" "$R35/wonder/x/y" && cd "$R35/Repos/a"
+R35=$(cd "$R35" && pwd -P)
+fail35() { echo "❌ FAIL: $1"; exit 1; }
+git init -q -b develop
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --inline --prefix rd --no-daemon > /dev/null 2>&1
+git add -A && git -c core.hooksPath=/dev/null commit -q -m "bd init"
+MAIN35="$R35/Repos/a/.beads"
+where35() { "$BD_BIN" where --no-daemon 2>&1 || true; }
+uses35() { # expected .beads dir: location AND database, no warning
+    local w; w=$(where35)
+    [[ "$(echo "$w" | head -1)" == "$1" ]] || fail35 "bd where location is not $1: $w"
+    [[ "$w" == *"database: $1/beads.db"* ]] || fail35 "bd where database is not in $1: $w"
+    [[ "$w" != *"Warning"* ]] || fail35 "bd where warns: $w"
+}
+
+# 1. unrelated directories at different depths (handoff test 6)
+"$BD_BIN" worktree create "$R35/wonder/x/y/wt" --branch t35 --no-daemon > /dev/null 2>&1 || fail35 "worktree create failed"
+cd "$R35/wonder/x/y/wt"
+uses35 "$MAIN35"
+# 2. worktree info reports the redirect (handoff test 5), also behind the /tmp symlink
+OUT35=$("$BD_BIN" worktree info --no-daemon 2>&1)
+[[ "$OUT35" == *"redirects to $MAIN35"* ]] || fail35 "worktree info: $OUT35"
+TMP35=$(mktemp -d /tmp/bd-e2e35.XXXXXX)
+(cd "$R35/Repos/a" && "$BD_BIN" worktree create "$TMP35/x" --branch t35b --no-daemon > /dev/null 2>&1)
+OUT35=$(cd "$TMP35/x" && "$BD_BIN" worktree info --no-daemon 2>&1)
+(cd "$R35/Repos/a" && git worktree remove --force "$TMP35/x"); rmdir "$TMP35"
+[[ "$OUT35" == *"redirects to $MAIN35"* ]] || fail35 "worktree info under /tmp: $OUT35"
+# doctor resolves it the same way
+OUT35=$("$BD_BIN" doctor --no-daemon < /dev/null 2>&1 || true)
+[[ "$OUT35" != *"Redirect target does not exist"* ]] || fail35 "doctor rejects a valid absolute redirect"
+
+# 3. redirects already written by older versions (relative to .beads) still work
+cd "$R35/wonder/x/y/wt"
+echo "../../../../../Repos/a/.beads" > .beads/redirect
+uses35 "$MAIN35"
+echo "../../../../Repos/a/.beads" > .beads/redirect   # documented form
+uses35 "$MAIN35"
+
+# 4. worktree of clone A redirected to checkout B (handoff test 7)
+git clone -q "$R35/Repos/a" "$R35/wonder/cloneA"
+cd "$R35/wonder/cloneA"
+mkdir -p .beads && echo 'issue-prefix: "wrong"' > .beads/config.yaml
+git worktree add -q "$R35/wonder/cw" -b cw
+mkdir -p "$R35/wonder/cw/.beads" && echo "$MAIN35" > "$R35/wonder/cw/.beads/redirect"
+cd "$R35/wonder/cw"
+uses35 "$MAIN35"
+"$BD_BIN" create "from redirected worktree" -p 2 --no-daemon > /dev/null 2>&1 || fail35 "create through redirect failed"
+OUT35=$(cd "$R35/Repos/a" && "$BD_BIN" list --no-daemon 2>/dev/null)
+[[ "$OUT35" == *"from redirected worktree"* ]] || fail35 "issue did not land in the redirected database"
+
+# 5. broken redirect: loud failure, nothing written anywhere else
+cd "$R35/wonder/x/y/wt"
+echo "/nonexistent/.beads" > .beads/redirect
+if "$BD_BIN" create "lost issue" -p 2 --no-daemon > "$R35/broken.txt" 2>&1; then fail35 "create succeeded through a broken redirect"; fi
+grep -q "broken beads redirect" "$R35/broken.txt" || fail35 "no explanation: $(cat "$R35/broken.txt")"
+if "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1; then fail35 "devlog sync ran through a broken redirect"; fi
+OUT35=$(cd "$R35/Repos/a" && "$BD_BIN" list --no-daemon 2>/dev/null)
+[[ "$OUT35" != *"lost issue"* ]] || fail35 "issue was written to a fallback database"
+# diagnosis still works
+OUT35=$("$BD_BIN" worktree info --no-daemon 2>&1) || fail35 "worktree info must work with a broken redirect"
+[[ "$OUT35" == *"broken redirect"* ]] || fail35 "worktree info hides the broken redirect: $OUT35"
+"$BD_BIN" where --no-daemon > /dev/null 2>&1 || fail35 "where must work with a broken redirect"
+# an explicit database does not depend on the redirect
+"$BD_BIN" --db "$MAIN35/beads.db" list --no-daemon > /dev/null 2>&1 || fail35 "--db must bypass the redirect check"
+# and the user can still commit code
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+( export PATH="$(dirname "$BD_BIN"):$PATH"; echo x > x.txt; git add x.txt; git commit -q -m "code commit" ) > "$R35/commit.txt" 2>&1 || fail35 "broken redirect blocks commits: $(cat "$R35/commit.txt")"
+
+cd "$TEST_DIR"
+echo "✅ Test 35 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"
