@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-11-26
+
 ### Added
 - **Release channels: `stable` and `dev`.** `bd upgrade --channel dev|stable` switches this machine (remembered per machine, not in the committed config); `stable` also takes you back from a dev build. `scripts/cut-release.sh --dev` cuts `X.Y.Z-dev.N` from any branch as a tag-only commit, so no branch ever carries a dev version.
 
