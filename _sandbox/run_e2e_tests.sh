@@ -1433,6 +1433,10 @@ OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "sync with sync-b
 [[ "$OUT37" != *"exit status 128"* && "$OUT37" != *"from-main"* ]] || fail37 "git ran on the wrong checkout: $OUT37"
 [ -z "$(git status --porcelain)" ] || fail37 "worktree .beads changed: $(git status --porcelain)"
 git -C "$C37/a/origin.git" rev-parse -q --verify refs/heads/beads-metadata > /dev/null || fail37 "nothing pushed to beads-metadata"
+# a dry run writes nothing, not even the reconcile export in the main checkout
+echo '{"stale":true}' >> "$C37/a/main/.beads/issues.jsonl"; SUM37=$(shasum "$C37/a/main/.beads/issues.jsonl")
+"$BD_BIN" sync --dry-run --no-daemon < /dev/null > /dev/null 2>&1 || fail37 "dry run failed"
+[ "$(shasum "$C37/a/main/.beads/issues.jsonl")" = "$SUM37" ] || fail37 "dry run rewrote the main checkout's JSONL"
 # 2. no sync-branch anywhere: refuse instead of checking out origin/main's .beads
 setup37 "$C37/b" no
 if OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1); then fail37 "from-main ran in a shared worktree: $OUT37"; fi

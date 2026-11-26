@@ -30,6 +30,11 @@ checkout's JSONL, so the output looked healthy. No data was lost from the databa
 *   **Action Taken:** `TestForeignBeadsDir` (main checkout, inside .beads, worktree with and without its own .beads, outside git) and `TestUseProjectBeadsDir`. E2E Test 37: sync-branch followed from a worktree, refusal (auto and explicit) leaves the branch copy intact, and the main checkout still syncs from main on a branch without upstream.
 *   **Result:** E2E 37/37. Go short suite: the same 9 pre-existing failures; `TestDetectPrefix` fails on the base commit too when run under this repo's config.yaml (it reads `issue-prefix: BeadsLog`).
 
+### **Phase 4: Retest on Fray (dev.2)**
+
+*   **Action Taken:** `bd sync --dry-run` in worktree-1: no exit 128, no from-main, sync-branch path planned, worktree file untouched (141, clean).
+*   **Result:** Found that the GH#885 reconcile export ignored `--dry-run`; it was unreachable from worktrees while git status failed. It rewrote the main checkout's JSONL from the database (205 issues, none removed vs HEAD: harmless but wrong for a dry run). Now prints what it would do. E2E Test 37 covers it.
+
 ## Final Session Summary
 
 **Final Status:** Done on fix/worktree-sync (stacked on feature/dev-channel). Fray worktree-1 file restored (141 lines, clean).
