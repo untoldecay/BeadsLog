@@ -48,6 +48,13 @@ type Presence struct {
 	blobRef  map[string]string // basename -> where that blob was found
 	files    map[string]string // basename -> path in another worktree
 
+	// For files linked outside the devlog directory (e.g. "../docs/x.md"):
+	// the other worktrees and every branch tip, searched by repo path.
+	worktrees []string          // other worktree roots
+	tips      []string          // commit ids, sorted
+	tipLabel  map[string]string // commit id -> ref or worktree label
+	pathCache map[string]pathHit
+
 	restriction string
 }
 
@@ -56,9 +63,66 @@ func NewPresence(devlogDir string) *Presence {
 	return &Presence{dir: devlogDir}
 }
 
-// Lookup reports where the devlog file lives. Only the base name is used:
-// index rows and sessions both refer to files inside the devlog directory.
+type pathHit struct {
+	file   string // path in another worktree
+	blob   string // object id on a branch tip
+	source string
+}
+
+// ResolvePath returns the on-disk path of an index link or session filename,
+// relative to the devlog directory dir. A plain name is a devlog file; a link
+// with directories ("../_documentation/x.md", "sub/x.md") is followed, with
+// the old base-name reading kept for links that repeat the directory
+// ("_rules/_devlog/x.md").
+func ResolvePath(dir, filename string) string {
+	if filepath.IsAbs(filename) {
+		return filename
+	}
+	base := filepath.Join(dir, filepath.Base(filename))
+	if filepath.Base(filename) == filename {
+		return base
+	}
+	full := filepath.Join(dir, filename)
+	if _, err := os.Stat(full); err == nil {
+		return full
+	}
+	if _, err := os.Stat(base); err == nil {
+		return base
+	}
+	if repeatsDir(dir, filename) {
+		return base
+	}
+	return full
+}
+
+// repeatsDir reports whether filename already starts with the devlog
+// directory, as in "_rules/_devlog/x.md" for dir "_rules/_devlog".
+func repeatsDir(dir, filename string) bool {
+	d := filepath.ToSlash(filepath.Clean(dir))
+	f := filepath.ToSlash(filepath.Clean(filename))
+	return d != "." && strings.HasPrefix(f, d+"/")
+}
+
+// nested reports whether filename points outside the plain devlog directory
+// listing, so lookups must use its full path rather than its base name.
+func (p *Presence) nested(filename string) bool {
+	if filepath.IsAbs(filename) {
+		dir, err := filepath.Abs(p.dir)
+		if err != nil {
+			return true
+		}
+		return canonicalAbove(filepath.Dir(filename)) != canonicalAbove(dir)
+	}
+	return filepath.Base(filename) != filename && !repeatsDir(p.dir, filename)
+}
+
+// Lookup reports where the devlog file lives. A plain name is looked up in
+// the devlog directory of every worktree and branch tip; a link that leaves
+// the directory ("../_documentation/x.md") is looked up by its own path.
 func (p *Presence) Lookup(filename string) State {
+	if p.nested(filename) {
+		return p.lookupPath(filename)
+	}
 	base := filepath.Base(filename)
 	if _, err := os.Stat(filepath.Join(p.dir, base)); err == nil {
 		return Here
@@ -76,6 +140,84 @@ func (p *Presence) Lookup(filename string) State {
 	return Absent
 }
 
+// lookupPath finds a file linked outside the devlog directory: on disk here,
+// then at the same repository path in the other worktrees and branch tips.
+func (p *Presence) lookupPath(filename string) State {
+	if _, err := os.Stat(ResolvePath(p.dir, filename)); err == nil {
+		return Here
+	}
+	p.load()
+	if p.err != nil {
+		return Unknown
+	}
+	if !p.inRepo {
+		return Absent // plain directory: disk is the only truth
+	}
+	rel, ok := p.repoPath(filename)
+	if !ok {
+		return Unknown // outside the repository: git cannot prove it is gone
+	}
+	hit, err := p.findPath(rel)
+	switch {
+	case err != nil:
+		return Unknown
+	case hit.file != "" || hit.blob != "":
+		return Elsewhere
+	}
+	return Absent
+}
+
+// repoPath turns a filename into a slash path relative to the repository
+// root, or false if it points outside the repository.
+func (p *Presence) repoPath(filename string) (string, bool) {
+	var rel string
+	if filepath.IsAbs(filename) {
+		r, err := filepath.Rel(canonical(p.toplevel), canonicalAbove(filepath.Dir(filename)))
+		if err != nil {
+			return "", false
+		}
+		rel = filepath.ToSlash(filepath.Join(r, filepath.Base(filename)))
+	} else {
+		rel = filepath.ToSlash(filepath.Clean(filepath.Join(filepath.FromSlash(p.prefix), filename)))
+	}
+	if rel == ".." || strings.HasPrefix(rel, "../") || rel == "." {
+		return "", false
+	}
+	return rel, true
+}
+
+func (p *Presence) findPath(rel string) (pathHit, error) {
+	if hit, ok := p.pathCache[rel]; ok {
+		return hit, nil
+	}
+	hit := pathHit{}
+	for _, wt := range p.worktrees {
+		path := filepath.Join(wt, filepath.FromSlash(rel))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			hit = pathHit{file: path, source: path}
+			break
+		}
+	}
+	if hit.file == "" && len(p.tips) > 0 {
+		var in bytes.Buffer
+		for _, id := range p.tips {
+			fmt.Fprintf(&in, "%s:%s\n", id, rel)
+		}
+		out, err := gitInput(p.toplevel, &in, "cat-file", "--batch-check")
+		if err != nil {
+			return hit, err
+		}
+		for i, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			if f := strings.Fields(line); len(f) == 3 && f[1] == "blob" && i < len(p.tips) {
+				hit = pathHit{blob: f[0], source: p.tipLabel[p.tips[i]]}
+				break
+			}
+		}
+	}
+	p.pathCache[rel] = hit
+	return hit, nil
+}
+
 // Read returns the content of a file that is Elsewhere and a label saying
 // where it came from (a worktree path or a ref).
 func (p *Presence) Read(filename string) (content []byte, source string, err error) {
@@ -83,6 +225,24 @@ func (p *Presence) Read(filename string) (content []byte, source string, err err
 	p.load()
 	if p.err != nil {
 		return nil, "", p.err
+	}
+	if p.nested(filename) {
+		rel, ok := p.repoPath(filename)
+		if !ok || !p.inRepo {
+			return nil, "", os.ErrNotExist
+		}
+		hit, err := p.findPath(rel)
+		switch {
+		case err != nil:
+			return nil, "", err
+		case hit.file != "":
+			content, err = os.ReadFile(hit.file) // #nosec G304 - path enumerated from git worktrees
+			return content, hit.source, err
+		case hit.blob != "":
+			content, err = git(p.toplevel, "cat-file", "blob", hit.blob)
+			return content, hit.source, err
+		}
+		return nil, "", os.ErrNotExist
 	}
 	if path, ok := p.files[base]; ok {
 		if content, err = os.ReadFile(path); err == nil { // #nosec G304 - path enumerated from git worktrees
@@ -119,6 +279,8 @@ func (p *Presence) load() {
 	p.blobs = map[string]string{}
 	p.blobRef = map[string]string{}
 	p.files = map[string]string{}
+	p.tipLabel = map[string]string{}
+	p.pathCache = map[string]pathHit{}
 	p.err = p.scan()
 }
 
@@ -227,6 +389,7 @@ func (p *Presence) scanWorktrees() (map[string]string, error) {
 			if canonical(path) == self {
 				continue
 			}
+			p.worktrees = append(p.worktrees, path)
 			dir := filepath.Join(path, filepath.FromSlash(p.prefix))
 			entries, err := os.ReadDir(dir)
 			if errors.Is(err, os.ErrNotExist) {
@@ -266,6 +429,11 @@ func (p *Presence) scanRefs(commits map[string]string) error {
 	if len(commits) == 0 {
 		return nil
 	}
+	for id, label := range commits {
+		p.tips = append(p.tips, id)
+		p.tipLabel[id] = label
+	}
+	sort.Strings(p.tips)
 
 	// Resolve <commit>:<dir> for all tips in one call, then list each distinct
 	// tree once: most branches share the same devlog directory.
@@ -322,6 +490,22 @@ func canonical(path string) string {
 		path = r
 	}
 	return filepath.Clean(path)
+}
+
+// canonicalAbove canonicalizes a path that may not exist (a directory that
+// is only on another branch): it resolves the nearest existing ancestor.
+func canonicalAbove(path string) string {
+	path = filepath.Clean(path)
+	rest := ""
+	for d := path; ; d = filepath.Dir(d) {
+		if _, err := os.Lstat(d); err == nil {
+			return filepath.Join(canonical(d), rest)
+		}
+		if filepath.Dir(d) == d {
+			return path
+		}
+		rest = filepath.Join(filepath.Base(d), rest)
+	}
 }
 
 // commonDir returns the canonical shared git directory for dir.

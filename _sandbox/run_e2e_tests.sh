@@ -1452,4 +1452,50 @@ OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "from-main in the
 cd "$TEST_DIR"
 echo "✅ Test 37 Passed."
 
+echo -e "\n[*] Test 38: devlog index rows linking files outside the devlog directory (BeadsLog-7hz)"
+# ---------------------------------------------------------
+W38="$TEST_DIR/link38"
+rm -rf "$W38"; mkdir -p "$W38" && cd "$W38"
+git init -q -b develop; git config user.name "E2E Tester"; git config user.email "e2e@example.com"; git config core.hooksPath /dev/null
+"$BD_BIN" init --quiet --inline --prefix lk --no-daemon < /dev/null > /dev/null 2>&1 || { echo "❌ FAIL: init"; exit 1; }
+DB38="$W38/.beads/beads.db"
+fail38() { echo "❌ FAIL: $1"; sqlite3 "$DB38" "select id, filename, is_missing, is_ghost from sessions" 2>&1 | head; exit 1; }
+q38() { sqlite3 "$DB38" "$1"; }
+sync38() { "$BD_BIN" devlog sync --no-daemon < /dev/null 2>&1; }
+git add -A && git commit -q -m init
+git branch old/feat                                  # predates the doc
+mkdir -p _rules/_documentation
+echo "SECURITY-DOC-TEXT" > _rules/_documentation/09_Security.md
+echo "SAME-NAME-DIFFERENT-FILE" > _rules/_devlog/other.md
+echo '| [docs] Security implementation | Security notes | E2E Tester | Unknown | 2025-11-27 00:00 | N/A | [09_Security.md](../_documentation/09_Security.md) |' >> _rules/_devlog/_index.md
+git add -A && git commit -q -m docs
+# 1. the linked file is read, not looked up as _rules/_devlog/09_Security.md
+OUT38=$(sync38)
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md' and is_ghost=0 and is_missing=0")" = "1" ] || fail38 "linked doc not synced: $OUT38"
+[ "$(q38 "select count(*) from sessions where narrative like '%SECURITY-DOC-TEXT%'")" = "1" ] || fail38 "linked doc content not read"
+# 2. a false ghost left by an older bd is restored by sync, and prune keeps it
+q38 "update sessions set is_ghost=1, is_missing=1 where filename='../_documentation/09_Security.md'"
+OUT38=$(sync38)
+[ "$(q38 "select sum(is_ghost) from sessions")" = "0" ] || fail38 "false ghost not restored by sync: $OUT38"
+q38 "update sessions set is_ghost=1, is_missing=1 where filename='../_documentation/09_Security.md'"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > "$W38/prune.txt" 2>&1 || fail38 "prune failed: $(cat "$W38/prune.txt")"
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md' and is_ghost=0")" = "1" ] || fail38 "prune deleted a session whose linked file exists: $(cat "$W38/prune.txt")"
+# 3. on a branch without the doc it lives elsewhere: no ghost, no prune
+git switch -q old/feat
+[ ! -e _rules/_documentation/09_Security.md ] || fail38 "fixture: doc should not exist on old/feat"
+OUT38=$(sync38)
+[ "$(q38 "select sum(is_ghost) from sessions")" = "0" ] || fail38 "linked doc on another branch became a ghost: $OUT38"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > /dev/null 2>&1
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md'")" = "1" ] || fail38 "prune deleted a linked doc that is on develop"
+# 4. deleted on every branch: a real ghost, pruned with its index row
+git switch -q develop
+git rm -q _rules/_documentation/09_Security.md && git commit -q -m "drop doc"
+sync38 > /dev/null
+[ "$(q38 "select is_ghost from sessions where filename='../_documentation/09_Security.md'")" = "1" ] || fail38 "doc deleted everywhere is not a ghost"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > "$W38/prune.txt" 2>&1 || fail38 "prune failed: $(cat "$W38/prune.txt")"
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md'")" = "0" ] || fail38 "real ghost not pruned"
+grep -q "09_Security.md" _rules/_devlog/_index.md && fail38 "pruned ghost's index row left behind (sync would resurrect it)"
+cd "$TEST_DIR"
+echo "✅ Test 38 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

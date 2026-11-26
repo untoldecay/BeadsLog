@@ -71,12 +71,15 @@ func SyncSession(store *sqlite.SQLiteStorage, row IndexRow, presence *devlog.Pre
 		return false, fmt.Errorf("failed to query session: %w", err)
 	}
 
-	// Read file content
-	// If Filename is relative, resolve it relative to the index directory
-	// Use base filename to prevent double-path if Filename already has prefix
+	// Read file content, resolving the link relative to the index directory.
+	// Links that leave it ("../_documentation/x.md") are followed; links that
+	// repeat the directory ("_rules/_devlog/x.md") still resolve by base name.
 	filePath := row.Filename
 	if !filepath.IsAbs(filePath) && row.Dir != "" {
-		filePath = filepath.Join(row.Dir, filepath.Base(row.Filename))
+		filePath = devlog.ResolvePath(row.Dir, row.Filename)
+	}
+	if abs, absErr := filepath.Abs(filePath); absErr == nil {
+		filePath = abs // presence resolves absolute paths against the repository
 	}
 
 	content, err := ioutil.ReadFile(filePath)

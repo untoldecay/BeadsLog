@@ -46,7 +46,13 @@ func PruneGhosts(ctx context.Context, db *sql.DB, p *Presence) (PruneResult, err
 			return res, err
 		}
 		ids = append(ids, id)
-		dead[filepath.Base(fn)] = true
+		// Index links are written as the session's filename: "x.md", or
+		// "../_documentation/x.md" for a file outside the devlog directory.
+		if p.nested(fn) && !filepath.IsAbs(fn) {
+			dead[filepath.ToSlash(fn)] = true
+		} else {
+			dead[filepath.Base(fn)] = true
+		}
 	}
 	if err := rows.Close(); err != nil {
 		return res, err

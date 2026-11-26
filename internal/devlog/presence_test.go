@@ -222,3 +222,82 @@ func TestRowIsDead(t *testing.T) {
 		t.Error("row matching is wrong")
 	}
 }
+
+// writeAt writes a file at a repository path (not inside the devlog dir).
+func writeAt(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Index rows may link files outside the devlog directory, e.g. old docs in
+// "../_documentation/". Looking them up by base name inside the devlog
+// directory called them absent, and prune deleted their sessions.
+func TestPresenceLinkOutsideDevlogDir(t *testing.T) {
+	root := newRepo(t)
+	link := "../_documentation/09_Security.md"
+	writeAt(t, root, "_rules/_documentation/09_Security.md", "security doc")
+	writeAt(t, root, "_rules/_documentation/sub/deep.md", "deep")
+	commit(t, root, "docs")
+
+	p := at(root)
+	expect(t, p, link, Here)
+	expect(t, p, "../_documentation/sub/deep.md", Here)
+	expect(t, p, "09_Security.md", Absent) // same base name in the devlog dir: different file
+	expect(t, p, "../_documentation/never.md", Absent)
+	expect(t, p, "../../../outside-the-repo.md", Unknown)
+
+	// Absolute paths (what sync passes) resolve the same way
+	abs, _ := filepath.Abs(filepath.Join(root, "_rules/_documentation/09_Security.md"))
+	expect(t, p, abs, Here)
+
+	// On another branch only: Elsewhere, readable from that branch
+	run(t, root, "switch", "-q", "old/feat")
+	p = at(root)
+	expect(t, p, link, Elsewhere)
+	expect(t, p, abs, Elsewhere)
+	content, src, err := p.Read(link)
+	if err != nil || string(content) != "security doc" || src != "develop" {
+		t.Errorf("Read = %q from %q, %v", content, src, err)
+	}
+
+	// In another worktree only (uncommitted there)
+	run(t, root, "switch", "-q", "develop")
+	wt := filepath.Join(t.TempDir(), "wt")
+	run(t, root, "worktree", "add", "-q", wt, "old/feat")
+	writeAt(t, wt, "_rules/_documentation/draft.md", "draft")
+	expect(t, at(root), "../_documentation/draft.md", Elsewhere)
+
+	// Deleted from every tip and worktree: really gone
+	if err := os.Remove(filepath.Join(wt, "_rules/_documentation/draft.md")); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, at(root), "../_documentation/draft.md", Absent)
+}
+
+func TestResolvePath(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "_rules", "_devlog")
+	writeAt(t, root, "_rules/_devlog/a.md", "a")
+	writeAt(t, root, "_rules/_documentation/doc.md", "doc")
+	for in, want := range map[string]string{
+		"a.md":                     filepath.Join(dir, "a.md"),
+		"../_documentation/doc.md": filepath.Join(root, "_rules", "_documentation", "doc.md"),
+		"_rules/_devlog/a.md":      filepath.Join(dir, "a.md"), // repeats the directory
+		"../_documentation/no.md":  filepath.Join(root, "_rules", "_documentation", "no.md"),
+		"/abs/x.md":                "/abs/x.md",
+	} {
+		if got := ResolvePath(dir, in); got != want {
+			t.Errorf("ResolvePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+	// repeated directory, relative form
+	if got := ResolvePath("_rules/_devlog", "_rules/_devlog/gone.md"); got != filepath.Join("_rules/_devlog", "gone.md") {
+		t.Errorf("repeated dir = %q", got)
+	}
+}
