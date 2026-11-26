@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/untoldecay/BeadsLog/internal/configfile"
 	"github.com/untoldecay/BeadsLog/internal/git"
@@ -33,64 +34,142 @@ var LegacyDatabaseNames = []string{"bd.db", "issues.db", "bugs.db"}
 
 // FollowRedirect checks if a .beads directory contains a redirect file and follows it.
 // If a redirect file exists, it returns the target .beads directory path.
-// If no redirect exists or there's an error, it returns the original path unchanged.
-//
-// The redirect file should contain a single path (relative or absolute) to the target
-// .beads directory. Relative paths are resolved from the parent directory of the
-// original .beads directory (i.e., the project root).
+// If no redirect exists or it cannot be followed, it returns the original path
+// unchanged (with a warning in the latter case; commands that open the database
+// refuse to run at all, see CheckRedirect).
 //
 // Redirect chains are not followed - only one level of redirection is supported.
 // This prevents infinite loops and keeps the behavior predictable.
 func FollowRedirect(beadsDir string) string {
-	redirectFile := filepath.Join(beadsDir, RedirectFileName)
-	data, err := os.ReadFile(redirectFile)
+	target, has, err := ResolveRedirect(beadsDir)
 	if err != nil {
-		// No redirect file or can't read it - use original path
+		warnRedirect(err.Error())
+		return beadsDir
+	}
+	if !has {
 		return beadsDir
 	}
 
-	// Parse the redirect target (trim whitespace and handle comments)
-	target := strings.TrimSpace(string(data))
+	// Prevent redirect chains - don't follow if target also has a redirect
+	if _, err := os.Stat(filepath.Join(target, RedirectFileName)); err == nil {
+		warnRedirect(fmt.Sprintf("redirect chains not allowed, ignoring redirect in %s", target))
+	}
+	return target
+}
 
-	// Skip empty lines and comments to find the actual path
-	lines := strings.Split(target, "\n")
-	target = ""
-	for _, line := range lines {
+var redirectWarnings sync.Map
+
+// warnRedirect prints each distinct warning once: every lookup re-reads the redirect.
+func warnRedirect(msg string) {
+	if _, seen := redirectWarnings.LoadOrStore(msg, true); !seen {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", msg)
+	}
+}
+
+// ResolveRedirect is the single interpretation of a .beads/redirect file.
+// It returns the target directory, whether a redirect is configured, and an
+// error if one is configured but cannot be followed.
+//
+// The file holds one path; blank lines and lines starting with # are ignored.
+// Relative paths are resolved from the parent of the .beads directory (the
+// project root). Redirects written by 'bd worktree create' up to 0.65.0 were
+// relative to the .beads directory itself, so that is tried second.
+func ResolveRedirect(beadsDir string) (target string, has bool, err error) {
+	data, readErr := os.ReadFile(filepath.Join(beadsDir, RedirectFileName)) // #nosec G304 - fixed name in a beads directory
+	if readErr != nil {
+		if os.IsNotExist(readErr) {
+			return "", false, nil
+		}
+		return "", true, fmt.Errorf("cannot read redirect in %s: %w", beadsDir, readErr)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
 			target = line
 			break
 		}
 	}
-
 	if target == "" {
-		return beadsDir
+		return "", false, nil
 	}
 
-	// Resolve relative paths from the parent of the .beads directory (project root)
+	candidates := []string{target}
 	if !filepath.IsAbs(target) {
-		projectRoot := filepath.Dir(beadsDir)
-		target = filepath.Join(projectRoot, target)
+		candidates = []string{
+			filepath.Join(filepath.Dir(beadsDir), target),
+			filepath.Join(beadsDir, target),
+		}
 	}
-
-	// Canonicalize the target path
-	target = utils.CanonicalizePath(target)
-
-	// Verify the target exists and is a directory
-	info, err := os.Stat(target)
-	if err != nil || !info.IsDir() {
-		// Invalid redirect target - fall back to original
-		fmt.Fprintf(os.Stderr, "Warning: redirect target does not exist or is not a directory: %s\n", target)
-		return beadsDir
+	existing := ""
+	for _, c := range candidates {
+		c = utils.CanonicalizePath(c)
+		if info, err := os.Stat(c); err != nil || !info.IsDir() {
+			continue
+		}
+		if hasBeadsProjectFiles(c) {
+			return c, true, nil
+		}
+		if existing == "" {
+			existing = c
+		}
 	}
-
-	// Prevent redirect chains - don't follow if target also has a redirect
-	targetRedirect := filepath.Join(target, RedirectFileName)
-	if _, err := os.Stat(targetRedirect); err == nil {
-		fmt.Fprintf(os.Stderr, "Warning: redirect chains not allowed, ignoring redirect in %s\n", target)
+	if existing != "" {
+		return existing, true, nil
 	}
+	return "", true, fmt.Errorf("redirect target does not exist or is not a directory: %s (from %s)",
+		utils.CanonicalizePath(candidates[0]), filepath.Join(beadsDir, RedirectFileName))
+}
 
-	return target
+// CheckRedirect returns an error if the .beads directory that applies here is
+// redirected to a target that cannot be followed. Falling back to another
+// database would silently put issues and devlogs in the wrong place.
+func CheckRedirect() error {
+	local := findLocalBeadsDir()
+	if local == "" {
+		return nil
+	}
+	if os.Getenv("BEADS_DIR") == "" {
+		// The upward walk may leave the repository; unrelated parents don't count.
+		if root := findGitRoot(); root != "" {
+			mainRoot, _ := git.GetMainRepoRoot()
+			parent := filepath.Dir(utils.CanonicalizePath(local))
+			if parent != utils.CanonicalizePath(root) && parent != utils.CanonicalizePath(mainRoot) {
+				return nil
+			}
+		}
+	}
+	_, _, err := ResolveRedirect(local)
+	return err
+}
+
+// worktreeLocalBeadsDir returns the linked worktree's own .beads directory if it
+// holds a redirect file, or "". Such a redirect wins over the main repository.
+func worktreeLocalBeadsDir() string {
+	if !git.IsWorktree() {
+		return ""
+	}
+	root := git.GetRepoRoot()
+	if root == "" {
+		return ""
+	}
+	dir := filepath.Join(root, ".beads")
+	if _, err := os.Stat(filepath.Join(dir, RedirectFileName)); err != nil {
+		return ""
+	}
+	return dir
+}
+
+// worktreeRedirectTarget returns the beads directory a linked worktree is
+// redirected to, or "" if it has no usable redirect.
+func worktreeRedirectTarget() string {
+	dir := worktreeLocalBeadsDir()
+	if dir == "" {
+		return ""
+	}
+	if target := FollowRedirect(dir); target != dir && hasBeadsProjectFiles(target) {
+		return target
+	}
+	return ""
 }
 
 // RedirectInfo contains information about a beads directory redirect.
@@ -141,6 +220,11 @@ func findLocalBeadsDir() string {
 	// Check BEADS_DIR environment variable first
 	if beadsDir := os.Getenv("BEADS_DIR"); beadsDir != "" {
 		return utils.CanonicalizePath(beadsDir)
+	}
+
+	// A linked worktree's own redirect wins over the main repository
+	if dir := worktreeLocalBeadsDir(); dir != "" {
+		return dir
 	}
 
 	// Check for worktree - use main repo's .beads
@@ -443,7 +527,7 @@ func hasBeadsProjectFiles(beadsDir string) bool {
 // Validates that the directory contains actual project files.
 // Redirect files are supported: if a .beads/redirect file exists, its contents
 // are used as the actual .beads directory path.
-// For worktrees, prioritizes local .beads if present, otherwise uses main repo.
+// For worktrees, the worktree's own redirect wins, then the main repository.
 func FindBeadsDir() string {
 	// 1. Check BEADS_DIR environment variable (preferred)
 	if beadsDir := os.Getenv("BEADS_DIR"); beadsDir != "" {
@@ -460,7 +544,11 @@ func FindBeadsDir() string {
 		}
 	}
 
-	// 2. For worktrees, prioritize main repository root (bd-de6)
+	// 2. For worktrees: the worktree's redirect, then the main repository root
+	// (bd-de6). findDatabaseInTree uses the same order; they must not disagree.
+	if target := worktreeRedirectTarget(); target != "" {
+		return target
+	}
 	if git.IsWorktree() {
 		mainRepoRoot, err := git.GetMainRepoRoot()
 		if err == nil && mainRepoRoot != "" {
@@ -548,7 +636,8 @@ func findGitRoot() string {
 
 // findDatabaseInTree walks up the directory tree looking for .beads/*.db
 // Stops at the git repository root to avoid finding unrelated databases.
-// For worktrees, searches the main repository root first, then falls back to worktree.
+// For worktrees, follows the worktree's own redirect, then searches the main
+// repository root, then falls back to the worktree.
 // Prefers config.json, falls back to beads.db, and warns if multiple .db files exist.
 // Redirect files are supported: if a .beads/redirect file exists, its contents
 // are used as the actual .beads directory path.
@@ -562,6 +651,12 @@ func findDatabaseInTree() string {
 	// This prevents issues when repos are accessed via symlinks (e.g. /Users/user/Code -> /Users/user/Documents/Code)
 	if resolvedDir, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = resolvedDir
+	}
+
+	// Same order as FindBeadsDir: a worktree's redirect decides, even if the
+	// target has no database (JSONL-only).
+	if target := worktreeRedirectTarget(); target != "" {
+		return findDatabaseInBeadsDir(target, true)
 	}
 
 	// Check if we're in a git worktree

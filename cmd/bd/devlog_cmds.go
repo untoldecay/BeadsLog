@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
+	"github.com/untoldecay/BeadsLog/internal/devlog"
 	"github.com/untoldecay/BeadsLog/internal/extractor"
 	"github.com/untoldecay/BeadsLog/internal/queries"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
@@ -536,6 +537,65 @@ var devlogOnboardCmd = &cobra.Command{
 	},
 }
 
+// reconcileGhosts un-marks sessions wrongly flagged as ghosts and marks those
+// whose file is gone everywhere, for sessions the index no longer references.
+func reconcileGhosts(db *sql.DB, rows []IndexRow, presence *devlog.Presence) {
+	if _, err := devlog.RestoreFound(rootCtx, db, presence); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not re-check ghost sessions: %v\n", err)
+	}
+
+	indexed := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		indexed[filepath.Base(r.Filename)] = true
+	}
+	sessRows, err := db.QueryContext(rootCtx, "SELECT id, filename FROM sessions WHERE is_ghost = 0")
+	if err != nil {
+		return
+	}
+	var gone []string
+	elsewhere, unproven := 0, 0
+	for sessRows.Next() {
+		var id, fn string
+		if sessRows.Scan(&id, &fn) != nil {
+			continue
+		}
+		if _, err := os.Stat(fn); err == nil {
+			continue // file exists at recorded path (orphan, adoptable via verify --fix)
+		}
+		switch presence.Lookup(fn) {
+		case devlog.Elsewhere:
+			elsewhere++
+		case devlog.Unknown:
+			unproven++
+		case devlog.Absent:
+			if presence.Restriction() != "" {
+				unproven++
+			} else if !indexed[filepath.Base(fn)] {
+				gone = append(gone, id)
+			}
+		}
+	}
+	_ = sessRows.Close()
+
+	for _, id := range gone {
+		_, _ = db.ExecContext(rootCtx, "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE id = ?", id)
+	}
+	if len(gone) > 0 && verboseFlag {
+		fmt.Printf("Marked %d de-indexed session(s) with missing files as ghosts\n", len(gone))
+	}
+	if quietFlag || elsewhere+unproven == 0 {
+		return
+	}
+	switch {
+	case presence.Restriction() != "":
+		fmt.Printf("worktree: %d session(s) have no file on this branch; not marked as ghosts. Sync from the main checkout after merging.\n", elsewhere+unproven)
+	case presence.Err() != nil:
+		fmt.Fprintf(os.Stderr, "Warning: %d session(s) have no file here; not marked as ghosts because git could not be queried: %v\n", unproven, presence.Err())
+	default:
+		fmt.Printf("○ %d session(s) have no file here but live on other branches or worktrees\n", elsewhere)
+	}
+}
+
 // devlogSyncCmd updates the database from the filesystem
 var devlogSyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -602,8 +662,9 @@ var devlogSyncCmd = &cobra.Command{
 			fmt.Printf("Scanning %d sessions...\n", len(rows))
 		}
 		updatedCount := 0
+		presence := devlog.NewPresence(devlogDir)
 		for _, row := range rows {
-			updated, err := SyncSession(store, row)
+			updated, err := SyncSession(store, row, presence)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error syncing session %s: %v\n", row.Subject, err)
 			}
@@ -620,35 +681,8 @@ var devlogSyncCmd = &cobra.Command{
 
 		// GHOST RECONCILIATION: sessions whose index row was removed are never
 		// visited by the row loop above, so their is_ghost flag goes stale.
-		// If the file is also gone from disk, mark them ghosts here.
-		indexed := make(map[string]bool, len(rows))
-		for _, r := range rows {
-			indexed[filepath.Base(r.Filename)] = true
-		}
 		db := store.UnderlyingDB()
-		if sessRows, qErr := db.QueryContext(rootCtx, "SELECT id, filename FROM sessions WHERE is_ghost = 0"); qErr == nil {
-			var staleIDs []string
-			for sessRows.Next() {
-				var id, fn string
-				if sessRows.Scan(&id, &fn) != nil || indexed[filepath.Base(fn)] {
-					continue
-				}
-				if _, err := os.Stat(fn); err == nil {
-					continue // file exists at recorded path (orphan, adoptable via verify --fix)
-				}
-				if _, err := os.Stat(filepath.Join(devlogDir, filepath.Base(fn))); err == nil {
-					continue // file exists in devlog dir
-				}
-				staleIDs = append(staleIDs, id)
-			}
-			sessRows.Close()
-			for _, id := range staleIDs {
-				_, _ = db.ExecContext(rootCtx, "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE id = ?", id)
-			}
-			if len(staleIDs) > 0 && verboseFlag {
-				fmt.Printf("Marked %d de-indexed session(s) with missing files as ghosts\n", len(staleIDs))
-			}
-		}
+		reconcileGhosts(db, rows, presence)
 
 		// ORPHAN DETECTION
 		orphans, _ := GetOrphanedFiles(devlogDir, rows)
@@ -695,7 +729,11 @@ var devlogSyncCmd = &cobra.Command{
 		// RECONCILIATION SUMMARY: surface repair needs instead of burying them in per-file warnings
 		incomplete, ghosts := devlogHealthCounts(store.UnderlyingDB())
 		if ghosts > 0 {
-			fmt.Printf("✖ %d ghost session(s) in index — run 'bd devlog prune'\n", ghosts)
+			hint := "run 'bd devlog prune'"
+			if presence.Restriction() != "" {
+				hint = "run 'bd devlog prune' from the main checkout"
+			}
+			fmt.Printf("✖ %d ghost session(s) in index — %s\n", ghosts, hint)
 		}
 		if incomplete > 0 {
 			fmt.Printf("○ %d incomplete session(s) — run 'bd devlog verify --fix'\n", incomplete)
@@ -1470,8 +1508,20 @@ var devlogShowCmd = &cobra.Command{
 			// Use base filename to prevent double-path if filename already has prefix
 			devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
 			if devlogDir != "" {
-				path := filepath.Join(devlogDir, filepath.Base(filename))
+				path := devlog.ResolvePath(devlogDir, filename)
 				content, err = os.ReadFile(path)
+			}
+		}
+
+		// 3. On another branch or in another worktree
+		if err != nil {
+			devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+			if devlogDir == "" {
+				devlogDir = "_rules/_devlog"
+			}
+			if elsewhere, source, readErr := devlog.NewPresence(devlogDir).Read(filename); readErr == nil {
+				content, err = elsewhere, nil
+				fmt.Fprintf(os.Stderr, "(not in this checkout; shown from %s)\n", source)
 			}
 		}
 
@@ -2920,6 +2970,17 @@ var devlogPruneCmd = &cobra.Command{
 		defer store.Close()
 		db := store.UnderlyingDB()
 
+		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
+		if devlogDir == "" {
+			devlogDir = "_rules/_devlog"
+		}
+		presence := devlog.NewPresence(devlogDir)
+		if reason := presence.Restriction(); reason != "" {
+			fmt.Fprintf(os.Stderr, "Error: refusing to prune: %s, and the database is shared.\n", reason)
+			fmt.Fprintf(os.Stderr, "Run 'bd devlog prune' from the main checkout after merging.\n")
+			os.Exit(1)
+		}
+
 		// --noise: purge junk entities (truncation artifacts, phrase fragments)
 		// that predate extraction-time filtering.
 		if noiseFlag, _ := cmd.Flags().GetBool("noise"); noiseFlag {
@@ -2927,71 +2988,19 @@ var devlogPruneCmd = &cobra.Command{
 			fmt.Printf("✅ Pruned %d noise entit(ies).\n", removed)
 		}
 
-		// Remove the ghosts' rows from _index.md first — otherwise the next
-		// sync re-ingests them from the index and resurrects the ghosts.
-		devlogDir, _ := store.GetConfig(rootCtx, "devlog_dir")
-		if devlogDir == "" {
-			devlogDir = "_rules/_devlog"
-		}
-		var ghostFiles []string
-		if ghostRows, qErr := db.QueryContext(rootCtx, "SELECT filename FROM sessions WHERE is_ghost = 1"); qErr == nil {
-			for ghostRows.Next() {
-				var fn string
-				if ghostRows.Scan(&fn) != nil {
-					continue
-				}
-				base := filepath.Base(fn)
-				// Skip if the file reappeared on disk — sync will un-ghost it
-				if _, err := os.Stat(filepath.Join(devlogDir, base)); err == nil {
-					continue
-				}
-				ghostFiles = append(ghostFiles, base)
-			}
-			ghostRows.Close()
-		}
-		removedRows := 0
-		indexPath := filepath.Join(devlogDir, "_index.md")
-		if content, rErr := os.ReadFile(indexPath); rErr == nil && len(ghostFiles) > 0 {
-			var kept []string
-			for _, line := range strings.Split(string(content), "\n") {
-				dead := false
-				for _, gf := range ghostFiles {
-					if strings.Contains(line, "]("+gf) {
-						dead = true
-						break
-					}
-				}
-				if dead {
-					removedRows++
-				} else {
-					kept = append(kept, line)
-				}
-			}
-			if removedRows > 0 {
-				if wErr := os.WriteFile(indexPath, []byte(strings.Join(kept, "\n")), 0644); wErr != nil {
-					fmt.Fprintf(os.Stderr, "Warning: could not update %s: %v\n", indexPath, wErr)
-					removedRows = 0
-				}
-			}
-		}
-
-		// Manual cleanup to ensure it works on databases without cascades
-		_, _ = db.Exec("DELETE FROM session_entities WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
-		_, _ = db.Exec("DELETE FROM extraction_log WHERE session_id IN (SELECT id FROM sessions WHERE is_ghost = 1)")
-		_, _ = db.Exec("DELETE FROM entity_deps WHERE discovered_in IN (SELECT id FROM sessions WHERE is_ghost = 1)")
-
-		res, err := db.Exec("DELETE FROM sessions WHERE is_ghost = 1")
+		res, err := devlog.PruneGhosts(rootCtx, db, presence)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error pruning ghosts: %v\n", err)
 			os.Exit(1)
 		}
-
-		count, _ := res.RowsAffected()
-		fmt.Printf("✅ Pruned %d ghost session(s).\n", count)
-		if removedRows > 0 {
-			fmt.Printf("✅ Removed %d dead row(s) from _index.md\n", removedRows)
+		if res.Restored > 0 {
+			fmt.Printf("↩ Kept %d session(s): their file exists here, on another branch or in another worktree.\n", res.Restored)
 		}
-		
+		fmt.Printf("✅ Pruned %d ghost session(s).\n", res.Deleted)
+		if res.RowsRemoved > 0 {
+			fmt.Printf("✅ Removed %d dead row(s) from _index.md\n", res.RowsRemoved)
+		}
+
 		// Flush cleanup
 		flushMetadata(rootCtx)
 	},

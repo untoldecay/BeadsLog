@@ -2,8 +2,9 @@ package changelog
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/untoldecay/BeadsLog/internal/channel"
 )
 
 type Entry struct {
@@ -16,8 +17,22 @@ type Entry struct {
 // CurrentVersion is the latest version of the tool embedded in this binary
 const CurrentVersion = "0.65.0"
 
-
 var entries = []Entry{
+	{
+		Version: "0.66.0",
+		Date:    "2026-11-26",
+		Features: []string{
+			"Worktree-safe devlogs: a session is a ghost only when its file is on no branch tip and in no worktree. In a linked worktree or a redirected checkout, 'bd devlog sync' never marks ghosts, and 'bd devlog prune' / 'bd doctor --fix' refuse. Sessions wrongly ghosted by older versions are restored.",
+			"'bd sync' in a linked worktree uses the config.yaml and sync-branch of the checkout that owns the database, and refuses instead of rolling the branch's .beads back from main; '--dry-run' writes nothing.",
+			"Devlog index links outside the devlog dir (e.g. ../_documentation/x.md) are followed by their real path instead of being ghosted and pruned by base name.",
+			"Redirects: one resolver; absolute paths accepted everywhere; a redirect that cannot be followed is an error, not a silent fallback to another database.",
+			"Release channels: 'bd upgrade --channel dev|stable'; 'bd upgrade' installs the exact released tag.",
+		},
+		Protocol: []string{
+			"In a worktree, 'bd devlog record', 'bd devlog sync' and 'bd sync' are safe. Prune from the checkout that holds the database after merging.",
+			"After upgrading, run 'bd refresh' so the daemon restarts on the new binary: an old daemon keeps the old logic.",
+		},
+	},
 	{
 		Version: "0.65.0",
 		Date:    "2026-08-24",
@@ -257,7 +272,7 @@ var entries = []Entry{
 	{
 		Version: "0.53.0",
 
-		Date:    "2026-05-30",
+		Date: "2026-05-30",
 		Features: []string{
 			"Write-First Workflow: Reverted 'Auto-Stub' in favor of a stricter 'Write -> Record' order.",
 			"Auto-Metadata Extraction: 'bd devlog record' now automatically parses Subject and Problem from your file.",
@@ -440,44 +455,30 @@ func IsNewer(v1, v2 string) bool {
 		return true
 	}
 
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	for i := 0; i < len(parts1) && i < len(parts2); i++ {
-		n1, _ := strconv.Atoi(parts1[i])
-		n2, _ := strconv.Atoi(parts2[i])
-
-		if n1 > n2 {
-			return true
-		}
-		if n1 < n2 {
-			return false
-		}
-	}
-	return len(parts1) > len(parts2)
+	return channel.Compare(v1, v2) > 0
 }
 
 // RenderLatest returns a formatted string of the latest changes for terminal output
 func RenderLatest() string {
 	latest := GetLatest()
 	var sb strings.Builder
-	
+
 	sb.WriteString(fmt.Sprintf("✨ What's New in BeadsLog %s (%s)\n", latest.Version, latest.Date))
 	sb.WriteString(strings.Repeat("-", 60) + "\n")
-	
+
 	if len(latest.Features) > 0 {
 		sb.WriteString("🚀 New Features:\n")
 		for _, f := range latest.Features {
 			sb.WriteString(fmt.Sprintf("  • %s\n", f))
 		}
 	}
-	
+
 	if len(latest.Protocol) > 0 {
 		sb.WriteString("\n📜 Protocol Updates (Mandatory for Agents):\n")
 		for _, p := range latest.Protocol {
 			sb.WriteString(fmt.Sprintf("  • %s\n", p))
 		}
 	}
-	
+
 	return sb.String()
 }

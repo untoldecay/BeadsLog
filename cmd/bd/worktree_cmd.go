@@ -202,13 +202,14 @@ func runWorktreeCreate(cmd *cobra.Command, args []string) error {
 
 	// Create redirect file
 	redirectPath := filepath.Join(worktreeBeadsDir, beads.RedirectFileName)
-	relPath, err := filepath.Rel(worktreeBeadsDir, mainBeadsDir)
+	// Absolute: unambiguous, and survives moving the worktree
+	absBeadsDir, err := filepath.Abs(mainBeadsDir)
 	if err != nil {
-		// Fall back to absolute path
-		relPath = mainBeadsDir
+		cleanupWorktree()
+		return fmt.Errorf("failed to resolve %s: %w", mainBeadsDir, err)
 	}
 	// #nosec G306 - redirect file needs to be readable
-	if err := os.WriteFile(redirectPath, []byte(relPath+"\n"), 0644); err != nil {
+	if err := os.WriteFile(redirectPath, []byte(absBeadsDir+"\n"), 0644); err != nil {
 		cleanupWorktree()
 		return fmt.Errorf("failed to create redirect file: %w", err)
 	}
@@ -289,7 +290,9 @@ func runWorktreeList(cmd *cobra.Command, args []string) error {
 			name = "(main)"
 		}
 		beadsInfo := wt.BeadsState
-		if wt.RedirectTo != "" {
+		if wt.RedirectTo == "broken" {
+			beadsInfo = "redirect (broken)"
+		} else if wt.RedirectTo != "" {
 			beadsInfo = fmt.Sprintf("redirect → %s", filepath.Base(filepath.Dir(wt.RedirectTo)))
 		}
 		fmt.Printf("%-20s %-40s %-20s %s\n",
@@ -397,6 +400,7 @@ func runWorktreeInfo(cmd *cobra.Command, args []string) error {
 
 	branch := getWorktreeCurrentBranch()
 	redirectInfo := beads.GetRedirectInfo()
+	redirectErr := beads.CheckRedirect()
 
 	if jsonOutput {
 		result := map[string]interface{}{
@@ -411,6 +415,9 @@ func runWorktreeInfo(cmd *cobra.Command, args []string) error {
 			result["beads_local"] = redirectInfo.LocalDir
 			result["beads_target"] = redirectInfo.TargetDir
 		}
+		if redirectErr != nil {
+			result["beads_redirect_error"] = redirectErr.Error()
+		}
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(result)
@@ -422,8 +429,12 @@ func runWorktreeInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Main repo: %s\n", mainRepoRoot)
 	if redirectInfo.IsRedirected {
 		fmt.Printf("  Beads: redirects to %s\n", redirectInfo.TargetDir)
+	} else if redirectErr != nil {
+		fmt.Printf("  Beads: broken redirect (%v)\n", redirectErr)
+	} else if dir := beads.FindBeadsDir(); dir != "" {
+		fmt.Printf("  Beads: %s (no redirect)\n", dir)
 	} else {
-		fmt.Printf("  Beads: local (no redirect)\n")
+		fmt.Printf("  Beads: none (no redirect)\n")
 	}
 
 	return nil
@@ -487,19 +498,10 @@ func getBeadsState(worktreePath, mainBeadsDir string) string {
 }
 
 func getRedirectTarget(worktreePath string) string {
-	redirectFile := filepath.Join(worktreePath, ".beads", beads.RedirectFileName)
-	// #nosec G304 - path is constructed from worktreePath which comes from git worktree list
-	data, err := os.ReadFile(redirectFile)
+	target, _, err := beads.ResolveRedirect(filepath.Join(worktreePath, ".beads"))
 	if err != nil {
-		return ""
+		return "broken"
 	}
-	target := strings.TrimSpace(string(data))
-	// Resolve relative paths
-	if !filepath.IsAbs(target) {
-		beadsDir := filepath.Join(worktreePath, ".beads")
-		target = filepath.Join(beadsDir, target)
-	}
-	target, _ = filepath.Abs(target)
 	return target
 }
 

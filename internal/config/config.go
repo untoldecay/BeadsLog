@@ -16,6 +16,17 @@ var v *viper.Viper
 
 // Initialize sets up the viper configuration singleton
 // Should be called once at application startup
+// projectBeadsDir, when set, is the .beads directory whose config.yaml wins
+// over the one found by walking up from the working directory. bd sets it
+// when the database belongs to another checkout (a linked worktree using the
+// main checkout's database, or a redirect), so settings such as sync-branch
+// come from the same place as the database (BeadsLog-7hz).
+var projectBeadsDir string
+
+// UseProjectBeadsDir makes Initialize read config.yaml from dir first.
+// An empty dir restores the default lookup.
+func UseProjectBeadsDir(dir string) { projectBeadsDir = dir }
+
 func Initialize() error {
 	v = viper.New()
 
@@ -25,6 +36,15 @@ func Initialize() error {
 	// Explicitly locate config.yaml and use SetConfigFile to avoid picking up config.json
 	// Precedence: project .beads/config.yaml > ~/.config/bd/config.yaml > ~/.beads/config.yaml
 	configFileSet := false
+
+	// 0. The .beads directory that owns the database, when it is not ours
+	if projectBeadsDir != "" {
+		configPath := filepath.Join(projectBeadsDir, "config.yaml")
+		if _, err := os.Stat(configPath); err == nil {
+			v.SetConfigFile(configPath)
+			configFileSet = true
+		}
+	}
 
 	// 1. Walk up from CWD to find project .beads/config.yaml
 	//    This allows commands to work from subdirectories

@@ -13,6 +13,7 @@ This document describes the complete release process for beads, including GitHub
 - [4. PyPI Release (MCP Server)](#4-pypi-release-mcp-server)
 - [5. npm Package Release](#5-npm-package-release)
 - [6. Verify Release](#6-verify-release)
+- [Dev Channel (Pre-releases)](#dev-channel-pre-releases)
 - [Hotfix Releases](#hotfix-releases)
 - [Rollback Procedure](#rollback-procedure)
 
@@ -476,6 +477,29 @@ bd version
 curl -fsSL https://raw.githubusercontent.com/untoldecay/BeadsLog/main/scripts/install.sh | bash
 bd version
 ```
+
+## Dev Channel (Pre-releases)
+
+Cut a pre-release of the current commit, from any branch:
+
+```bash
+scripts/cut-release.sh --dev --dry-run   # build and show the version, push nothing
+scripts/cut-release.sh --dev             # push vX.Y.Z-dev.N and create a GitHub pre-release
+```
+
+- The version bump is committed in a temporary worktree and **only the tag is pushed**. Your branch and `main` never carry a dev version. Don't merge a dev tag into `main`.
+- The base is the open dev series, else the next minor after the latest stable tag. Override with `--base X.Y.Z`.
+- Uncommitted changes are not included.
+- A pushed tag is permanent (the Go module proxy never reuses a version). To fix a bad dev build, cut the next one.
+- `go install ...@latest`, `install.sh` and the stable channel ignore dev tags. The Release workflow does too.
+
+```bash
+bd upgrade --channel dev      # follow dev builds on this machine
+bd upgrade --channel stable   # go back to the latest release
+```
+
+bd 0.65.0 and older don't know about channels: install the first dev build with
+`go install github.com/untoldecay/BeadsLog/cmd/bd@vX.Y.Z-dev.N`.
 
 ## Hotfix Releases
 

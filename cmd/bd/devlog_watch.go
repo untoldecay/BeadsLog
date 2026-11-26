@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/untoldecay/BeadsLog/internal/devlog"
 	"github.com/untoldecay/BeadsLog/internal/storage/sqlite"
 )
 
@@ -48,8 +49,9 @@ Reuses the daemon's file-watcher/debounce; runs standalone (no daemon needed).`,
 				fmt.Fprintf(os.Stderr, "watch: index parse error: %v\n", err)
 				return
 			}
+			presence := devlog.NewPresence(devlogDir)
 			for _, row := range rows {
-				updated, err := SyncSession(store, row)
+				updated, err := SyncSession(store, row, presence)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "watch: sync error (%s): %v\n", row.Subject, err)
 					continue

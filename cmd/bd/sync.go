@@ -184,6 +184,8 @@ Use --merge to merge the sync branch back to main branch.`,
 		// leaving the JSONL in an inconsistent state across worktrees.
 		if hasUncommitted, err := gitHasUncommittedBeadsChanges(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to check for uncommitted changes: %v\n", err)
+		} else if hasUncommitted && dryRun {
+			fmt.Println("→ [DRY RUN] Would re-export from database (uncommitted JSONL changes)")
 		} else if hasUncommitted {
 			fmt.Println("→ Detected uncommitted JSONL changes (possible incomplete sync)")
 			fmt.Println("→ Re-exporting from database to reconcile state...")
@@ -214,7 +216,9 @@ Use --merge to merge the sync branch back to main branch.`,
 		if !noPull && !gitHasUpstream() && !hasSyncBranchConfig {
 			if hasGitRemote(ctx) {
 				// Remote exists but no upstream - use from-main mode
-				fmt.Println("→ No upstream configured, using --from-main mode")
+				if beads.ForeignBeadsDir() == "" {
+					fmt.Println("→ No upstream configured, using --from-main mode")
+				}
 				// Force noGitHistory=true for auto-detected from-main mode (fixes #417)
 				if err := doSyncFromMain(ctx, jsonlPath, renameOnImport, dryRun, true); err != nil {
 					FatalError("%v", err)

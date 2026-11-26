@@ -47,3 +47,16 @@ var entries = []Entry{
 		t.Errorf("expected nil for malformed input, got %v", f)
 	}
 }
+
+// A dev build carries the previous version's changelog; its bullets must not be
+// presented as the dev build's own.
+func TestReleaseFeaturesOnlyForOwnVersion(t *testing.T) {
+	src := `const CurrentVersion = "0.65.0"
+	Features: []string{"Stable feature."},`
+	if got := releaseFeatures(src, "0.65.0"); len(got) != 1 {
+		t.Errorf("own version: got %v", got)
+	}
+	if got := releaseFeatures(src, "0.66.0-dev.1"); got != nil {
+		t.Errorf("leaked another version's features: %v", got)
+	}
+}

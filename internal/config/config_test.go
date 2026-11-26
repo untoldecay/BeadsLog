@@ -844,3 +844,46 @@ validation:
 		t.Errorf("GetString(validation.on-sync) = %q, want \"warn\"", got)
 	}
 }
+
+// BeadsLog-7hz: when the database belongs to another checkout, its
+// config.yaml wins over the one in the working directory.
+func TestUseProjectBeadsDir(t *testing.T) {
+	restore := envSnapshot(t)
+	defer restore()
+	root := t.TempDir()
+	write := func(dir, body string) string {
+		b := filepath.Join(root, dir, ".beads")
+		if err := os.MkdirAll(b, 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(b, "config.yaml"), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	owner := write("main", "sync-branch: \"beads-metadata\"\n")
+	write("wt", "actor: worktree\n")
+	noConfig := filepath.Join(root, "empty", ".beads")
+	if err := os.MkdirAll(noConfig, 0750); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(root, "wt"))
+	t.Cleanup(func() { UseProjectBeadsDir("") })
+
+	for _, tc := range []struct{ dir, want, actor string }{
+		{"", "", "worktree"},
+		{owner, "beads-metadata", ""},
+		{noConfig, "", "worktree"}, // owner has no config.yaml: fall back to the walk
+	} {
+		UseProjectBeadsDir(tc.dir)
+		if err := Initialize(); err != nil {
+			t.Fatal(err)
+		}
+		if got := GetString("sync-branch"); got != tc.want {
+			t.Errorf("dir %q: sync-branch = %q, want %q", tc.dir, got, tc.want)
+		}
+		if got := GetString("actor"); got != tc.actor {
+			t.Errorf("dir %q: actor = %q, want %q", tc.dir, got, tc.actor)
+		}
+	}
+}

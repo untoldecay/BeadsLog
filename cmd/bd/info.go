@@ -297,6 +297,17 @@ type VersionChange struct {
 // versionChanges contains agent-actionable changes for recent versions
 var versionChanges = []VersionChange{
 	{
+		Version: "0.66.0",
+		Date:    "2026-11-26",
+		Changes: []string{
+			"SAFE IN WORKTREES: 'bd devlog sync' never marks ghosts in a linked worktree or redirected checkout; a session is a ghost only when its file is on no branch tip and in no worktree. 'bd devlog prune' and 'bd doctor --fix' refuse there: prune from the database's checkout after merging",
+			"FIX: 'bd sync' in a linked worktree uses the database owner's config.yaml and sync-branch, and refuses instead of rolling the branch's .beads back from main when none is set; '--dry-run' writes nothing",
+			"FIX: devlog index links outside the devlog dir (e.g. ../_documentation/x.md) are followed by their real path; they are no longer ghosted or pruned by base name",
+			"CHANGED: a redirect that cannot be followed is an error, not a silent fallback; absolute redirects are accepted everywhere, relative ones resolve from the project root",
+			"NEW: release channels: 'bd upgrade --channel dev|stable'; 'bd upgrade' installs the exact released tag",
+		},
+	},
+	{
 		Version: "0.65.0",
 		Date:    "2026-08-24",
 		Changes: []string{
@@ -476,7 +487,7 @@ var versionChanges = []VersionChange{
 	{
 		Version: "0.52.0",
 
-		Date:    "2026-05-30",
+		Date: "2026-05-30",
 		Changes: []string{
 			"NEW: Write-First Workflow - bd devlog record now requires the file to exist",
 			"NEW: Auto-Metadata - Tool automatically parses Subject/Problem from Markdown",

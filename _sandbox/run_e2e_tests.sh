@@ -1130,4 +1130,372 @@ fi
 cd "$TEST_DIR"
 echo "✅ Test 33 Passed."
 
+# ---------------------------------------------------------
+echo -e "\n[*] Test 34: worktrees — a devlog on another branch is never a ghost (BeadsLog-svg.1)"
+# ---------------------------------------------------------
+W34="$TEST_DIR/wt34"
+mkdir -p "$W34/main" && cd "$W34/main"
+git init -q -b develop
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --inline --prefix wt --no-daemon > /dev/null 2>&1
+DB34="$W34/main/.beads/beads.db"
+fail34() { echo "❌ FAIL: $1"; "$BD_BIN" devlog status --no-daemon 2>&1 | head -20; exit 1; }
+# JSON status is the CLI's own view of the shared database
+ghosts34() { (cd "$W34/main" && "$BD_BIN" devlog status --json --no-daemon 2>/dev/null | sed -n 's/.*"ghosts": *\([0-9]*\).*/\1/p' | head -1); }
+listed34() { local l; l=$(cd "$W34/main" && "$BD_BIN" devlog list --no-daemon 2>/dev/null); [[ "$l" == *"$1"* ]]; }
+log34() { # name
+    printf '# %s\n\n## Problem\n%s\n\nFULLTEXT-%s\n\n### Architectural Relationships\n- mod%s -> core34 (uses)\n' "$1" "$1" "$1" "$1" > "_rules/_devlog/2026-11-25_$1.md"
+    "$BD_BIN" devlog record --file "_rules/_devlog/2026-11-25_$1.md" --subject "[feature] $1" --problem "$1 problem" --no-daemon > /dev/null 2>&1
+}
+quiet_commit() { git add -A && git -c core.hooksPath=/dev/null commit -q --allow-empty -m "$1"; }
+
+quiet_commit "bd init"
+git branch old/feat
+log34 AlphaLog
+quiet_commit "devlog Alpha"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "fixture should start with 0 ghosts, got '$(ghosts34)'"
+
+# 1. sync from a worktree on an older branch
+git worktree add -q "$W34/wt" old/feat
+mkdir -p "$W34/wt/.beads" && echo "$W34/main/.beads" > "$W34/wt/.beads/redirect"
+cd "$W34/wt"
+OUT34=$("$BD_BIN" devlog sync --no-daemon 2>&1)
+echo "$OUT34" | grep -q "worktree: 1 session(s) have no file on this branch" || fail34 "worktree sync did not explain itself: $OUT34"
+[ "$(ghosts34)" = "0" ] || fail34 "worktree sync created ghosts"
+listed34 AlphaLog || fail34 "AlphaLog disappeared from list after a worktree sync"
+# show still works from the branch that lacks the file
+OUT34=$("$BD_BIN" devlog show 2026-11-25_AlphaLog --no-daemon 2>/dev/null || true)
+[[ "$OUT34" == *"FULLTEXT-AlphaLog"* ]] || fail34 "show could not read AlphaLog from its branch"
+
+# 1b. the shared post-commit hook must be just as safe
+git -c core.hooksPath=/dev/null commit -q --allow-empty -m noop
+( export PATH="$(dirname "$BD_BIN"):$PATH"; git commit -q --allow-empty -m "plain commit, hooks on" > /dev/null 2>&1 || true )
+sleep 3
+[ "$(ghosts34)" = "0" ] || fail34 "post-commit hook in a worktree created ghosts"
+
+# 2. prune and doctor --fix refuse in a worktree, even with a real ghost present
+cd "$W34/main"
+log34 PhantomLog                       # never committed
+rm "_rules/_devlog/2026-11-25_PhantomLog.md"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "1" ] || fail34 "a file that exists nowhere must still become a ghost"
+cd "$W34/wt"
+if "$BD_BIN" devlog prune --no-daemon > "$W34/prune.txt" 2>&1; then fail34 "prune must exit non-zero in a linked worktree"; fi
+grep -q "main checkout" "$W34/prune.txt" || fail34 "prune refusal has no hint: $(cat "$W34/prune.txt")"
+"$BD_BIN" doctor --fix --yes < /dev/null > /dev/null 2>&1 || true
+[ "$(ghosts34)" = "1" ] || fail34 "doctor --fix pruned from a linked worktree"
+
+# 3. unmerged devlog recorded in the worktree survives sync + prune in main
+log34 BetaLog
+quiet_commit "devlog Beta"
+cd "$W34/main"
+OUT34=$("$BD_BIN" devlog sync --no-daemon 2>&1)
+echo "$OUT34" | grep -q "live on other branches" || fail34 "main sync did not report sessions elsewhere: $OUT34"
+"$BD_BIN" devlog prune --no-daemon > "$W34/prune.txt" 2>&1 || fail34 "prune failed in main: $(cat "$W34/prune.txt")"
+listed34 BetaLog || fail34 "prune deleted a session that lives on an unmerged branch"
+listed34 AlphaLog || fail34 "prune deleted a live session"
+
+# 4. the real ghost is gone, for good
+grep -q "Pruned 1 ghost" "$W34/prune.txt" || fail34 "real ghost not pruned: $(cat "$W34/prune.txt")"
+grep -q PhantomLog _rules/_devlog/_index.md && fail34 "pruned ghost still in _index.md"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "ghost resurrected after prune"
+
+# 5. uncommitted devlog in another worktree is not a ghost either
+cd "$W34/wt" && log34 DraftLog
+cd "$W34/main" && "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "0" ] || fail34 "uncommitted devlog in another worktree was marked as a ghost"
+
+# 6. committed, then deleted on every branch: really gone
+log34 GammaLog
+quiet_commit "devlog Gamma"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+rm "_rules/_devlog/2026-11-25_GammaLog.md"
+quiet_commit "delete Gamma"
+"$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+[ "$(ghosts34)" = "1" ] || fail34 "a devlog deleted from all branch tips must become a ghost"
+"$BD_BIN" doctor --fix --yes < /dev/null > /dev/null 2>&1 || true
+[ "$(ghosts34)" = "0" ] || fail34 "doctor --fix must prune real ghosts in the main checkout"
+listed34 BetaLog || fail34 "doctor --fix deleted a session that lives on an unmerged branch"
+
+# 7. ghosts wrongly marked by an older bd are restored, and prune keeps them
+if command -v sqlite3 > /dev/null 2>&1; then
+    sqlite3 "$DB34" "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE filename LIKE '%BetaLog%' OR filename LIKE '%AlphaLog%'"
+    OUT34=$("$BD_BIN" devlog prune --no-daemon 2>&1)
+    echo "$OUT34" | grep -q "Kept 2 session(s)" || fail34 "prune did not restore false ghosts: $OUT34"
+    listed34 BetaLog || fail34 "false ghost was deleted by prune"
+    sqlite3 "$DB34" "UPDATE sessions SET is_ghost = 1, is_missing = 1 WHERE filename LIKE '%BetaLog%'"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    [ "$(ghosts34)" = "0" ] || fail34 "sync did not restore a false ghost"
+
+    # 8. indexed here but the file is only on another branch: text is kept,
+    #    and text destroyed by an older bd is fetched back.
+    len34() { sqlite3 "$DB34" "SELECT length(narrative) FROM sessions WHERE filename LIKE '%AlphaLog%'"; }
+    L0=$(len34)
+    git branch keep/alpha
+    git rm -q "_rules/_devlog/2026-11-25_AlphaLog.md"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    [ "$(len34)" = "$L0" ] || fail34 "sync truncated a narrative whose file is on another branch ($L0 -> $(len34))"
+    SUM=$(printf '%s' 'AlphaLog problem' | shasum -a 256 | cut -d' ' -f1)
+    sqlite3 "$DB34" "UPDATE sessions SET narrative = 'AlphaLog problem', file_hash = '$SUM', is_ghost = 1 WHERE filename LIKE '%AlphaLog%'"
+    "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1
+    OUT34=$(sqlite3 "$DB34" "SELECT narrative FROM sessions WHERE filename LIKE '%AlphaLog%'")
+    [[ "$OUT34" == *"FULLTEXT-AlphaLog"* ]] || fail34 "destroyed narrative was not restored"
+fi
+
+cd "$TEST_DIR"
+echo "✅ Test 34 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 35: redirects — one resolver, one lookup order, broken is an error (BeadsLog-svg.2)"
+# ---------------------------------------------------------
+R35="$TEST_DIR/rd35"
+mkdir -p "$R35/Repos/a" "$R35/wonder/x/y" && cd "$R35/Repos/a"
+R35=$(cd "$R35" && pwd -P)
+fail35() { echo "❌ FAIL: $1"; exit 1; }
+git init -q -b develop
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+"$BD_BIN" init --quiet --inline --prefix rd --no-daemon > /dev/null 2>&1
+git add -A && git -c core.hooksPath=/dev/null commit -q -m "bd init"
+MAIN35="$R35/Repos/a/.beads"
+where35() { "$BD_BIN" where --no-daemon 2>&1 || true; }
+uses35() { # expected .beads dir: location AND database, no warning
+    local w; w=$(where35)
+    [[ "$(echo "$w" | head -1)" == "$1" ]] || fail35 "bd where location is not $1: $w"
+    [[ "$w" == *"database: $1/beads.db"* ]] || fail35 "bd where database is not in $1: $w"
+    [[ "$w" != *"Warning"* ]] || fail35 "bd where warns: $w"
+}
+
+# 1. unrelated directories at different depths (handoff test 6)
+"$BD_BIN" worktree create "$R35/wonder/x/y/wt" --branch t35 --no-daemon > /dev/null 2>&1 || fail35 "worktree create failed"
+cd "$R35/wonder/x/y/wt"
+uses35 "$MAIN35"
+# 2. worktree info reports the redirect (handoff test 5), also behind the /tmp symlink
+OUT35=$("$BD_BIN" worktree info --no-daemon 2>&1)
+[[ "$OUT35" == *"redirects to $MAIN35"* ]] || fail35 "worktree info: $OUT35"
+TMP35=$(mktemp -d /tmp/bd-e2e35.XXXXXX)
+(cd "$R35/Repos/a" && "$BD_BIN" worktree create "$TMP35/x" --branch t35b --no-daemon > /dev/null 2>&1)
+OUT35=$(cd "$TMP35/x" && "$BD_BIN" worktree info --no-daemon 2>&1)
+(cd "$R35/Repos/a" && git worktree remove --force "$TMP35/x"); rmdir "$TMP35"
+[[ "$OUT35" == *"redirects to $MAIN35"* ]] || fail35 "worktree info under /tmp: $OUT35"
+# doctor resolves it the same way
+OUT35=$("$BD_BIN" doctor --no-daemon < /dev/null 2>&1 || true)
+[[ "$OUT35" != *"Redirect target does not exist"* ]] || fail35 "doctor rejects a valid absolute redirect"
+
+# 3. redirects already written by older versions (relative to .beads) still work
+cd "$R35/wonder/x/y/wt"
+echo "../../../../../Repos/a/.beads" > .beads/redirect
+uses35 "$MAIN35"
+echo "../../../../Repos/a/.beads" > .beads/redirect   # documented form
+uses35 "$MAIN35"
+
+# 4. worktree of clone A redirected to checkout B (handoff test 7)
+git clone -q "$R35/Repos/a" "$R35/wonder/cloneA"
+cd "$R35/wonder/cloneA"
+mkdir -p .beads && echo 'issue-prefix: "wrong"' > .beads/config.yaml
+git worktree add -q "$R35/wonder/cw" -b cw
+mkdir -p "$R35/wonder/cw/.beads" && echo "$MAIN35" > "$R35/wonder/cw/.beads/redirect"
+cd "$R35/wonder/cw"
+uses35 "$MAIN35"
+"$BD_BIN" create "from redirected worktree" -p 2 --no-daemon > /dev/null 2>&1 || fail35 "create through redirect failed"
+OUT35=$(cd "$R35/Repos/a" && "$BD_BIN" list --no-daemon 2>/dev/null)
+[[ "$OUT35" == *"from redirected worktree"* ]] || fail35 "issue did not land in the redirected database"
+
+# 5. broken redirect: loud failure, nothing written anywhere else
+cd "$R35/wonder/x/y/wt"
+echo "/nonexistent/.beads" > .beads/redirect
+if "$BD_BIN" create "lost issue" -p 2 --no-daemon > "$R35/broken.txt" 2>&1; then fail35 "create succeeded through a broken redirect"; fi
+grep -q "broken beads redirect" "$R35/broken.txt" || fail35 "no explanation: $(cat "$R35/broken.txt")"
+if "$BD_BIN" devlog sync --no-daemon > /dev/null 2>&1; then fail35 "devlog sync ran through a broken redirect"; fi
+OUT35=$(cd "$R35/Repos/a" && "$BD_BIN" list --no-daemon 2>/dev/null)
+[[ "$OUT35" != *"lost issue"* ]] || fail35 "issue was written to a fallback database"
+# diagnosis still works
+OUT35=$("$BD_BIN" worktree info --no-daemon 2>&1) || fail35 "worktree info must work with a broken redirect"
+[[ "$OUT35" == *"broken redirect"* ]] || fail35 "worktree info hides the broken redirect: $OUT35"
+"$BD_BIN" where --no-daemon > /dev/null 2>&1 || fail35 "where must work with a broken redirect"
+# an explicit database does not depend on the redirect
+"$BD_BIN" --db "$MAIN35/beads.db" list --no-daemon > /dev/null 2>&1 || fail35 "--db must bypass the redirect check"
+# and the user can still commit code
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+( export PATH="$(dirname "$BD_BIN"):$PATH"; echo x > x.txt; git add x.txt; git commit -q -m "code commit" ) > "$R35/commit.txt" 2>&1 || fail35 "broken redirect blocks commits: $(cat "$R35/commit.txt")"
+
+cd "$TEST_DIR"
+echo "✅ Test 35 Passed."
+
+# ---------------------------------------------------------
+echo -e "\n[*] Test 36: release channels — cut-release --dev and bd upgrade --channel (BeadsLog-70m)"
+# ---------------------------------------------------------
+C36="$TEST_DIR/ch36"
+mkdir -p "$C36/home" "$C36/fakebin" "$C36/plain"
+fail36() { echo "❌ FAIL: $1"; exit 1; }
+CUT36="$ROOT_DIR/scripts/cut-release.sh"
+# Throwaway remote; a synthetic stable tag keeps this independent of real tags
+git clone -q --bare "$ROOT_DIR" "$C36/origin.git"
+git -C "$C36/origin.git" tag -l | xargs git -C "$C36/origin.git" tag -d > /dev/null
+git clone -q "$C36/origin.git" "$C36/src" 2> /dev/null && cd "$C36/src"
+git config user.name "E2E Tester"; git config user.email "e2e@example.com"
+git switch -q -C main && git push -q -f origin main
+git tag v99.0.0 && git push -q origin v99.0.0
+git switch -q -c feature/x && git commit -q --allow-empty -m "feature work" && git push -q origin feature/x
+heads36() { git -C "$C36/origin.git" for-each-ref --format='%(refname) %(objectname)' refs/heads; git rev-parse HEAD; git status --porcelain; }
+tags36() { git -C "$C36/origin.git" tag -l | sort; }
+BEFORE36=$(heads36)
+
+# 1. dry run publishes nothing
+"$CUT36" --dev --dry-run > "$C36/out" 2>&1 || fail36 "dry run: $(cat "$C36/out")"
+grep -q "99.1.0-dev.1" "$C36/out" || fail36 "dry run chose the wrong version: $(cat "$C36/out")"
+[ "$(tags36)" = "v99.0.0" ] || fail36 "dry run pushed a tag"
+# 2. two cuts: versions increment, branches and checkout are untouched
+echo "dirty" >> README.md   # uncommitted work must neither block nor leak
+BEFORE36=$(heads36)
+"$CUT36" --dev --yes --no-github > "$C36/out" 2>&1 || fail36 "cut: $(cat "$C36/out")"
+"$CUT36" --dev --yes --no-github > "$C36/out" 2>&1 || fail36 "second cut: $(cat "$C36/out")"
+[ "$(tags36 | tr '\n' ' ')" = "v99.0.0 v99.1.0-dev.1 v99.1.0-dev.2 " ] || fail36 "tags: $(tags36)"
+[ "$(heads36)" = "$BEFORE36" ] || fail36 "a branch or the checkout changed"
+[ "$(git worktree list | wc -l | tr -d ' ')" = "1" ] || fail36 "temporary worktree left behind"
+[ "$(git rev-parse 'v99.1.0-dev.2^{commit}~1')" = "$(git rev-parse HEAD)" ] || fail36 "tag is not on top of HEAD"
+[ "$(git diff --name-only HEAD v99.1.0-dev.2)" = "cmd/bd/version.go" ] || fail36 "tag contains more than the version bump"
+OUT36=$(git show v99.1.0-dev.2:cmd/bd/version.go)
+[[ "$OUT36" == *'Version = "99.1.0-dev.2"'* ]] || fail36 "version not bumped in the tag"
+[ -z "$(git -C "$C36/origin.git" branch --contains v99.1.0-dev.2)" ] || fail36 "dev commit is on a branch"
+# 3. guard rails
+if "$CUT36" --dev --base 98.0.0 --yes --no-github > /dev/null 2>&1; then fail36 "accepted a base older than stable"; fi
+if "$CUT36" --dev --base 99.0.0 --yes --no-github > /dev/null 2>&1; then fail36 "accepted the stable version as base"; fi
+if "$CUT36" --bogus < /dev/null > /dev/null 2>&1; then fail36 "unknown option started a release"; fi
+printf 'n\n' | "$CUT36" --dev --no-github > /dev/null 2>&1 || fail36 "declining should exit cleanly"
+printf '#!/bin/sh\nexit 1\n' > "$C36/origin.git/hooks/pre-receive" && chmod +x "$C36/origin.git/hooks/pre-receive"
+if "$CUT36" --dev --yes --no-github > /dev/null 2>&1; then fail36 "rejected push reported success"; fi
+rm "$C36/origin.git/hooks/pre-receive"
+[ -z "$(git tag -l 'v99.1.0-dev.3')" ] || fail36 "failed push left a local tag"
+[ "$(tags36 | wc -l | tr -d ' ')" = "3" ] || fail36 "guard rails pushed something"
+
+# 4. bd upgrade, outside any repository, with a recording 'go'
+printf '#!/bin/sh\necho "$@" >> "%s/go.log"\n' "$C36" > "$C36/fakebin/go" && chmod +x "$C36/fakebin/go"
+up36() { # binary, args...
+    local bin="$1"; shift
+    (cd "$C36/plain" && HOME="$C36/home" XDG_CONFIG_HOME="$C36/home/cfg" BD_RELEASE_SOURCE="$C36/origin.git" PATH="$C36/fakebin:$PATH" "$bin" upgrade "$@" < /dev/null 2>&1)
+}
+OUT36=$(up36 "$BD_BIN" --json)
+[[ "$OUT36" == *'"channel": "stable"'* && "$OUT36" == *'"latest_version": "99.0.0"'* ]] || fail36 "default channel: $OUT36"
+OUT36=$(up36 "$BD_BIN" --channel dev --json)
+[[ "$OUT36" == *'"latest_version": "99.1.0-dev.2"'* && "$OUT36" == *'"upgrade_available": true'* ]] || fail36 "dev channel: $OUT36"
+OUT36=$(up36 "$BD_BIN" --json)
+[[ "$OUT36" == *'"channel": "dev"'* ]] || fail36 "channel not remembered: $OUT36"
+OUT36=$(up36 "$BD_BIN" --install)
+grep -qx "install github.com/untoldecay/BeadsLog/cmd/bd@v99.1.0-dev.2" "$C36/go.log" || fail36 "did not install the exact tag: $(cat "$C36/go.log" 2>/dev/null) $OUT36"
+if up36 "$BD_BIN" --channel beta > /dev/null; then fail36 "unknown channel accepted"; fi
+# going back to stable from a dev build is offered, and installs the stable tag
+(cd "$ROOT_DIR" && "$(command -v go)" build -ldflags "-X main.Version=99.1.0-dev.2" -o "$C36/bd-dev" ./cmd/bd)
+OUT36=$(up36 "$C36/bd-dev")
+[[ "$OUT36" == *"up to date"* ]] || fail36 "dev build on dev channel: $OUT36"
+OUT36=$(up36 "$C36/bd-dev" --channel stable --install)
+[[ "$OUT36" == *"Back to stable: v99.0.0"* ]] || fail36 "going back: $OUT36"
+[ "$(tail -1 "$C36/go.log")" = "install github.com/untoldecay/BeadsLog/cmd/bd@v99.0.0" ] || fail36 "going back installed: $(tail -1 "$C36/go.log")"
+# without a saved choice a dev build follows dev, and gets the release once it exists
+rm -rf "$C36/home"; mkdir "$C36/home"
+git -C "$C36/origin.git" tag v99.1.0 refs/heads/main
+OUT36=$(up36 "$C36/bd-dev" --json)
+[[ "$OUT36" == *'"channel": "dev"'* && "$OUT36" == *'"latest_version": "99.1.0"'* && "$OUT36" == *'"upgrade_available": true'* ]] || fail36 "dev to release: $OUT36"
+# the next series opens after the release
+cd "$C36/src" && "$CUT36" --dev --dry-run > "$C36/out" 2>&1 || fail36 "$(cat "$C36/out")"
+grep -q "99.2.0-dev.1" "$C36/out" || fail36 "next series: $(cat "$C36/out")"
+
+cd "$TEST_DIR"
+echo "✅ Test 36 Passed."
+
+echo -e "\n[*] Test 37: bd sync in a linked worktree never rolls back the branch's .beads (BeadsLog-7hz)"
+# ---------------------------------------------------------
+C37="$TEST_DIR/wt37"
+fail37() { echo "❌ FAIL: $1"; exit 1; }
+setup37() { # dir, with-sync-branch(yes|no)
+    local R="$1"; rm -rf "$R"; mkdir -p "$R"
+    git init -q --bare "$R/origin.git"; git init -q -b main "$R/main"; cd "$R/main"
+    git config user.name "E2E Tester"; git config user.email "e2e@example.com"; git remote add origin "$R/origin.git"
+    "$BD_BIN" init --prefix wt --quiet --no-daemon < /dev/null > /dev/null 2>&1 || fail37 "init"
+    rm -f .git/hooks/*; sed -i.bak '/^sync-branch/d' .beads/config.yaml; rm -f .beads/config.yaml.bak
+    sqlite3 .beads/beads.db "delete from config where key='sync.branch'"
+    "$BD_BIN" create --title one --type task --priority 2 --no-daemon > /dev/null 2>&1
+    "$BD_BIN" sync --flush-only --no-daemon > /dev/null 2>&1
+    git add -f .beads/issues.jsonl .beads/config.yaml .beads/.gitignore && git commit -q --no-verify -m base
+    git push -q -u origin main --no-verify
+    git worktree add -q -b feat "$R/wt"
+    "$BD_BIN" create --title two --type task --priority 2 --no-daemon > /dev/null 2>&1
+    "$BD_BIN" sync --flush-only --no-daemon > /dev/null 2>&1
+    [ "$2" = yes ] && printf '\nsync-branch: "beads-metadata"\n' >> .beads/config.yaml
+    cp .beads/issues.jsonl "$R/wt/.beads/issues.jsonl"; cd "$R/wt"
+    git add -f .beads/issues.jsonl && git commit -q --no-verify -m feat   # branch copy: 2 issues, origin/main: 1
+}
+# 1. sync-branch set in the main checkout only: the worktree follows it
+setup37 "$C37/a" yes
+OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "sync with sync-branch: $OUT37"
+[[ "$OUT37" == *"sync branch 'beads-metadata'"* ]] || fail37 "worktree ignored the main checkout's sync-branch: $OUT37"
+[[ "$OUT37" != *"exit status 128"* && "$OUT37" != *"from-main"* ]] || fail37 "git ran on the wrong checkout: $OUT37"
+[ -z "$(git status --porcelain)" ] || fail37 "worktree .beads changed: $(git status --porcelain)"
+git -C "$C37/a/origin.git" rev-parse -q --verify refs/heads/beads-metadata > /dev/null || fail37 "nothing pushed to beads-metadata"
+# a dry run writes nothing, not even the reconcile export in the main checkout
+echo '{"stale":true}' >> "$C37/a/main/.beads/issues.jsonl"; SUM37=$(shasum "$C37/a/main/.beads/issues.jsonl")
+"$BD_BIN" sync --dry-run --no-daemon < /dev/null > /dev/null 2>&1 || fail37 "dry run failed"
+[ "$(shasum "$C37/a/main/.beads/issues.jsonl")" = "$SUM37" ] || fail37 "dry run rewrote the main checkout's JSONL"
+# 2. no sync-branch anywhere: refuse instead of checking out origin/main's .beads
+setup37 "$C37/b" no
+if OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1); then fail37 "from-main ran in a shared worktree: $OUT37"; fi
+[[ "$OUT37" == *"uses the database in"* ]] || fail37 "refusal does not explain: $OUT37"
+[ -z "$(git status --porcelain)" ] || fail37 "refused sync still changed .beads: $(git status --porcelain)"
+[ "$(wc -l < .beads/issues.jsonl | tr -d ' ')" = "2" ] || fail37 "branch issues.jsonl rolled back"
+if "$BD_BIN" sync --from-main --no-daemon < /dev/null > /dev/null 2>&1; then fail37 "explicit --from-main ran in a shared worktree"; fi
+[ -z "$(git status --porcelain)" ] || fail37 "explicit --from-main changed .beads"
+# 3. the main checkout itself still syncs from main on a branch without upstream
+cd "$C37/b/main" && git switch -q -c ephemeral
+OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "from-main in the main checkout: $OUT37"
+[[ "$OUT37" == *"Sync from main complete"* ]] || fail37 "main checkout lost from-main: $OUT37"
+cd "$TEST_DIR"
+echo "✅ Test 37 Passed."
+
+echo -e "\n[*] Test 38: devlog index rows linking files outside the devlog directory (BeadsLog-7hz)"
+# ---------------------------------------------------------
+W38="$TEST_DIR/link38"
+rm -rf "$W38"; mkdir -p "$W38" && cd "$W38"
+git init -q -b develop; git config user.name "E2E Tester"; git config user.email "e2e@example.com"; git config core.hooksPath /dev/null
+"$BD_BIN" init --quiet --inline --prefix lk --no-daemon < /dev/null > /dev/null 2>&1 || { echo "❌ FAIL: init"; exit 1; }
+DB38="$W38/.beads/beads.db"
+fail38() { echo "❌ FAIL: $1"; sqlite3 "$DB38" "select id, filename, is_missing, is_ghost from sessions" 2>&1 | head; exit 1; }
+q38() { sqlite3 "$DB38" "$1"; }
+sync38() { "$BD_BIN" devlog sync --no-daemon < /dev/null 2>&1; }
+git add -A && git commit -q -m init
+git branch old/feat                                  # predates the doc
+mkdir -p _rules/_documentation
+echo "SECURITY-DOC-TEXT" > _rules/_documentation/09_Security.md
+echo "SAME-NAME-DIFFERENT-FILE" > _rules/_devlog/other.md
+echo '| [docs] Security implementation | Security notes | E2E Tester | Unknown | 2025-11-27 00:00 | N/A | [09_Security.md](../_documentation/09_Security.md) |' >> _rules/_devlog/_index.md
+git add -A && git commit -q -m docs
+# 1. the linked file is read, not looked up as _rules/_devlog/09_Security.md
+OUT38=$(sync38)
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md' and is_ghost=0 and is_missing=0")" = "1" ] || fail38 "linked doc not synced: $OUT38"
+[ "$(q38 "select count(*) from sessions where narrative like '%SECURITY-DOC-TEXT%'")" = "1" ] || fail38 "linked doc content not read"
+# 2. a false ghost left by an older bd is restored by sync, and prune keeps it
+q38 "update sessions set is_ghost=1, is_missing=1 where filename='../_documentation/09_Security.md'"
+OUT38=$(sync38)
+[ "$(q38 "select sum(is_ghost) from sessions")" = "0" ] || fail38 "false ghost not restored by sync: $OUT38"
+q38 "update sessions set is_ghost=1, is_missing=1 where filename='../_documentation/09_Security.md'"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > "$W38/prune.txt" 2>&1 || fail38 "prune failed: $(cat "$W38/prune.txt")"
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md' and is_ghost=0")" = "1" ] || fail38 "prune deleted a session whose linked file exists: $(cat "$W38/prune.txt")"
+# 3. on a branch without the doc it lives elsewhere: no ghost, no prune
+git switch -q old/feat
+[ ! -e _rules/_documentation/09_Security.md ] || fail38 "fixture: doc should not exist on old/feat"
+OUT38=$(sync38)
+[ "$(q38 "select sum(is_ghost) from sessions")" = "0" ] || fail38 "linked doc on another branch became a ghost: $OUT38"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > /dev/null 2>&1
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md'")" = "1" ] || fail38 "prune deleted a linked doc that is on develop"
+# 4. deleted on every branch: a real ghost, pruned with its index row
+git switch -q develop
+git rm -q _rules/_documentation/09_Security.md && git commit -q -m "drop doc"
+sync38 > /dev/null
+[ "$(q38 "select is_ghost from sessions where filename='../_documentation/09_Security.md'")" = "1" ] || fail38 "doc deleted everywhere is not a ghost"
+"$BD_BIN" devlog prune --no-daemon < /dev/null > "$W38/prune.txt" 2>&1 || fail38 "prune failed: $(cat "$W38/prune.txt")"
+[ "$(q38 "select count(*) from sessions where filename='../_documentation/09_Security.md'")" = "0" ] || fail38 "real ghost not pruned"
+grep -q "09_Security.md" _rules/_devlog/_index.md && fail38 "pruned ghost's index row left behind (sync would resurrect it)"
+cd "$TEST_DIR"
+echo "✅ Test 38 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

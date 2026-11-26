@@ -218,7 +218,9 @@ echo "../main-clone/.beads" > .beads/redirect
 echo "/path/to/shared/.beads" > .beads/redirect
 ```
 
-The redirect file should contain a single path (relative or absolute) to the target `.beads` directory.
+The redirect file should contain a single path to the target `.beads` directory: absolute, or relative to the project root (the directory that contains `.beads`).
+
+In a git worktree, the worktree's own redirect wins over the main repository's `.beads`.
 
 **Example setup:**
 ```
@@ -253,6 +255,8 @@ bd where --json
 
 - **Single-level redirects only**: Redirect chains are not followed (A → B → C won't work)
 - **Target must exist**: The redirect target directory must exist and contain a valid database
+- **Broken redirects are errors**: bd refuses to run rather than use another database. `bd where`, `bd worktree info` and `bd doctor` still work so you can fix it
+- **Devlog ghosts**: a linked worktree, or a checkout redirected to another repository's database, never marks or prunes ghost sessions. Run `bd devlog sync`/`prune` from the main checkout
 - **Daemon coordination**: All clones share the same daemon when using redirects
 
 ### When to Use Redirects

@@ -11,43 +11,51 @@ import (
 	"time"
 
 	"github.com/untoldecay/BeadsLog/internal/changelog"
+	"github.com/untoldecay/BeadsLog/internal/channel"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/ui"
 )
 
 const (
-	// Raw URL to the changelog file in the main repository
-	RemoteChangelogURL = "https://raw.githubusercontent.com/untoldecay/BeadsLog/main/internal/changelog/changelog.go"
-	UpdateCommand      = "go install github.com/untoldecay/BeadsLog/cmd/bd@main"
+	modulePath = "github.com/untoldecay/BeadsLog/cmd/bd"
+	releaseURL = "https://github.com/untoldecay/BeadsLog/releases/tag/v%s"
+
+	// The changelog as of a given tag
+	remoteChangelogURL = "https://raw.githubusercontent.com/untoldecay/BeadsLog/v%s/internal/changelog/changelog.go"
 )
 
-// fetchRemoteChangelog fetches the remote changelog.go once and returns the
-// latest version plus a best-effort list of that version's Features bullets,
-// so `bd upgrade` can surface what's new without the new binary installed.
-func fetchRemoteChangelog() (version string, features []string, err error) {
+// installCommand installs exactly the given published version.
+func installCommand(version string) string {
+	return fmt.Sprintf("go install %s@v%s", modulePath, version)
+}
+
+// fetchReleaseFeatures returns the Features bullets of a published version, or
+// nil. Dev builds are cut without a changelog entry of their own; the previous
+// version's bullets must not be shown as theirs.
+func fetchReleaseFeatures(version string) []string {
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(RemoteChangelogURL)
+	resp, err := client.Get(fmt.Sprintf(remoteChangelogURL, version))
 	if err != nil {
-		return "", nil, err
+		return nil
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
-		return "", nil, fmt.Errorf("failed to fetch remote changelog: %s", resp.Status)
+		return nil
 	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", nil, err
+		return nil
 	}
-	text := string(body)
+	return releaseFeatures(string(body), version)
+}
 
+func releaseFeatures(changelogSource, version string) []string {
 	re := regexp.MustCompile(`const\s+CurrentVersion\s+=\s+"([^"]+)"`)
-	matches := re.FindStringSubmatch(text)
-	if len(matches) < 2 {
-		return "", nil, fmt.Errorf("could not find version string in remote changelog")
+	m := re.FindStringSubmatch(changelogSource)
+	if len(m) < 2 || m[1] != version {
+		return nil
 	}
-	return matches[1], extractLatestFeatures(text), nil
+	return extractLatestFeatures(changelogSource)
 }
 
 // extractLatestFeatures pulls the quoted strings from the FIRST Features block
@@ -71,23 +79,24 @@ func extractLatestFeatures(text string) []string {
 	return features
 }
 
-// fetchRemoteVersion is the thin version-only wrapper used by the background
-// update check.
-func fetchRemoteVersion() (string, error) {
-	v, _, err := fetchRemoteChangelog()
-	return v, err
-}
+func runUpdate(version string) {
+	fmt.Printf("\n🚀 Running update: %s\n", installCommand(version))
 
-func runUpdate() {
-	fmt.Printf("\n🚀 Running update: %s\n", UpdateCommand)
-	
-	// Split command for exec
-	parts := strings.Fields(UpdateCommand)
-	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	if err := cmd.Run(); err != nil {
+	install := func(extraEnv ...string) error {
+		parts := strings.Fields(installCommand(version))
+		cmd := exec.Command(parts[0], parts[1:]...) // #nosec G204 - version comes from a validated tag
+		cmd.Env = append(os.Environ(), extraEnv...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	err := install()
+	if err != nil {
+		// The module proxy may not know a tag pushed minutes ago.
+		fmt.Println("Retrying without the module proxy...")
+		err = install("GOPROXY=direct")
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "\n❌ Update failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -109,7 +118,7 @@ func maybeCheckForUpdates() {
 
 	// Perform check in background-ish (fast)
 	go func() {
-		latest, err := fetchRemoteVersion()
+		latest, err := channel.FetchLatest(channel.Current(Version))
 		if err != nil {
 			return
 		}

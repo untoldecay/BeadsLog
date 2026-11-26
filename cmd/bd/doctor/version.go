@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/untoldecay/BeadsLog/internal/channel"
 )
 
 // CheckCLIVersion checks if the CLI version is up to date.
@@ -224,40 +226,10 @@ func fetchLatestGitHubRelease() (string, error) {
 	return version, nil
 }
 
-// CompareVersions compares two semantic version strings.
+// CompareVersions compares two version strings, pre-releases included.
 // Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
-// Handles versions like "0.20.1", "1.2.3", etc.
 func CompareVersions(v1, v2 string) int {
-	// Split versions into parts
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	// Compare each part
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		var p1, p2 int
-
-		// Get part value or default to 0 if part doesn't exist
-		if i < len(parts1) {
-			_, _ = fmt.Sscanf(parts1[i], "%d", &p1)
-		}
-		if i < len(parts2) {
-			_, _ = fmt.Sscanf(parts2[i], "%d", &p2)
-		}
-
-		if p1 < p2 {
-			return -1
-		}
-		if p1 > p2 {
-			return 1
-		}
-	}
-
-	return 0
+	return channel.Compare(v1, v2)
 }
 
 // IsValidSemver checks if a version string is valid semver-like format (X.Y.Z)
