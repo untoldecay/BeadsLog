@@ -166,7 +166,9 @@ func getOwner() string {
 }
 
 func init() {
-	// Initialize viper configuration
+	// Initialize viper configuration. When the database belongs to another
+	// checkout, its config.yaml is the one that describes it (BeadsLog-7hz).
+	config.UseProjectBeadsDir(beads.ForeignBeadsDir())
 	if err := config.Initialize(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to initialize config: %v\n", err)
 	}

@@ -88,6 +88,13 @@ func getRepoRootForWorktree(_ context.Context) string {
 	return repoRoot
 }
 
+// beadsDirIsElsewhere reports whether .beads/ lives in another checkout:
+// a redirect, or a linked worktree using the main checkout's database. Git
+// commands on it must then run from that checkout (bd-arjb, BeadsLog-7hz).
+func beadsDirIsElsewhere() bool {
+	return beads.GetRedirectInfo().IsRedirected || beads.ForeignBeadsDir() != ""
+}
+
 // gitHasBeadsChanges checks if any tracked files in .beads/ have uncommitted changes
 // This function is worktree-aware and handles bare repo worktree setups (GH#827).
 // It also handles redirected beads directories (bd-arjb) by running git commands
@@ -102,8 +109,7 @@ func gitHasBeadsChanges(ctx context.Context) (bool, error) {
 	// Check if beads directory is redirected (bd-arjb)
 	// When redirected, beadsDir points outside the current repo, so we need to
 	// run git commands from the directory containing the actual .beads/
-	redirectInfo := beads.GetRedirectInfo()
-	if redirectInfo.IsRedirected {
+	if beadsDirIsElsewhere() {
 		// beadsDir is the target (e.g., /path/to/mayor/rig/.beads)
 		// We need to run git from the parent of .beads (e.g., /path/to/mayor/rig)
 		targetRepoDir := filepath.Dir(beadsDir)
@@ -458,8 +464,7 @@ func restoreBeadsDirFromBranch(ctx context.Context) error {
 	// Skip restore when beads directory is redirected (bd-lmqhe)
 	// When redirected, the beads directory is in a different repo, so
 	// git checkout from the current repo won't work for paths outside it.
-	redirectInfo := beads.GetRedirectInfo()
-	if redirectInfo.IsRedirected {
+	if beadsDirIsElsewhere() {
 		return nil
 	}
 
@@ -489,8 +494,7 @@ func gitHasUncommittedBeadsChanges(ctx context.Context) (bool, error) {
 	// Check if beads directory is redirected (bd-arjb)
 	// When redirected, beadsDir points outside the current repo, so we need to
 	// run git commands from the directory containing the actual .beads/
-	redirectInfo := beads.GetRedirectInfo()
-	if redirectInfo.IsRedirected {
+	if beadsDirIsElsewhere() {
 		targetRepoDir := filepath.Dir(beadsDir)
 		cmd := exec.CommandContext(ctx, "git", "-C", targetRepoDir, "status", "--porcelain", jsonlPath) //nolint:gosec // G204: jsonlPath from internal beads.FindBeadsDir()
 		output, err := cmd.Output()

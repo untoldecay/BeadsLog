@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/untoldecay/BeadsLog/internal/beads"
 	"github.com/untoldecay/BeadsLog/internal/config"
 	"github.com/untoldecay/BeadsLog/internal/debug"
 	"github.com/untoldecay/BeadsLog/internal/queries"
@@ -258,6 +259,16 @@ func doSyncFromMain(ctx context.Context, jsonlPath string, renameOnImport bool, 
 		if configuredRemote, err := store.GetConfig(ctx, "sync.remote"); err == nil && configuredRemote != "" {
 			remote = configuredRemote
 		}
+	}
+
+	// From-main checks .beads/ out into this checkout, then imports the JSONL
+	// next to the database. When the database belongs to another checkout,
+	// those are two different files: the checkout rolls back this branch's
+	// copy and the import never sees it (BeadsLog-7hz). Refuse.
+	if owner := beads.ForeignBeadsDir(); owner != "" {
+		return fmt.Errorf("this checkout uses the database in %s; sync from main there instead.\n"+
+			"  Run 'bd sync' in %s, or set sync-branch in %s",
+			owner, filepath.Dir(owner), filepath.Join(owner, "config.yaml"))
 	}
 
 	if dryRun {

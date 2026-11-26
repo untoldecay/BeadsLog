@@ -1404,4 +1404,48 @@ grep -q "99.2.0-dev.1" "$C36/out" || fail36 "next series: $(cat "$C36/out")"
 cd "$TEST_DIR"
 echo "✅ Test 36 Passed."
 
+echo -e "\n[*] Test 37: bd sync in a linked worktree never rolls back the branch's .beads (BeadsLog-7hz)"
+# ---------------------------------------------------------
+C37="$TEST_DIR/wt37"
+fail37() { echo "❌ FAIL: $1"; exit 1; }
+setup37() { # dir, with-sync-branch(yes|no)
+    local R="$1"; rm -rf "$R"; mkdir -p "$R"
+    git init -q --bare "$R/origin.git"; git init -q -b main "$R/main"; cd "$R/main"
+    git config user.name "E2E Tester"; git config user.email "e2e@example.com"; git remote add origin "$R/origin.git"
+    "$BD_BIN" init --prefix wt --quiet --no-daemon < /dev/null > /dev/null 2>&1 || fail37 "init"
+    rm -f .git/hooks/*; sed -i.bak '/^sync-branch/d' .beads/config.yaml; rm -f .beads/config.yaml.bak
+    sqlite3 .beads/beads.db "delete from config where key='sync.branch'"
+    "$BD_BIN" create --title one --type task --priority 2 --no-daemon > /dev/null 2>&1
+    "$BD_BIN" sync --flush-only --no-daemon > /dev/null 2>&1
+    git add -f .beads/issues.jsonl .beads/config.yaml .beads/.gitignore && git commit -q --no-verify -m base
+    git push -q -u origin main --no-verify
+    git worktree add -q -b feat "$R/wt"
+    "$BD_BIN" create --title two --type task --priority 2 --no-daemon > /dev/null 2>&1
+    "$BD_BIN" sync --flush-only --no-daemon > /dev/null 2>&1
+    [ "$2" = yes ] && printf '\nsync-branch: "beads-metadata"\n' >> .beads/config.yaml
+    cp .beads/issues.jsonl "$R/wt/.beads/issues.jsonl"; cd "$R/wt"
+    git add -f .beads/issues.jsonl && git commit -q --no-verify -m feat   # branch copy: 2 issues, origin/main: 1
+}
+# 1. sync-branch set in the main checkout only: the worktree follows it
+setup37 "$C37/a" yes
+OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "sync with sync-branch: $OUT37"
+[[ "$OUT37" == *"sync branch 'beads-metadata'"* ]] || fail37 "worktree ignored the main checkout's sync-branch: $OUT37"
+[[ "$OUT37" != *"exit status 128"* && "$OUT37" != *"from-main"* ]] || fail37 "git ran on the wrong checkout: $OUT37"
+[ -z "$(git status --porcelain)" ] || fail37 "worktree .beads changed: $(git status --porcelain)"
+git -C "$C37/a/origin.git" rev-parse -q --verify refs/heads/beads-metadata > /dev/null || fail37 "nothing pushed to beads-metadata"
+# 2. no sync-branch anywhere: refuse instead of checking out origin/main's .beads
+setup37 "$C37/b" no
+if OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1); then fail37 "from-main ran in a shared worktree: $OUT37"; fi
+[[ "$OUT37" == *"uses the database in"* ]] || fail37 "refusal does not explain: $OUT37"
+[ -z "$(git status --porcelain)" ] || fail37 "refused sync still changed .beads: $(git status --porcelain)"
+[ "$(wc -l < .beads/issues.jsonl | tr -d ' ')" = "2" ] || fail37 "branch issues.jsonl rolled back"
+if "$BD_BIN" sync --from-main --no-daemon < /dev/null > /dev/null 2>&1; then fail37 "explicit --from-main ran in a shared worktree"; fi
+[ -z "$(git status --porcelain)" ] || fail37 "explicit --from-main changed .beads"
+# 3. the main checkout itself still syncs from main on a branch without upstream
+cd "$C37/b/main" && git switch -q -c ephemeral
+OUT37=$("$BD_BIN" sync --no-daemon < /dev/null 2>&1) || fail37 "from-main in the main checkout: $OUT37"
+[[ "$OUT37" == *"Sync from main complete"* ]] || fail37 "main checkout lost from-main: $OUT37"
+cd "$TEST_DIR"
+echo "✅ Test 37 Passed."
+
 echo -e "\n🎉 ALL EXTENSIVE TESTS PASSED SUCCESSFULLY!"

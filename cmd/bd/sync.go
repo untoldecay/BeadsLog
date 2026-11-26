@@ -214,7 +214,9 @@ Use --merge to merge the sync branch back to main branch.`,
 		if !noPull && !gitHasUpstream() && !hasSyncBranchConfig {
 			if hasGitRemote(ctx) {
 				// Remote exists but no upstream - use from-main mode
-				fmt.Println("→ No upstream configured, using --from-main mode")
+				if beads.ForeignBeadsDir() == "" {
+					fmt.Println("→ No upstream configured, using --from-main mode")
+				}
 				// Force noGitHistory=true for auto-detected from-main mode (fixes #417)
 				if err := doSyncFromMain(ctx, jsonlPath, renameOnImport, dryRun, true); err != nil {
 					FatalError("%v", err)
