@@ -734,6 +734,7 @@ main() {
         echo "Creating git commit..."
 
         git add cmd/bd/version.go \
+                internal/changelog/changelog.go \
                 claude-plugin/.claude-plugin/plugin.json \
                 .claude-plugin/marketplace.json \
                 integrations/beads-mcp/pyproject.toml \
