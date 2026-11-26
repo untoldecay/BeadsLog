@@ -168,6 +168,11 @@ update_changelog() {
         return
     fi
 
+    # The release notes may already carry the heading (written by hand or by an agent).
+    if grep -q "^## \[$version\]" CHANGELOG.md; then
+        return
+    fi
+
     # Create a temporary file with the updated changelog
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS

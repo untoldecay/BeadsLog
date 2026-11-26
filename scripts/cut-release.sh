@@ -25,6 +25,20 @@ fi
 echo -e "${BLUE}🚀 BeadsLog Release Orchestrator${NC}"
 echo -e "${BLUE}=================================${NC}"
 
+# A stable release is cut on main: the bump commit and the tag must both be on
+# main, or `bd upgrade` installs a tag main does not contain.
+cd "$ROOT_DIR"
+if [[ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]]; then
+    echo -e "${RED}Stable releases are cut from main. Merge your branch, then: git switch main${NC}"
+    echo "For a pre-release of this branch: $0 --dev"
+    exit 1
+fi
+git fetch -q origin main
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+    echo -e "${RED}Local main differs from origin/main. Run: git pull --ff-only${NC}"
+    exit 1
+fi
+
 # 1. Get current version
 CURRENT_VERSION=$(grep "Version = " "$ROOT_DIR/cmd/bd/version.go" | sed 's/.*"\(.*\)".*/\1/')
 echo -e "Current Version: ${YELLOW}$CURRENT_VERSION${NC}"
@@ -103,27 +117,12 @@ echo -e "${YELLOW}Building tool...${NC}"
 go build -o bd ./cmd/bd/
 
 # 5. Publish
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo -e "\n${YELLOW}Publishing...${NC}"
-read -p "Do you want to publish (push to remote)? [y/N] " DO_PUBLISH
+read -p "Push main and tag v$NEW_VERSION (starts the release build)? [y/N] " DO_PUBLISH
 if [[ $DO_PUBLISH =~ ^[Yy]$ ]]; then
-    echo "1) Push to current branch ($CURRENT_BRANCH)"
-    echo "2) Push to main"
-    read -p "Select [1-2]: " PUSH_CHOICE
-    
-    TARGET_BRANCH=$CURRENT_BRANCH
-    if [ "$PUSH_CHOICE" == "2" ]; then
-        TARGET_BRANCH="main"
-    fi
-    
-    echo "Pushing to $TARGET_BRANCH..."
-    git push origin "$TARGET_BRANCH"
-    
-    read -p "Create and push tag v$NEW_VERSION? [y/N] " DO_TAG
-    if [[ $DO_TAG =~ ^[Yy]$ ]]; then
-        git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-        git push origin "v$NEW_VERSION"
-    fi
+    git push origin main
+    git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+    git push origin "v$NEW_VERSION"
 fi
 
 # 6. Display install commands

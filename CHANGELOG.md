@@ -26,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.65.0] - 2026-08-24
 
-## [0.65.0] - 2026-08-24
-
 ### Added
 - `bd bench [question]` — a harness-agnostic A/B benchmark protocol. The current agent runs BeadsLog retrieval vs brute-force `grep` on this repo's own devlog history, scored by a blind judge, and reports tokens and tool-calls. Works in any repo with `bd` + an agent. Includes a daemon-hygiene section to prevent daemon swarms during multi-subagent runs.
 
