@@ -487,7 +487,7 @@ var versionChanges = []VersionChange{
 	{
 		Version: "0.52.0",
 
-		Date:    "2026-05-30",
+		Date: "2026-05-30",
 		Changes: []string{
 			"NEW: Write-First Workflow - bd devlog record now requires the file to exist",
 			"NEW: Auto-Metadata - Tool automatically parses Subject/Problem from Markdown",
